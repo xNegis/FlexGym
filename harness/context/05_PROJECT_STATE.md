@@ -1,5 +1,3 @@
-
-
 # `05_PROJECT_STATE.md`
 
 # Project State
@@ -10,35 +8,37 @@ Phase 0 — Foundation
 
 ## Current Status
 
-Project planning initialized.
-
-No implementation features have been completed yet.
+F01 — Project Infrastructure implemented and validated.
 
 ## Completed Features
 
-None.
+* F01 — Project Infrastructure
 
 ## Next Feature
 
-F01 — Project Infrastructure
+F02 — User Authentication
 
 ## Existing Feature Specifications
 
-None.
+* `harness/features/01_project_infrastructure.md`
 
 ## Current Technology
 
 Backend:
-Python / FastAPI
+Python 3.11+ / FastAPI / uv
 
 Frontend:
-React / TypeScript
+React 19 / TypeScript 6 / Vite / npm
 
 Persistence:
-SQLite / SQLAlchemy
+SQLite / SQLAlchemy 2 / Alembic
 
 Testing:
 pytest / Playwright
+
+Code Quality:
+Backend: Ruff (lint + format), mypy (type checking)
+Frontend: Prettier (format), ESLint (lint), tsc (type checking)
 
 ## Important Current Constraints
 
