@@ -42,7 +42,7 @@ const req = {
 export async function fetchRegistrationStatus(): Promise<RegistrationStatusResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/registration-status`);
   if (!response.ok) {
-    return { registration_available: false };
+    throw new Error("Unable to determine registration status");
   }
   return (await response.json()) as RegistrationStatusResponse;
 }
@@ -83,15 +83,21 @@ export async function fetchMe(): Promise<UserResponse | null> {
   const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
     credentials: "include",
   });
-  if (!response.ok) {
+  if (response.status === 401) {
     return null;
+  }
+  if (!response.ok) {
+    throw new Error("Unable to determine authenticated user");
   }
   return (await response.json()) as UserResponse;
 }
 
 export async function logout(): Promise<void> {
-  await fetch(`${API_BASE_URL}/api/auth/logout`, {
+  const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
     method: "POST",
     credentials: "include",
   });
+  if (!response.ok) {
+    throw new Error("Unable to log out");
+  }
 }

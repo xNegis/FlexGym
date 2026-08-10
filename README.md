@@ -18,7 +18,7 @@ cd backend
 # Install dependencies
 uv sync --extra dev
 
-# Optional: configure DATABASE_URL, ALLOWED_ORIGINS, and APP_ENV as
+# Optional: configure DATABASE_URL, ALLOWED_ORIGINS, APP_ENV, and JWT_SECRET as
 # environment variables. The defaults work for local development;
 # .env.example documents the supported values.
 
@@ -47,7 +47,8 @@ npm run dev
 
 ### Verification
 
-Open http://localhost:5173 in a browser. The shell should display a ready state after successfully connecting to the backend.
+Open http://localhost:5173 in a browser. A new installation should display registration after
+successfully connecting to the backend.
 
 ## Running Tests
 
@@ -56,13 +57,6 @@ Open http://localhost:5173 in a browser. The shell should display a ready state 
 ```bash
 cd backend
 .venv\Scripts\python -m pytest
-```
-
-### End-to-end tests
-
-```bash
-cd frontend
-npx playwright test
 ```
 
 ## Code Quality
@@ -84,7 +78,3 @@ npx prettier --check "src/**/*.{ts,tsx,css}"  # formatting
 npx eslint src/                                 # linting
 npx tsc -b                                      # type checking
 ```
-
-
-xnegis@gmail.com
-123456789101112131415!

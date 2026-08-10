@@ -4,6 +4,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from app.models import Base
 
 config = context.config
 
@@ -14,8 +15,6 @@ database_url = os.getenv("DATABASE_URL")
 if not database_url:
     database_url = "sqlite:///flexgym.db"
 config.set_main_option("sqlalchemy.url", database_url)
-
-from app.models import Base
 
 target_metadata = Base.metadata
 

@@ -88,9 +88,7 @@ export default function RegistrationForm({ onRegistered }: Props) {
           maxLength={128}
           disabled={pending}
         />
-        {passwordMatchError && (
-          <span className="auth-field-error">{passwordMatchError}</span>
-        )}
+        {passwordMatchError && <span className="auth-field-error">{passwordMatchError}</span>}
       </label>
       <button type="submit" className="auth-button" disabled={!canSubmit}>
         {pending ? "Creating account..." : "Register"}

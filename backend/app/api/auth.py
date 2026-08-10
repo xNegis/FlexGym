@@ -59,6 +59,17 @@ class AuthRequest(BaseModel):
         return v
 
 
+class RegistrationRequest(AuthRequest):
+    @field_validator("password")
+    @classmethod
+    def validate_password_length(cls, v: str) -> str:
+        if len(v) < 15:
+            raise ValueError("password must contain at least 15 characters")
+        if len(v) > 128:
+            raise ValueError("password must not exceed 128 characters")
+        return v
+
+
 def _make_auth_response(status_code: int, content: dict[str, object], token: str) -> JSONResponse:
     config = get_config()
     secure = config.app_env != "development"
@@ -97,7 +108,7 @@ def registration_status(session: Session = Depends(get_session)) -> JSONResponse
 
 @router.post("/auth/register")
 def register(
-    body: AuthRequest,
+    body: RegistrationRequest,
     session: Session = Depends(get_session),
 ) -> JSONResponse:
     try:

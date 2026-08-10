@@ -12,8 +12,7 @@ export default function LoginForm({ onLoggedIn }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const canSubmit =
-    email.trim().length > 0 && password.length > 0 && !pending;
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !pending;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

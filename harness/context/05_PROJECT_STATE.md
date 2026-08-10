@@ -8,15 +8,16 @@ Phase 0 — Foundation
 
 ## Current Status
 
-F01 — Project Infrastructure implemented and validated.
+F02 — User Authentication implemented and validated.
 
 ## Completed Features
 
 * F01 — Project Infrastructure
+* F02 — User Authentication
 
 ## Next Feature
 
-F02 — User Authentication
+F03 — User Fitness Profile
 
 ## Existing Feature Specifications
 
@@ -34,8 +35,11 @@ React 19 / TypeScript 6 / Vite / npm
 Persistence:
 SQLite / SQLAlchemy 2 / Alembic
 
+Authentication:
+Email and password / Argon2id / JWT cookie
+
 Testing:
-pytest / Playwright
+pytest (basic backend tests) / Playwright deferred
 
 Code Quality:
 Backend: Ruff (lint + format), mypy (type checking)

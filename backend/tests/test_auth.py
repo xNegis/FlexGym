@@ -28,6 +28,12 @@ def test_first_account_registration_flow(client: TestClient) -> None:
     assert available.status_code == 200
     assert available.json() == {"registration_available": True}
 
+    invalid = client.post(
+        "/api/auth/register",
+        json={"email": "user@example.com", "password": "too-short"},
+    )
+    assert invalid.status_code == 422
+
     registered = client.post(
         "/api/auth/register",
         json={"email": "  User@Example.COM  ", "password": "a-secure-password-15"},

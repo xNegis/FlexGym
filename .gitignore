@@ -9,6 +9,7 @@ dist/
 
 # Backend
 backend/flexgym*.db
+backend/test*.db
 backend/.env
 backend/local.settings.json
 

@@ -73,9 +73,7 @@ function App() {
         <h1 className="title">FlexGym</h1>
         <div className="status unavailable" role="alert">
           <p>Unable to reach the server</p>
-          <p className="hint">
-            Please ensure the backend is running and try again.
-          </p>
+          <p className="hint">Please ensure the backend is running and try again.</p>
           <button type="button" className="retry" onClick={bootstrap}>
             Retry
           </button>

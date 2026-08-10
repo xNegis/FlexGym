@@ -138,20 +138,20 @@ Password hashes never appear in API responses.
 
 ## Acceptance Criteria
 
-* [ ] A new installation reports registration as available and can create its first account.
-* [ ] Further registration is unavailable after that account exists.
-* [ ] Registration persists normalized email and an Argon2id hash, never the plaintext password.
-* [ ] Registration authenticates immediately and displays the authenticated shell.
-* [ ] The user can log in irrespective of email casing.
-* [ ] Unknown-email and incorrect-password attempts return the same public error.
-* [ ] Email and password validation follows the documented rules.
-* [ ] A valid cookie lets `/api/auth/me` return the public user.
-* [ ] Missing, invalid, expired, and unknown-user JWTs receive `401` without internal details.
-* [ ] Reloading while authenticated restores authenticated state.
-* [ ] Logout removes the cookie, returns to login, and also succeeds without a valid cookie.
-* [ ] The backend-unavailable and retry experience from F01 still works.
-* [ ] All UI states work at a mobile viewport without horizontal overflow.
-* [ ] Existing health, CORS, quality, and automated validations continue to pass.
+* [x] A new installation reports registration as available and can create its first account.
+* [x] Further registration is unavailable after that account exists.
+* [x] Registration persists normalized email and an Argon2id hash, never the plaintext password.
+* [x] Registration authenticates immediately and displays the authenticated shell.
+* [x] The user can log in irrespective of email casing.
+* [x] Unknown-email and incorrect-password attempts return the same public error.
+* [x] Email and password validation follows the documented rules.
+* [x] A valid cookie lets `/api/auth/me` return the public user.
+* [x] Missing, invalid, expired, and unknown-user JWTs receive `401` without internal details.
+* [x] Reloading while authenticated restores authenticated state.
+* [x] Logout removes the cookie, returns to login, and also succeeds without a valid cookie.
+* [x] The backend-unavailable and retry experience from F01 still works.
+* [x] All UI states work at a mobile viewport without horizontal overflow.
+* [x] Existing health, CORS, quality, and automated validations continue to pass.
 
 ## Tests
 
