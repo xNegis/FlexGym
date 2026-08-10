@@ -71,3 +71,31 @@ The user should explicitly accept consequential changes before they modify the a
 Raw user behaviour must remain distinguishable from deterministic derived signals and LLM interpretations.
 
 This improves auditability, testability and future algorithm development.
+
+---
+
+## DEC-007 — Basic JWT authentication for the proof of concept
+
+**Status:** Accepted
+
+Authentication will initially use a single seven-day JWT signed by the backend and transported
+in an HTTP-only cookie.
+
+The proof of concept will not persist sessions or introduce refresh tokens, token rotation, or a
+revocation list. Logout removes the browser cookie; a copied JWT remains valid until its expiry.
+
+This tradeoff keeps F02 small while retaining a replaceable authentication boundary for future
+hardening.
+
+---
+
+## DEC-008 — Defer end-to-end testing during the early proof of concept
+
+**Status:** Accepted
+
+New features will initially require only a small set of basic backend tests for their essential
+behaviour. Exhaustive variant testing and Playwright end-to-end coverage are deferred until the
+main product flows are more stable.
+
+Existing testing infrastructure may remain available, but end-to-end execution is not part of
+the current feature validation contract.

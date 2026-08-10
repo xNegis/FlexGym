@@ -20,3 +20,78 @@ export async function fetchHealth(): Promise<HealthResponse> {
   }
   return { status: "unavailable" };
 }
+
+export interface RegistrationStatusResponse {
+  registration_available: boolean;
+}
+
+export interface UserResponse {
+  id: number;
+  email: string;
+}
+
+export interface AuthErrorResponse {
+  detail: string;
+}
+
+const req = {
+  credentials: "include" as RequestCredentials,
+  headers: { "Content-Type": "application/json" },
+};
+
+export async function fetchRegistrationStatus(): Promise<RegistrationStatusResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/registration-status`);
+  if (!response.ok) {
+    return { registration_available: false };
+  }
+  return (await response.json()) as RegistrationStatusResponse;
+}
+
+export async function registerUser(
+  email: string,
+  password: string,
+): Promise<UserResponse | AuthErrorResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    method: "POST",
+    ...req,
+    body: JSON.stringify({ email, password }),
+  });
+  const data = (await response.json()) as UserResponse | AuthErrorResponse;
+  if (!response.ok) {
+    return data as AuthErrorResponse;
+  }
+  return data as UserResponse;
+}
+
+export async function loginUser(
+  email: string,
+  password: string,
+): Promise<UserResponse | AuthErrorResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: "POST",
+    ...req,
+    body: JSON.stringify({ email, password }),
+  });
+  const data = (await response.json()) as UserResponse | AuthErrorResponse;
+  if (!response.ok) {
+    return data as AuthErrorResponse;
+  }
+  return data as UserResponse;
+}
+
+export async function fetchMe(): Promise<UserResponse | null> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    credentials: "include",
+  });
+  if (!response.ok) {
+    return null;
+  }
+  return (await response.json()) as UserResponse;
+}
+
+export async function logout(): Promise<void> {
+  await fetch(`${API_BASE_URL}/api/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+}

@@ -15,7 +15,9 @@ if not database_url:
     database_url = "sqlite:///flexgym.db"
 config.set_main_option("sqlalchemy.url", database_url)
 
-target_metadata = None
+from app.models import Base
+
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:

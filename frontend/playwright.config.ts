@@ -3,17 +3,20 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
   timeout: 30000,
+  workers: 1,
   use: {
     baseURL: "http://localhost:5173",
   },
   webServer: [
     {
-      command: "cd ../backend && .venv\\Scripts\\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
+      command:
+        "cd ../backend && .venv\\Scripts\\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
       port: 8000,
       reuseExistingServer: true,
       env: {
         DATABASE_URL: "sqlite:///./test_e2e.db",
         ALLOWED_ORIGINS: "http://localhost:5173",
+        JWT_SECRET: "playwright-test-jwt-secret",
       },
     },
     {

@@ -3,12 +3,14 @@ import { expect, test } from "@playwright/test";
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
 
 test.describe("FlexGym smoke", () => {
-  test("displays ready state through real API and database", async ({ page }) => {
+  test("displays auth screen after health check", async ({ page }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await page.goto("/");
 
     await expect(page.locator("text=FlexGym")).toBeVisible();
-    await expect(page.locator("text=System ready")).toBeVisible();
+    // Either registration or login should be visible (not loading/unavailable)
+    const form = page.locator(".auth-form");
+    await expect(form).toBeVisible();
   });
 
   test("shows unavailable state and retries successfully", async ({ page }) => {
@@ -24,7 +26,8 @@ test.describe("FlexGym smoke", () => {
     await page.unroute("**/api/health");
     await page.click("text=Retry");
 
-    await expect(page.locator("text=System ready")).toBeVisible();
+    const form = page.locator(".auth-form");
+    await expect(form).toBeVisible();
   });
 
   test("shows loading state before health response", async ({ page }) => {
@@ -41,20 +44,27 @@ test.describe("FlexGym smoke", () => {
 
     await page.goto("/");
 
-    await expect(page.locator("text=Checking system status...")).toBeVisible();
+    await expect(
+      page.locator("text=Checking system status..."),
+    ).toBeVisible();
 
     resolveHealth!();
-    await expect(page.locator("text=System ready")).toBeVisible();
+    const form = page.locator(".auth-form");
+    await expect(form).toBeVisible();
   });
 
   test("has no horizontal overflow at mobile viewport", async ({ page }) => {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await page.goto("/");
 
-    await expect(page.locator("text=System ready")).toBeVisible();
+    await expect(page.locator("text=FlexGym")).toBeVisible();
 
-    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    const scrollWidth = await page.evaluate(
+      () => document.documentElement.scrollWidth,
+    );
+    const clientWidth = await page.evaluate(
+      () => document.documentElement.clientWidth,
+    );
 
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
   });

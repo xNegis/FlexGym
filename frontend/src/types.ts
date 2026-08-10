@@ -1,3 +1,8 @@
-type AppState = "loading" | "ready" | "unavailable";
+type AuthScreen = "loading" | "unavailable" | "registration" | "login" | "authenticated";
 
-export { type AppState };
+interface User {
+  id: number;
+  email: string;
+}
+
+export { type AuthScreen, type User };

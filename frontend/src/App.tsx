@@ -1,46 +1,96 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchHealth } from "./api";
-import type { AppState } from "./types";
+import { fetchHealth, fetchMe, fetchRegistrationStatus } from "./api";
+import AuthShell from "./components/AuthShell";
+import LoginForm from "./components/LoginForm";
+import RegistrationForm from "./components/RegistrationForm";
+import type { AuthScreen, User } from "./types";
 import "./App.css";
 
 function App() {
-  const [state, setState] = useState<AppState>("loading");
+  const [screen, setScreen] = useState<AuthScreen>("loading");
+  const [user, setUser] = useState<User | null>(null);
 
-  const checkHealth = useCallback(async () => {
-    setState("loading");
+  const bootstrap = useCallback(async () => {
+    setScreen("loading");
     try {
       const result = await fetchHealth();
-      setState(result.status === "ok" ? "ready" : "unavailable");
+      if (result.status !== "ok") {
+        setScreen("unavailable");
+        return;
+      }
     } catch {
-      setState("unavailable");
+      setScreen("unavailable");
+      return;
+    }
+
+    try {
+      const currentUser = await fetchMe();
+      if (currentUser) {
+        setUser(currentUser);
+        setScreen("authenticated");
+        return;
+      }
+
+      const regStatus = await fetchRegistrationStatus();
+      if (regStatus.registration_available) {
+        setScreen("registration");
+      } else {
+        setScreen("login");
+      }
+    } catch {
+      setScreen("unavailable");
     }
   }, []);
 
   useEffect(() => {
-    checkHealth();
-  }, [checkHealth]);
+    bootstrap();
+  }, [bootstrap]);
+
+  const handleUser = (u: User) => {
+    setUser(u);
+    setScreen("authenticated");
+  };
+
+  const handleLoggedOut = () => {
+    setUser(null);
+    setScreen("login");
+  };
+
+  if (screen === "loading") {
+    return (
+      <div className="shell">
+        <h1 className="title">FlexGym</h1>
+        <div className="status loading" role="status">
+          <p>Checking system status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "unavailable") {
+    return (
+      <div className="shell">
+        <h1 className="title">FlexGym</h1>
+        <div className="status unavailable" role="alert">
+          <p>Unable to reach the server</p>
+          <p className="hint">
+            Please ensure the backend is running and try again.
+          </p>
+          <button type="button" className="retry" onClick={bootstrap}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="shell">
       <h1 className="title">FlexGym</h1>
-      {state === "loading" && (
-        <div className="status loading" role="status">
-          <p>Checking system status...</p>
-        </div>
-      )}
-      {state === "ready" && (
-        <div className="status ready" role="status">
-          <p>System ready</p>
-        </div>
-      )}
-      {state === "unavailable" && (
-        <div className="status unavailable" role="alert">
-          <p>Unable to reach the server</p>
-          <p className="hint">Please ensure the backend is running and try again.</p>
-          <button type="button" className="retry" onClick={checkHealth}>
-            Retry
-          </button>
-        </div>
+      {screen === "registration" && <RegistrationForm onRegistered={handleUser} />}
+      {screen === "login" && <LoginForm onLoggedIn={handleUser} />}
+      {screen === "authenticated" && user && (
+        <AuthShell email={user.email} onLoggedOut={handleLoggedOut} />
       )}
     </div>
   );

@@ -2,6 +2,8 @@ import json
 import os
 from pathlib import Path
 
+_DEV_JWT_SECRET = "flexgym-development-secret-do-not-use-in-production"
+
 
 class ConfigurationError(Exception):
     pass
@@ -37,8 +39,14 @@ class Config:
         if self.app_env == "development":
             defaults.setdefault("DATABASE_URL", "sqlite:///flexgym.db")
             defaults.setdefault("ALLOWED_ORIGINS", "http://localhost:5173")
+            defaults.setdefault("JWT_SECRET", _DEV_JWT_SECRET)
         self.database_url = _get_value("DATABASE_URL", defaults)
         self.allowed_origins = _parse_allowed_origins(_get_value("ALLOWED_ORIGINS", defaults))
+        self.jwt_secret = _get_value("JWT_SECRET", defaults)
+        if self.app_env != "development" and self.jwt_secret == _DEV_JWT_SECRET:
+            raise ConfigurationError(
+                "JWT_SECRET must not use the development default in non-development environments"
+            )
 
 
 _config: Config | None = None

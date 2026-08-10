@@ -21,6 +21,7 @@ F02 — User Authentication
 ## Existing Feature Specifications
 
 * `harness/features/01_project_infrastructure.md`
+* `harness/features/02_user_authentication.md`
 
 ## Current Technology
 
