@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchHealth, fetchMe, fetchRegistrationStatus } from "./api";
+import { fetchFitnessProfile, fetchHealth, fetchMe, fetchRegistrationStatus } from "./api";
 import AuthShell from "./components/AuthShell";
+import FitnessProfileForm from "./components/FitnessProfileForm";
 import LoginForm from "./components/LoginForm";
 import RegistrationForm from "./components/RegistrationForm";
 import type { AuthScreen, User } from "./types";
@@ -27,7 +28,13 @@ function App() {
       const currentUser = await fetchMe();
       if (currentUser) {
         setUser(currentUser);
-        setScreen("authenticated");
+
+        const profile = await fetchFitnessProfile();
+        if (profile) {
+          setScreen("authenticated");
+        } else {
+          setScreen("onboarding");
+        }
         return;
       }
 
@@ -46,8 +53,18 @@ function App() {
     bootstrap();
   }, [bootstrap]);
 
-  const handleUser = (u: User) => {
+  const handleUser = async (u: User) => {
     setUser(u);
+    setScreen("loading");
+    try {
+      const profile = await fetchFitnessProfile();
+      setScreen(profile ? "authenticated" : "onboarding");
+    } catch {
+      setScreen("unavailable");
+    }
+  };
+
+  const handleProfileCreated = () => {
     setScreen("authenticated");
   };
 
@@ -87,6 +104,9 @@ function App() {
       <h1 className="title">FlexGym</h1>
       {screen === "registration" && <RegistrationForm onRegistered={handleUser} />}
       {screen === "login" && <LoginForm onLoggedIn={handleUser} />}
+      {screen === "onboarding" && (
+        <FitnessProfileForm onProfileCreated={handleProfileCreated} onLoggedOut={handleLoggedOut} />
+      )}
       {screen === "authenticated" && user && (
         <AuthShell email={user.email} onLoggedOut={handleLoggedOut} />
       )}

@@ -8,21 +8,23 @@ Phase 0 — Foundation
 
 ## Current Status
 
-F02 — User Authentication implemented and validated.
+F03 — User Fitness Profile implemented and validated.
 
 ## Completed Features
 
 * F01 — Project Infrastructure
 * F02 — User Authentication
+* F03 — User Fitness Profile
 
 ## Next Feature
 
-F03 — User Fitness Profile
+F04 — Profile Management
 
 ## Existing Feature Specifications
 
 * `harness/features/01_project_infrastructure.md`
 * `harness/features/02_user_authentication.md`
+* `harness/features/03_user_fitness_profile.md`
 
 ## Current Technology
 

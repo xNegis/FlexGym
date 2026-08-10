@@ -25,6 +25,7 @@ export default function AuthShell({ email, onLoggedOut }: Props) {
 
   return (
     <div className="auth-shell">
+      <p className="profile-ready">Your profile is ready.</p>
       <p className="auth-shell-email">{email}</p>
       {error && (
         <div className="auth-error" role="alert">

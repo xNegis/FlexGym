@@ -99,3 +99,27 @@ main product flows are more stable.
 
 Existing testing infrastructure may remain available, but end-to-end execution is not part of
 the current feature validation contract.
+
+---
+
+## DEC-009 — Frontend API boundaries must normalize untrusted responses
+
+**Status:** Accepted
+
+HTTP response bodies are runtime input and must not be trusted merely because frontend TypeScript
+types describe an expected shape.
+
+Frontend API functions must parse response bodies as `unknown` and validate or normalize them
+before returning values to UI components. In particular, error payloads must become a stable,
+UI-safe representation such as a string message or a deliberately typed application error. React
+components must never render raw values taken directly from a server response.
+
+Feature specifications must define the important non-success statuses and their public response
+shapes. This includes framework-generated validation responses such as FastAPI's `422` payload. If
+an endpoint retains a framework-native error shape, the frontend API boundary must handle it
+explicitly. Unexpected or malformed error bodies must fall back to a safe generic message without
+breaking the current screen.
+
+This decision does not require a global custom error framework or exhaustive error-path testing.
+Each feature should verify one representative normal failure for every user flow it introduces or
+materially changes, while keeping automated coverage proportional to the feature.

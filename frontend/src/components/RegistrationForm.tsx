@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { registerUser } from "../api";
-import type { AuthErrorResponse, UserResponse } from "../api";
+import type { UserResponse } from "../api";
 
 interface Props {
   onRegistered: (user: UserResponse) => void;
@@ -33,9 +33,9 @@ export default function RegistrationForm({ onRegistered }: Props) {
     try {
       const result = await registerUser(email, password);
       if ("detail" in result) {
-        setError((result as AuthErrorResponse).detail);
+        setError(result.detail);
       } else {
-        onRegistered(result as UserResponse);
+        onRegistered(result);
       }
     } catch {
       setError("Unable to reach the server. Please try again.");
