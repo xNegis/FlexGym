@@ -78,3 +78,5 @@ npx prettier --check "src/**/*.{ts,tsx,css}"  # formatting
 npx eslint src/                                 # linting
 npx tsc -b                                      # type checking
 ```
+xnegis@gmail.com
+123456789101112131415!
