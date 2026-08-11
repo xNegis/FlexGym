@@ -631,6 +631,37 @@
   font-weight: 500;
 }
 
+.routine-active-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  background: #e6f4ea;
+  color: #1e7e34;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  vertical-align: middle;
+  letter-spacing: 0.04em;
+}
+
+.routine-no-active-message {
+  font-size: 0.8125rem;
+  color: #666;
+  margin: 0 0 0.75rem;
+  line-height: 1.4;
+}
+
+.routine-activation-hint {
+  font-size: 0.8125rem;
+  color: #856404;
+  background: #fff3cd;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  margin: 0.5rem 0;
+  line-height: 1.4;
+}
+
 .routine-item-objective {
   color: #666;
   font-size: 0.8125rem;

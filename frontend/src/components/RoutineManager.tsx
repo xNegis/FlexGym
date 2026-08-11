@@ -1,7 +1,9 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
+  activateRoutine,
   createRoutine,
   createTrainingDay,
+  deactivateRoutine,
   deleteRoutine,
   deleteTrainingDay,
   fetchRoutines,
@@ -21,7 +23,15 @@ interface Props {
   onUnauthenticated: () => void;
 }
 
-type ViewMode = "list" | "create" | "detail" | "edit" | "delete" | "configExercises";
+type ViewMode =
+  | "list"
+  | "create"
+  | "detail"
+  | "edit"
+  | "delete"
+  | "activateConfirm"
+  | "deactivateConfirm"
+  | "configExercises";
 
 interface FormState {
   name: string;
@@ -289,6 +299,87 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
     setError(null);
   };
 
+  // -- Activation / deactivation ---------------------------------------
+
+  const [activationPending, setActivationPending] = useState(false);
+  const [activationError, setActivationError] = useState<string | null>(null);
+
+  const getActiveRoutine = (): Routine | undefined => {
+    if (!routines) return undefined;
+    return routines.find((r) => r.is_active);
+  };
+
+  const enterActivateConfirm = () => {
+    setActivationError(null);
+    setViewMode("activateConfirm");
+  };
+
+  const cancelActivate = () => {
+    setActivationError(null);
+    setViewMode("detail");
+  };
+
+  const handleActivate = async () => {
+    if (selectedId === null) return;
+    setActivationError(null);
+    setActivationPending(true);
+    try {
+      const result = await activateRoutine(selectedId);
+      if ("detail" in result) {
+        setActivationError(result.detail);
+      } else {
+        setViewMode("detail");
+        await loadRoutines();
+        if (result.routine) {
+          setSelectedRoutine(result.routine);
+        }
+      }
+    } catch (e) {
+      if (e instanceof UnauthenticatedError) {
+        onUnauthenticated();
+        return;
+      }
+      setActivationError("Unable to activate routine");
+    } finally {
+      setActivationPending(false);
+    }
+  };
+
+  const enterDeactivateConfirm = () => {
+    setActivationError(null);
+    setViewMode("deactivateConfirm");
+  };
+
+  const cancelDeactivate = () => {
+    setActivationError(null);
+    setViewMode("detail");
+  };
+
+  const handleDeactivate = async () => {
+    setActivationError(null);
+    setActivationPending(true);
+    try {
+      const result = await deactivateRoutine();
+      if (result.detail) {
+        setActivationError(result.detail);
+      } else {
+        setViewMode("detail");
+        await loadRoutines();
+        if (selectedId && selectedRoutine) {
+          setSelectedRoutine({ ...selectedRoutine, is_active: false });
+        }
+      }
+    } catch (e) {
+      if (e instanceof UnauthenticatedError) {
+        onUnauthenticated();
+        return;
+      }
+      setActivationError("Unable to deactivate routine");
+    } finally {
+      setActivationPending(false);
+    }
+  };
+
   // -- Training day actions --------------------------------------------
 
   const canAddDay = (() => {
@@ -480,27 +571,41 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
             </p>
           </div>
         ) : (
-          <ul className="routine-list">
-            {routines!.map((r) => (
-              <li key={r.id} className="routine-item">
-                <button
-                  type="button"
-                  className="routine-item-button"
-                  onClick={() => handleOpenRoutine(r)}
-                >
-                  <div className="routine-item-content">
-                    <span className="routine-item-name">{r.name}</span>
-                    <div className="routine-item-meta">
-                      <span className="routine-item-objective">{labelFor(r.objective)}</span>
-                      <span className="routine-item-count">
-                        {trainingDayCountLabel(r.training_day_count)}
+          <>
+            {!getActiveRoutine() && routines!.some((r) => r.training_day_count >= 1) && (
+              <p className="routine-no-active-message">
+                No routine is currently selected as your active training plan.
+              </p>
+            )}
+            <ul className="routine-list">
+              {routines!.map((r) => (
+                <li key={r.id} className="routine-item">
+                  <button
+                    type="button"
+                    className="routine-item-button"
+                    onClick={() => handleOpenRoutine(r)}
+                  >
+                    <div className="routine-item-content">
+                      <span className="routine-item-name">
+                        {r.name}
+                        {r.is_active && (
+                          <span className="routine-active-badge" aria-label="Active">
+                            Active
+                          </span>
+                        )}
                       </span>
+                      <div className="routine-item-meta">
+                        <span className="routine-item-objective">{labelFor(r.objective)}</span>
+                        <span className="routine-item-count">
+                          {trainingDayCountLabel(r.training_day_count)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     );
@@ -589,7 +694,16 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
               Are you sure you want to delete <strong>{slot?.training_day.name}</strong> from{" "}
               <strong>{slot ? WEEKDAYS[slot.position - 1] : "unknown weekday"}</strong>? All
               configured exercises and planned sets inside it will also be permanently deleted. That
-              weekday will become a rest day. This action is permanent and cannot be undone.
+              weekday will become a rest day.
+              {selectedRoutine.is_active &&
+                schedule.filter((s) => s.type === "training").length === 1 && (
+                  <>
+                    {" "}
+                    This will also deactivate <strong>{selectedRoutine.name}</strong> since it will
+                    have no remaining training days.
+                  </>
+                )}{" "}
+              This action is permanent and cannot be undone.
             </p>
           </div>
 
@@ -632,6 +746,11 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
 
     const atLimit = schedule ? schedule.filter((s) => s.type === "training").length >= 7 : false;
 
+    const trainingCount = schedule ? schedule.filter((s) => s.type === "training").length : 0;
+    const canActivate = trainingCount >= 1;
+    const thisIsActive = selectedRoutine.is_active;
+    const otherIsActive = !thisIsActive && !!getActiveRoutine();
+
     return (
       <div className="routine-detail">
         <h2 className="routine-detail-heading">{selectedRoutine.name}</h2>
@@ -646,6 +765,10 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
               {selectedRoutine.description ?? "No description provided"}
             </span>
           </div>
+          <div className="routine-detail-row">
+            <span className="routine-detail-label">Status</span>
+            <span className="routine-detail-value">{thisIsActive ? "Active" : "Not active"}</span>
+          </div>
         </div>
 
         {error && (
@@ -653,8 +776,50 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
             {error}
           </div>
         )}
+        {activationError && (
+          <div className="routine-detail-error" role="alert">
+            {activationError}
+          </div>
+        )}
 
         <div className="routine-detail-actions">
+          {thisIsActive ? (
+            <button
+              type="button"
+              className="auth-delete-button"
+              onClick={enterDeactivateConfirm}
+              disabled={activationPending || pending}
+            >
+              Deactivate routine
+            </button>
+          ) : otherIsActive ? (
+            <button
+              type="button"
+              className="auth-button"
+              onClick={enterActivateConfirm}
+              disabled={!canActivate || activationPending || pending}
+              title={!canActivate ? "Add at least one training day to activate this routine" : ""}
+            >
+              {activationPending ? "Switching..." : "Switch to this routine"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="auth-button"
+              onClick={handleActivate}
+              disabled={!canActivate || activationPending || pending}
+              title={!canActivate ? "Add at least one training day to activate this routine" : ""}
+            >
+              {activationPending ? "Activating..." : "Activate routine"}
+            </button>
+          )}
+
+          {!canActivate && !thisIsActive && (
+            <p className="routine-activation-hint">
+              At least one training day is required before this routine can be activated.
+            </p>
+          )}
+
           <button type="button" className="auth-button" onClick={enterEdit}>
             Edit routine
           </button>
@@ -846,6 +1011,7 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
   // -- Render: Delete routine confirmation -----------------------------
 
   if (viewMode === "delete") {
+    const isActive = selectedRoutine?.is_active ?? false;
     return (
       <div className="routine-detail">
         <h2 className="routine-form-heading">Delete routine</h2>
@@ -859,6 +1025,9 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
                 All {selectedRoutine.training_day_count} training days, their configured exercises,
                 and planned sets will also be permanently deleted.
               </>
+            )}
+            {isActive && (
+              <> Deleting this routine will also leave you with no active training plan.</>
             )}{" "}
             This action is permanent and cannot be undone.
           </p>
@@ -879,6 +1048,92 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
           {pending ? "Deleting..." : "Delete routine"}
         </button>
         <button type="button" className="auth-cancel" onClick={cancelDelete} disabled={pending}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  // -- Render: Activate / Switch confirmation ---------------------------
+
+  if (viewMode === "activateConfirm") {
+    const active = getActiveRoutine();
+    return (
+      <div className="routine-detail">
+        <h2 className="routine-form-heading">Switch active routine</h2>
+
+        <div className="delete-confirmation">
+          <p>
+            Are you sure you want to switch your active routine from{" "}
+            <strong>{active?.name ?? "unknown"}</strong> to <strong>{selectedRoutine?.name}</strong>
+            ?
+          </p>
+          <p>
+            <strong>{selectedRoutine?.name}</strong> will become your plan for future workouts. Your
+            routines and their contents will not be deleted.
+          </p>
+        </div>
+
+        {activationError && (
+          <div className="routine-detail-error" role="alert">
+            {activationError}
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="auth-button"
+          onClick={handleActivate}
+          disabled={activationPending || pending}
+        >
+          {activationPending ? "Switching..." : `Switch routine`}
+        </button>
+        <button
+          type="button"
+          className="auth-cancel"
+          onClick={cancelActivate}
+          disabled={activationPending || pending}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  // -- Render: Deactivate confirmation ----------------------------------
+
+  if (viewMode === "deactivateConfirm") {
+    return (
+      <div className="routine-detail">
+        <h2 className="routine-form-heading">Deactivate routine</h2>
+
+        <div className="delete-confirmation">
+          <p>
+            Are you sure you want to deactivate <strong>{selectedRoutine?.name}</strong>? No routine
+            will be selected for future workouts. The routine and its contents will not be deleted.
+          </p>
+        </div>
+
+        {activationError && (
+          <div className="routine-detail-error" role="alert">
+            {activationError}
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="auth-delete-confirm-button"
+          onClick={handleDeactivate}
+          disabled={activationPending || pending}
+        >
+          {activationPending ? "Deactivating..." : "Deactivate routine"}
+        </button>
+        <button
+          type="button"
+          className="auth-cancel"
+          onClick={cancelDeactivate}
+          disabled={activationPending || pending}
+        >
           Cancel
         </button>
       </div>

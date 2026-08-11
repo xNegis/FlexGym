@@ -1,4 +1,5 @@
 import type {
+  ActiveRoutine,
   ConfiguredExercise,
   ConfiguredSet,
   ConfiguredSetTempo,
@@ -463,6 +464,7 @@ function isRoutine(value: unknown): value is Routine {
     Number.isInteger(v.training_day_count) &&
     v.training_day_count >= 0 &&
     v.training_day_count <= 7 &&
+    typeof v.is_active === "boolean" &&
     typeof v.created_at === "string" &&
     v.created_at.length > 0 &&
     typeof v.updated_at === "string" &&
@@ -1277,4 +1279,105 @@ export async function deleteExerciseConfig(
     return { detail: "Configured exercise not found" };
   }
   return { detail: "Unable to delete exercise" };
+}
+
+function isActiveRoutine(value: unknown): value is ActiveRoutine {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (!isRoutine(v.routine)) return false;
+  if ((v.routine as Routine).is_active !== true) return false;
+  return typeof v.activated_at === "string" && v.activated_at.length > 0;
+}
+
+export async function fetchActiveRoutine(): Promise<ActiveRoutine | null> {
+  const response = await fetch(`${API_BASE_URL}/api/active-routine`, {
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load active routine");
+  }
+  const data: unknown = await response.json();
+  if (data === null) {
+    return null;
+  }
+  if (!isActiveRoutine(data)) {
+    throw new Error("Invalid active routine response");
+  }
+  return data;
+}
+
+export type ActivateRoutineResult = ActiveRoutine | { detail: string };
+
+export async function activateRoutine(routineId: number): Promise<ActivateRoutineResult> {
+  const response = await fetch(`${API_BASE_URL}/api/active-routine`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ routine_id: routineId }),
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return { detail: "Routine not found" };
+    }
+    if (response.status === 409) {
+      if (
+        typeof result === "object" &&
+        result !== null &&
+        "detail" in result &&
+        typeof (result as Record<string, unknown>).detail === "string"
+      ) {
+        return { detail: (result as Record<string, unknown>).detail as string };
+      }
+      return { detail: "Routine cannot be activated" };
+    }
+    if (response.status === 422) {
+      if (typeof result === "object" && result !== null && "detail" in result) {
+        const detail = (result as Record<string, unknown>).detail;
+        if (Array.isArray(detail)) {
+          const messages = detail
+            .filter(
+              (item): item is { msg: string } =>
+                typeof item === "object" &&
+                item !== null &&
+                "msg" in item &&
+                typeof item.msg === "string",
+            )
+            .map((item) => item.msg);
+          return {
+            detail: messages.length > 0 ? messages.join("; ") : "Invalid request",
+          };
+        }
+        if (typeof detail === "string") {
+          return { detail };
+        }
+      }
+      return { detail: "Invalid request" };
+    }
+    return { detail: "Unable to activate routine" };
+  }
+  if (!isActiveRoutine(result)) {
+    throw new Error("Invalid active routine response");
+  }
+  return result;
+}
+
+export async function deactivateRoutine(): Promise<{ detail: string | null }> {
+  const response = await fetch(`${API_BASE_URL}/api/active-routine`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 204) {
+    return { detail: null };
+  }
+  return { detail: "Unable to deactivate routine" };
 }

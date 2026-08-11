@@ -128,6 +128,9 @@ def update_routine(
 
 
 def delete_routine(session: Session, routine_id: int, user_id: int) -> None:
+    from app.services.active_routine_service import clear_active_if_matches_routine
+
     routine = _require_routine(session, routine_id, user_id)
+    clear_active_if_matches_routine(session, routine_id)
     session.delete(routine)
     session.commit()

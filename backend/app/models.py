@@ -106,9 +106,44 @@ class Routine(Base):
         cascade="all, delete-orphan",
         foreign_keys="RoutineScheduleAssignment.routine_id",
     )
+    active_routine: Mapped["ActiveRoutine | None"] = relationship(
+        "ActiveRoutine",
+        back_populates="routine",
+        uselist=False,
+        cascade="all, delete-orphan",
+        foreign_keys="ActiveRoutine.routine_id",
+    )
 
     __table_args__ = (
         UniqueConstraint("user_id", "normalized_name", name="uq_routine_user_normalized_name"),
+        UniqueConstraint("id", "user_id", name="uq_routine_id_user_id"),
+    )
+
+
+class ActiveRoutine(Base):
+    __tablename__ = "active_routines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    user: Mapped["User"] = relationship("User")
+    routine_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("routines.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    routine: Mapped["Routine"] = relationship(
+        "Routine", back_populates="active_routine", foreign_keys=[routine_id]
+    )
+    activated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["routine_id", "user_id"],
+            ["routines.id", "routines.user_id"],
+            name="fk_active_routine_routine_user",
+        ),
     )
 
 

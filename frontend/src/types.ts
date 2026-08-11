@@ -31,8 +31,14 @@ interface Routine {
   objective: string;
   description: string | null;
   training_day_count: number;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+interface ActiveRoutine {
+  routine: Routine;
+  activated_at: string;
 }
 
 interface TrainingDay {
@@ -114,6 +120,7 @@ interface ConfiguredExercise {
 }
 
 export {
+  type ActiveRoutine,
   type AuthScreen,
   type ConfiguredExercise,
   type ConfiguredSet,

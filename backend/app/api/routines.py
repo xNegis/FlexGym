@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user
 from app.db import get_session
 from app.models import Routine, User
+from app.services.active_routine_service import (
+    is_routine_active,
+)
 from app.services.routine_service import (
     OBJECTIVE_VALUES,
     RoutineNameConflictError,
@@ -78,19 +81,18 @@ class RoutineOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-def _routine_out(routine: Routine) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "id": routine.id,
-            "name": routine.name,
-            "objective": routine.objective,
-            "description": routine.description,
-            "training_day_count": len(routine.training_days),
-            "created_at": routine.created_at.isoformat(),
-            "updated_at": routine.updated_at.isoformat(),
-        },
-    )
+def _routine_dict(routine: Routine, session: Session, user_id: int) -> dict[str, object]:
+    active = is_routine_active(session, routine.id, user_id)
+    return {
+        "id": routine.id,
+        "name": routine.name,
+        "objective": routine.objective,
+        "description": routine.description,
+        "training_day_count": len(routine.training_days),
+        "is_active": active,
+        "created_at": routine.created_at.isoformat(),
+        "updated_at": routine.updated_at.isoformat(),
+    }
 
 
 @router.get("/routines")
@@ -101,18 +103,7 @@ def list_routines_endpoint(
     routines = list_routines(session, current_user.id)
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=[
-            {
-                "id": r.id,
-                "name": r.name,
-                "objective": r.objective,
-                "description": r.description,
-                "training_day_count": len(r.training_days),
-                "created_at": r.created_at.isoformat(),
-                "updated_at": r.updated_at.isoformat(),
-            }
-            for r in routines
-        ],
+        content=[_routine_dict(r, session, current_user.id) for r in routines],
     )
 
 
@@ -137,15 +128,7 @@ def create_routine_endpoint(
         )
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
-        content={
-            "id": routine.id,
-            "name": routine.name,
-            "objective": routine.objective,
-            "description": routine.description,
-            "training_day_count": len(routine.training_days),
-            "created_at": routine.created_at.isoformat(),
-            "updated_at": routine.updated_at.isoformat(),
-        },
+        content=_routine_dict(routine, session, current_user.id),
     )
 
 
@@ -161,7 +144,10 @@ def get_routine_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"detail": "Routine not found"},
         )
-    return _routine_out(routine)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=_routine_dict(routine, session, current_user.id),
+    )
 
 
 @router.put("/routines/{routine_id}")
@@ -190,7 +176,10 @@ def update_routine_endpoint(
             status_code=status.HTTP_409_CONFLICT,
             content={"detail": str(exc)},
         )
-    return _routine_out(routine)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=_routine_dict(routine, session, current_user.id),
+    )
 
 
 @router.delete("/routines/{routine_id}")

@@ -4,7 +4,7 @@
 
 ## Current Phase
 
-Phase 1 — Training Planning
+Phase 1 — Training Planning completed
 
 ## Current Status
 
@@ -23,6 +23,12 @@ F09 — Routine Exercise Configuration is implemented and validated.
 
 F10 — Routine Schedule is implemented and validated.
 
+F11 — Active Routine is implemented and validated.
+
+Phase 1 — Training Planning is completed. The application now supports user-owned routines,
+scheduled training days, structured exercise prescriptions, and an explicit active-routine
+selection.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -34,6 +40,7 @@ F10 — Routine Schedule is implemented and validated.
 * F08 — Training Day Management
 * F09 — Routine Exercise Configuration
 * F10 — Routine Schedule
+* F11 — Active Routine
 
 ## Skipped Features
 
@@ -41,7 +48,8 @@ F10 — Routine Schedule is implemented and validated.
 
 ## Next Feature
 
-F11 — Active Routine is next in Phase 1 and remains to be specified.
+Phase 2 — Workout Tracking is next. Start Workout is the next appropriate feature and remains to be
+specified.
 
 ## Existing Feature Specifications
 
@@ -55,6 +63,7 @@ F11 — Active Routine is next in Phase 1 and remains to be specified.
 * `harness/features/08_training_day_management.md`
 * `harness/features/09_routine_exercise_configuration.md`
 * `harness/features/10_routine_schedule.md`
+* `harness/features/11_active_routine.md`
 
 ## Current Technology
 
@@ -88,4 +97,4 @@ Frontend: Prettier (format), ESLint (lint), tsc (type checking)
 
 ## Open Questions
 
-None currently blocking Phase 1 planning.
+None currently blocking Phase 2 planning.

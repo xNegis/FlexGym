@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.active_routine import router as active_routine_router
 from app.api.auth import router as auth_router
 from app.api.exercise_configuration import router as exercise_config_router
 from app.api.exercises import router as exercises_router
@@ -28,6 +29,7 @@ app.add_middleware(
 )
 
 app.include_router(health_router, prefix="/api")
+app.include_router(active_routine_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(fitness_profile_router, prefix="/api")
 app.include_router(exercises_router, prefix="/api")

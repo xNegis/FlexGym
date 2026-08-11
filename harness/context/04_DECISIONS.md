@@ -251,3 +251,23 @@ training-day reference represents rest.
 
 This decision supersedes the parts of DEC-014 and F08 that made training-day display order
 independent from weekly allocation or allowed a persisted training day to remain unassigned.
+
+---
+
+## DEC-017 — Active routine is a lightweight singleton selection
+
+**Status:** Accepted
+
+Each user may have zero or one active routine. Activation selects the current plan for future
+workout flows; it does not clone, freeze, archive, or version the routine, and active routines remain
+editable.
+
+A routine needs at least one training day to be activated. Weekly assignment completeness is also
+verified, although F10 enforces it during supported writes. Configured exercises are deliberately
+not an activation requirement because session-level workout readiness belongs to the future Start
+Workout feature.
+
+Switching replaces the selection atomically after explicit frontend confirmation. Users may
+deactivate without deleting the plan. Deleting the active routine or its final training day clears
+the selection atomically. F11 records only when the current selection was activated; activation
+history, plan snapshots, commitment periods, and adherence are deferred.

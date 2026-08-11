@@ -58,7 +58,10 @@ def list_training_days(session: Session, routine_id: int, user_id: int) -> list[
             selectinload(TrainingDay.schedule_assignment),
         )
         .filter(TrainingDay.routine_id == routine_id)
-        .join(RoutineScheduleAssignment)
+        .join(
+            RoutineScheduleAssignment,
+            TrainingDay.id == RoutineScheduleAssignment.training_day_id,
+        )
         .order_by(RoutineScheduleAssignment.week_position.asc(), TrainingDay.id.asc())
         .all()
     )
@@ -105,9 +108,19 @@ def rename_training_day(
 
 
 def delete_training_day(session: Session, routine_id: int, user_id: int, day_id: int) -> None:
+    from app.services.active_routine_service import clear_active_if_matches_routine
+
     _require_routine(session, routine_id, user_id)
     day = _require_training_day(session, routine_id, day_id)
     routine = day.routine
+
+    remaining = (
+        session.query(TrainingDay)
+        .filter(TrainingDay.routine_id == routine_id, TrainingDay.id != day_id)
+        .count()
+    )
+    if remaining == 0:
+        clear_active_if_matches_routine(session, routine_id)
 
     session.delete(day)
     _refresh_routine_timestamp(session, routine)
