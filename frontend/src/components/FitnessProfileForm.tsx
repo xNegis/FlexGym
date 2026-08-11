@@ -1,39 +1,17 @@
 import { type FormEvent, useState } from "react";
 import { createFitnessProfile, fetchFitnessProfile, logout } from "../api";
+import {
+  ENVIRONMENT_OPTIONS,
+  EXPERIENCE_OPTIONS,
+  GOAL_OPTIONS,
+  SEX_OPTIONS,
+} from "./profileConstants";
+import type { FitnessProfile } from "../types";
 
 interface Props {
-  onProfileCreated: () => void;
+  onProfileCreated: (profile: FitnessProfile) => void;
   onLoggedOut: () => void;
 }
-
-const SEX_OPTIONS = [
-  { value: "", label: "Select..." },
-  { value: "male", label: "Male" },
-  { value: "female", label: "Female" },
-];
-
-const EXPERIENCE_OPTIONS = [
-  { value: "", label: "Select..." },
-  { value: "beginner", label: "Beginner" },
-  { value: "intermediate", label: "Intermediate" },
-  { value: "advanced", label: "Advanced" },
-];
-
-const GOAL_OPTIONS = [
-  { value: "", label: "Select..." },
-  { value: "build_muscle", label: "Build muscle" },
-  { value: "lose_fat", label: "Lose fat" },
-  { value: "increase_strength", label: "Increase strength" },
-  { value: "general_fitness", label: "General fitness" },
-];
-
-const ENVIRONMENT_OPTIONS = [
-  { value: "", label: "Select..." },
-  { value: "full_gym", label: "Full gym" },
-  { value: "home_gym", label: "Home gym" },
-  { value: "minimal_equipment", label: "Minimal equipment" },
-  { value: "bodyweight_only", label: "Bodyweight only" },
-];
 
 export default function FitnessProfileForm({ onProfileCreated, onLoggedOut }: Props) {
   const [dateOfBirth, setDateOfBirth] = useState("");
@@ -93,13 +71,13 @@ export default function FitnessProfileForm({ onProfileCreated, onLoggedOut }: Pr
         if (result.detail === "Fitness profile already exists") {
           const existingProfile = await fetchFitnessProfile();
           if (existingProfile) {
-            onProfileCreated();
+            onProfileCreated(existingProfile);
             return;
           }
         }
         setError(result.detail);
       } else {
-        onProfileCreated();
+        onProfileCreated(result);
       }
     } catch {
       setError("Unable to reach the server. Please try again.");

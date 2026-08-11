@@ -1,20 +1,24 @@
-"""Fitness profile endpoints: retrieval and creation."""
+"""Fitness profile endpoints: retrieval, creation, update, and deletion."""
 
 import datetime
 import logging
 
 from fastapi import APIRouter, Depends, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
+from app.auth.cookies import clear_auth_cookie
 from app.auth.dependencies import get_current_user
 from app.db import get_session
 from app.models import User
 from app.services.fitness_profile_service import (
     ProfileAlreadyExistsError,
+    ProfileNotFoundError,
     create_fitness_profile,
+    delete_fitness_profile,
     get_fitness_profile,
+    update_fitness_profile,
 )
 
 __all__ = ["router"]
@@ -29,7 +33,7 @@ PRIMARY_GOAL_VALUES = {"build_muscle", "lose_fat", "increase_strength", "general
 TRAINING_ENVIRONMENT_VALUES = {"full_gym", "home_gym", "minimal_equipment", "bodyweight_only"}
 
 
-class FitnessProfileCreate(BaseModel):
+class FitnessProfileRequest(BaseModel):
     date_of_birth: datetime.date
     biological_sex: str
     height_cm: float
@@ -165,6 +169,11 @@ class FitnessProfileCreate(BaseModel):
         return trimmed
 
 
+class FitnessProfileUpdate(FitnessProfileRequest):
+    body_fat_percentage: float | None
+    physical_limitations: str | None
+
+
 class FitnessProfileOut(BaseModel):
     id: int
     date_of_birth: datetime.date
@@ -184,6 +193,13 @@ class FitnessProfileOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+def _profile_out(profile: object) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=FitnessProfileOut.model_validate(profile).model_dump(mode="json"),
+    )
+
+
 @router.get("/fitness-profile")
 def get_profile(
     session: Session = Depends(get_session),
@@ -195,15 +211,12 @@ def get_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"detail": "Fitness profile not found"},
         )
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=FitnessProfileOut.model_validate(profile).model_dump(mode="json"),
-    )
+    return _profile_out(profile)
 
 
 @router.post("/fitness-profile")
 def create_profile(
-    body: FitnessProfileCreate,
+    body: FitnessProfileRequest,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
@@ -232,3 +245,50 @@ def create_profile(
         status_code=status.HTTP_201_CREATED,
         content=FitnessProfileOut.model_validate(profile).model_dump(mode="json"),
     )
+
+
+@router.put("/fitness-profile")
+def update_profile(
+    body: FitnessProfileUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> JSONResponse:
+    try:
+        profile = update_fitness_profile(
+            session=session,
+            user_id=current_user.id,
+            date_of_birth=body.date_of_birth,
+            biological_sex=body.biological_sex,
+            height_cm=body.height_cm,
+            weight_kg=body.weight_kg,
+            body_fat_percentage=body.body_fat_percentage,
+            training_experience=body.training_experience,
+            primary_goal=body.primary_goal,
+            training_days_per_week=body.training_days_per_week,
+            preferred_workout_duration_minutes=body.preferred_workout_duration_minutes,
+            training_environment=body.training_environment,
+            physical_limitations=body.physical_limitations,
+        )
+    except ProfileNotFoundError as exc:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": str(exc)},
+        )
+    return _profile_out(profile)
+
+
+@router.delete("/fitness-profile")
+def delete_profile_endpoint(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    try:
+        delete_fitness_profile(session, user_id=current_user.id)
+    except ProfileNotFoundError as exc:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": str(exc)},
+        )
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    clear_auth_cookie(response)
+    return response

@@ -123,3 +123,34 @@ breaking the current screen.
 This decision does not require a global custom error framework or exhaustive error-path testing.
 Each feature should verify one representative normal failure for every user flow it introduces or
 materially changes, while keeping automated coverage proportional to the feature.
+
+---
+
+## DEC-010 — Hosted installations permit multiple user accounts
+
+**Status:** Accepted
+
+The personal-first product direction does not imply a single-account deployment. Registration is
+available to unauthenticated visitors, and multiple users with unique normalized email addresses may
+coexist in one installation.
+
+This replaces the original F02 proof-of-concept restriction that closed registration after the first
+account. Authentication and persisted domain data remain explicitly user-owned; invitations, roles,
+administration, and other multi-user collaboration features remain out of scope.
+
+---
+
+## DEC-011 — The initial exercise catalog is curated global reference data
+
+**Status:** Proposed
+
+FlexGym's initial exercise catalog consists of global, system-managed exercise records with stable
+slugs. It is installed through the normal database migration/bootstrap path and is read-only through
+user-facing APIs.
+
+The initial dataset is explicitly curated and versioned in the repository rather than fetched from
+an external exercise service or invented at runtime. This gives later routines stable references and
+makes fresh installations useful without an administrator import step.
+
+User-created exercises remain a separate, user-owned capability for a later feature. The shared
+catalog does not infer exercise suitability from profile data and does not represent medical advice.

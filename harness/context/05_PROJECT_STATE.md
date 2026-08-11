@@ -4,27 +4,32 @@
 
 ## Current Phase
 
-Phase 0 — Foundation
+Phase 1 — Training Planning
 
 ## Current Status
 
-F03 — User Fitness Profile implemented and validated.
+Phase 0 — Foundation completed. F01 through F04 are implemented and validated.
+
+F05 — Exercise Catalog has a detailed draft specification awaiting product review.
 
 ## Completed Features
 
 * F01 — Project Infrastructure
 * F02 — User Authentication
 * F03 — User Fitness Profile
+* F04 — Profile Management
 
 ## Next Feature
 
-F04 — Profile Management
+Review and approve F05 — Exercise Catalog, then implement and validate it.
 
 ## Existing Feature Specifications
 
 * `harness/features/01_project_infrastructure.md`
 * `harness/features/02_user_authentication.md`
 * `harness/features/03_user_fitness_profile.md`
+* `harness/features/04_profile_management.md`
+* `harness/features/05_exercise_catalog.md`
 
 ## Current Technology
 
@@ -38,7 +43,7 @@ Persistence:
 SQLite / SQLAlchemy 2 / Alembic
 
 Authentication:
-Email and password / Argon2id / JWT cookie
+Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
 pytest (basic backend tests) / Playwright deferred
@@ -58,4 +63,4 @@ Frontend: Prettier (format), ESLint (lint), tsc (type checking)
 
 ## Open Questions
 
-None currently blocking Phase 0.
+None currently blocking Phase 1 planning.

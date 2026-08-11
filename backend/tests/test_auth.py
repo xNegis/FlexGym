@@ -23,11 +23,7 @@ def test_jwt_round_trip_and_invalid_token() -> None:
     assert decode_token("not.a.valid.token") is None
 
 
-def test_first_account_registration_flow(client: TestClient) -> None:
-    available = client.get("/api/auth/registration-status")
-    assert available.status_code == 200
-    assert available.json() == {"registration_available": True}
-
+def test_multi_account_registration_and_duplicate_email(client: TestClient) -> None:
     invalid = client.post(
         "/api/auth/register",
         json={"email": "user@example.com", "password": "too-short"},
@@ -42,14 +38,19 @@ def test_first_account_registration_flow(client: TestClient) -> None:
     assert registered.json() == {"id": 1, "email": "user@example.com"}
     assert registered.cookies.get("flexgym_token") is not None
 
-    unavailable = client.get("/api/auth/registration-status")
-    assert unavailable.json() == {"registration_available": False}
-
     second = client.post(
         "/api/auth/register",
         json={"email": "second@example.com", "password": "a-secure-password-15"},
     )
-    assert second.status_code == 403
+    assert second.status_code == 201
+    assert second.json() == {"id": 2, "email": "second@example.com"}
+
+    duplicate = client.post(
+        "/api/auth/register",
+        json={"email": " USER@example.com ", "password": "another-password-15"},
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json() == {"detail": "Email is already registered"}
 
 
 def test_login_and_generic_credentials_error(client: TestClient) -> None:

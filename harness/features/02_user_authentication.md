@@ -2,25 +2,25 @@
 
 ## Objective
 
-Allow the owner of FlexGym to register, log in, remain authenticated, inspect their identity,
-and log out. This establishes user ownership for future features without introducing fitness
-profile data or production-grade authentication infrastructure.
+Allow FlexGym users to register, log in, remain authenticated, inspect their identity, and log out.
+This establishes user ownership for future features without introducing fitness profile data or
+production-grade authentication infrastructure.
 
 ## Context
 
 F01 established the React frontend, FastAPI backend, REST API, and SQLite persistence.
 
-FlexGym is currently personal-first. F02 allows creation of one account but models `User`
-normally so multi-user support can be added later. Authentication uses a single signed JWT in an
+FlexGym is currently personal-first but permits multiple independent user accounts so a hosted
+installation is not restricted to a single person. Authentication uses a single signed JWT in an
 HTTP-only cookie; there are no persisted sessions, refresh tokens, or revocation mechanisms.
 
 ## User Experience
 
-On a new installation, the visitor sees registration. Submitting a valid email and password
-creates the account and authenticates it immediately.
+An unauthenticated visitor sees login and can follow a visible registration link. Submitting a valid
+email and password creates an account and authenticates it immediately.
 
-Once the account exists, unauthenticated visitors see login. Incorrect credentials produce a
-generic error that does not reveal whether the email exists.
+The registration screen links back to login. Incorrect login credentials produce a generic error
+that does not reveal whether the email exists.
 
 An authenticated user sees a minimal FlexGym shell containing their email and a logout action.
 Logout returns them to login. Fitness-profile fields and a dashboard belong to later features.
@@ -29,9 +29,8 @@ Logout returns them to login. Fitness-profile fields and a dashboard belong to l
 
 ### FR-1 — Registration
 
-The first visitor can create an account with an email and password. Registration is unavailable
-after an account exists. The backend exposes registration availability so the frontend can show
-the correct screen.
+Any unauthenticated visitor can create an account with an email and password that is not already
+registered. Multiple accounts may coexist, but normalized email addresses remain unique.
 
 ### FR-2 — Login
 
@@ -75,12 +74,11 @@ Plaintext passwords are never persisted. No `Session` entity or table is introdu
 
 ## API Requirements
 
-* `GET /api/auth/registration-status`
-  * `200 {"registration_available": true|false}`.
 * `POST /api/auth/register`
   * Accepts `{"email": string, "password": string}`.
   * Returns `201` with the public user and authentication cookie.
-  * Returns `403` when registration is no longer available and `422` for invalid input.
+  * Returns `409 {"detail":"Email is already registered"}` when the normalized email already
+    exists and `422` for invalid input.
 * `POST /api/auth/login`
   * Accepts `{"email": string, "password": string}`.
   * Returns `200` with the public user and authentication cookie.
@@ -105,6 +103,8 @@ Password hashes never appear in API responses.
 
 * Registration requests email, password, and password confirmation.
 * Login requests email and password.
+* Login includes a “No account yet? Register” action and registration includes an “Already have an
+  account? Log in” action.
 * Forms show actionable validation and request errors and prevent repeated submission while
   pending.
 * Password confirmation is validated by the frontend; the API does not receive it.
@@ -115,7 +115,7 @@ Password hashes never appear in API responses.
 
 ## Business Rules
 
-* Only the first account can be registered in F02.
+* Multiple accounts can be registered, and each normalized email is unique.
 * Registration and login authenticate immediately.
 * The JWT uses `HS256`, expires after seven days, and contains only `sub`, `iat`, and `exp`.
 * `sub` identifies the user; the backend still loads that user from the database.
@@ -138,8 +138,9 @@ Password hashes never appear in API responses.
 
 ## Acceptance Criteria
 
-* [x] A new installation reports registration as available and can create its first account.
-* [x] Further registration is unavailable after that account exists.
+* [x] An unauthenticated visitor can navigate between login and registration.
+* [x] Multiple accounts with distinct normalized emails can be registered.
+* [x] Registration rejects an email that is already registered without changing the existing user.
 * [x] Registration persists normalized email and an Argon2id hash, never the plaintext password.
 * [x] Registration authenticates immediately and displays the authenticated shell.
 * [x] The user can log in irrespective of email casing.
@@ -159,7 +160,7 @@ Keep a small backend test suite covering only the essential behaviour:
 
 * Argon2id hash and verification.
 * JWT creation, validation, and rejection of an invalid token.
-* First-account registration and closure of further registration.
+* Multiple-account registration and duplicate normalized-email rejection.
 * Successful login and the shared generic credentials error.
 * Authenticated identity and unauthenticated access.
 * Idempotent logout.
@@ -170,7 +171,7 @@ cookie attribute. Tests use isolated persistence and do not depend on execution 
 ## Out of Scope
 
 * Fitness profile, dashboard, and final navigation or visual design.
-* Additional users, invitations, administration, roles, and permissions.
+* Invitations, administration, roles, and permissions.
 * Email verification or delivery; forgotten-password and password-change flows.
 * OAuth, social login, passkeys, and multi-factor authentication.
 * Refresh tokens, rotation, persisted sessions, revocation, and device/session management.

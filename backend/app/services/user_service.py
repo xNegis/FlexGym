@@ -2,6 +2,7 @@
 
 import re
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.jwt import create_token
@@ -16,6 +17,10 @@ class RegistrationError(Exception):
 
 
 class LoginError(Exception):
+    pass
+
+
+class EmailAlreadyRegisteredError(RegistrationError):
     pass
 
 
@@ -37,21 +42,22 @@ def _validate_password(password: str) -> None:
         raise RegistrationError("Password must not exceed 128 characters")
 
 
-def registration_is_available(session: Session) -> bool:
-    return session.query(User).first() is None
-
-
 def register_user(session: Session, email: str, password: str) -> tuple[User, str]:
-    if not registration_is_available(session):
-        raise RegistrationError("Registration is no longer available")
-
     normalized_email = _normalize_email(email)
     _validate_email(normalized_email)
     _validate_password(password)
 
+    existing = session.query(User).filter(User.email == normalized_email).first()
+    if existing is not None:
+        raise EmailAlreadyRegisteredError("Email is already registered")
+
     user = User(email=normalized_email, password_hash=hash_password(password))
     session.add(user)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise EmailAlreadyRegisteredError("Email is already registered") from exc
     session.refresh(user)
 
     token = create_token(user.id)

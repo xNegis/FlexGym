@@ -4,9 +4,10 @@ import type { UserResponse } from "../api";
 
 interface Props {
   onRegistered: (user: UserResponse) => void;
+  onLoginRequested: () => void;
 }
 
-export default function RegistrationForm({ onRegistered }: Props) {
+export default function RegistrationForm({ onRegistered, onLoginRequested }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -93,6 +94,12 @@ export default function RegistrationForm({ onRegistered }: Props) {
       <button type="submit" className="auth-button" disabled={!canSubmit}>
         {pending ? "Creating account..." : "Register"}
       </button>
+      <p className="auth-switch">
+        Already have an account?{" "}
+        <button type="button" onClick={onLoginRequested} disabled={pending}>
+          Log in
+        </button>
+      </p>
     </form>
   );
 }

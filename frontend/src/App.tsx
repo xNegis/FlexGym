@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchFitnessProfile, fetchHealth, fetchMe, fetchRegistrationStatus } from "./api";
-import AuthShell from "./components/AuthShell";
+import { fetchFitnessProfile, fetchHealth, fetchMe } from "./api";
 import FitnessProfileForm from "./components/FitnessProfileForm";
 import LoginForm from "./components/LoginForm";
+import ProfileManagement from "./components/ProfileManagement";
 import RegistrationForm from "./components/RegistrationForm";
-import type { AuthScreen, User } from "./types";
+import type { AuthScreen, FitnessProfile, User } from "./types";
 import "./App.css";
 
 function App() {
   const [screen, setScreen] = useState<AuthScreen>("loading");
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<FitnessProfile | null>(null);
 
   const bootstrap = useCallback(async () => {
     setScreen("loading");
@@ -29,8 +30,9 @@ function App() {
       if (currentUser) {
         setUser(currentUser);
 
-        const profile = await fetchFitnessProfile();
-        if (profile) {
+        const currentProfile = await fetchFitnessProfile();
+        if (currentProfile) {
+          setProfile(currentProfile);
           setScreen("authenticated");
         } else {
           setScreen("onboarding");
@@ -38,12 +40,7 @@ function App() {
         return;
       }
 
-      const regStatus = await fetchRegistrationStatus();
-      if (regStatus.registration_available) {
-        setScreen("registration");
-      } else {
-        setScreen("login");
-      }
+      setScreen("login");
     } catch {
       setScreen("unavailable");
     }
@@ -57,19 +54,36 @@ function App() {
     setUser(u);
     setScreen("loading");
     try {
-      const profile = await fetchFitnessProfile();
-      setScreen(profile ? "authenticated" : "onboarding");
+      const currentProfile = await fetchFitnessProfile();
+      if (currentProfile) {
+        setProfile(currentProfile);
+        setScreen("authenticated");
+      } else {
+        setScreen("onboarding");
+      }
     } catch {
       setScreen("unavailable");
     }
   };
 
-  const handleProfileCreated = () => {
+  const handleProfileCreated = (created: FitnessProfile) => {
+    setProfile(created);
     setScreen("authenticated");
+  };
+
+  const handleProfileUpdated = (updated: FitnessProfile) => {
+    setProfile(updated);
+  };
+
+  const handleProfileDeleted = () => {
+    setUser(null);
+    setProfile(null);
+    setScreen("login");
   };
 
   const handleLoggedOut = () => {
     setUser(null);
+    setProfile(null);
     setScreen("login");
   };
 
@@ -102,13 +116,26 @@ function App() {
   return (
     <div className="shell">
       <h1 className="title">FlexGym</h1>
-      {screen === "registration" && <RegistrationForm onRegistered={handleUser} />}
-      {screen === "login" && <LoginForm onLoggedIn={handleUser} />}
+      {screen === "registration" && (
+        <RegistrationForm onRegistered={handleUser} onLoginRequested={() => setScreen("login")} />
+      )}
+      {screen === "login" && (
+        <LoginForm
+          onLoggedIn={handleUser}
+          onRegistrationRequested={() => setScreen("registration")}
+        />
+      )}
       {screen === "onboarding" && (
         <FitnessProfileForm onProfileCreated={handleProfileCreated} onLoggedOut={handleLoggedOut} />
       )}
-      {screen === "authenticated" && user && (
-        <AuthShell email={user.email} onLoggedOut={handleLoggedOut} />
+      {screen === "authenticated" && user && profile && (
+        <ProfileManagement
+          profile={profile}
+          email={user.email}
+          onLoggedOut={handleLoggedOut}
+          onProfileDeleted={handleProfileDeleted}
+          onProfileUpdated={handleProfileUpdated}
+        />
       )}
     </div>
   );

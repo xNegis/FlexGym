@@ -23,10 +23,6 @@ export async function fetchHealth(): Promise<HealthResponse> {
   return { status: "unavailable" };
 }
 
-export interface RegistrationStatusResponse {
-  registration_available: boolean;
-}
-
 export interface UserResponse {
   id: number;
   email: string;
@@ -82,18 +78,31 @@ async function responseJson(response: Response): Promise<unknown> {
   }
 }
 
+function isFitnessProfile(value: unknown): value is FitnessProfile {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "number" &&
+    typeof v.date_of_birth === "string" &&
+    typeof v.biological_sex === "string" &&
+    typeof v.height_cm === "number" &&
+    typeof v.weight_kg === "number" &&
+    (v.body_fat_percentage === null || typeof v.body_fat_percentage === "number") &&
+    typeof v.training_experience === "string" &&
+    typeof v.primary_goal === "string" &&
+    typeof v.training_days_per_week === "number" &&
+    typeof v.preferred_workout_duration_minutes === "number" &&
+    typeof v.training_environment === "string" &&
+    (v.physical_limitations === null || typeof v.physical_limitations === "string") &&
+    typeof v.created_at === "string" &&
+    typeof v.updated_at === "string"
+  );
+}
+
 const req = {
   credentials: "include" as RequestCredentials,
   headers: { "Content-Type": "application/json" },
 };
-
-export async function fetchRegistrationStatus(): Promise<RegistrationStatusResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/registration-status`);
-  if (!response.ok) {
-    throw new Error("Unable to determine registration status");
-  }
-  return (await response.json()) as RegistrationStatusResponse;
-}
 
 export async function registerUser(
   email: string,
@@ -166,7 +175,11 @@ export async function fetchFitnessProfile(): Promise<FitnessProfile | null> {
   if (!response.ok) {
     throw new Error("Unable to check fitness profile");
   }
-  return (await response.json()) as FitnessProfile;
+  const data: unknown = await response.json();
+  if (!isFitnessProfile(data)) {
+    throw new Error("Invalid profile response");
+  }
+  return data;
 }
 
 export async function createFitnessProfile(
@@ -202,5 +215,68 @@ export async function createFitnessProfile(
     }
     return { detail: "Unable to save fitness profile" };
   }
-  return result as FitnessProfile;
+  if (!isFitnessProfile(result)) {
+    throw new Error("Invalid profile response");
+  }
+  return result;
+}
+
+export async function updateFitnessProfile(
+  data: Record<string, unknown>,
+): Promise<FitnessProfile | { detail: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/fitness-profile`, {
+    method: "PUT",
+    ...req,
+    body: JSON.stringify(data),
+  });
+  const result: unknown = await response.json();
+  if (!response.ok) {
+    if (response.status === 404) {
+      return { detail: "Fitness profile not found" };
+    }
+    if (typeof result === "object" && result !== null && "detail" in result) {
+      const detail = result.detail;
+      if (Array.isArray(detail)) {
+        const messages = detail
+          .filter(
+            (item): item is { msg: string } =>
+              typeof item === "object" &&
+              item !== null &&
+              "msg" in item &&
+              typeof item.msg === "string",
+          )
+          .map((item) => item.msg);
+        return { detail: messages.length > 0 ? messages.join("; ") : "Invalid profile data" };
+      }
+      if (typeof detail === "string") {
+        return { detail };
+      }
+    }
+    return { detail: "Unable to save fitness profile" };
+  }
+  if (!isFitnessProfile(result)) {
+    throw new Error("Invalid profile response");
+  }
+  return result;
+}
+
+export async function deleteFitnessProfile(): Promise<{ detail: string } | null> {
+  const response = await fetch(`${API_BASE_URL}/api/fitness-profile`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (response.status === 204) {
+    return null;
+  }
+  if (response.status === 404) {
+    return { detail: "Fitness profile not found" };
+  }
+  const result: unknown = await responseJson(response);
+  if (typeof result === "object" && result !== null && "detail" in result) {
+    const detail = result.detail;
+    if (typeof detail === "string") {
+      return { detail };
+    }
+  }
+  return { detail: "Unable to delete fitness profile" };
 }

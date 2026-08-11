@@ -8,17 +8,18 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
+from app.auth.cookies import clear_auth_cookie
 from app.auth.dependencies import COOKIE_NAME, get_current_user
 from app.auth.jwt import TOKEN_EXPIRY
 from app.config import get_config
 from app.db import get_session
 from app.models import User
 from app.services.user_service import (
+    EmailAlreadyRegisteredError,
     LoginError,
     RegistrationError,
     login_user,
     register_user,
-    registration_is_available,
 )
 
 __all__ = ["router"]
@@ -86,26 +87,6 @@ def _make_auth_response(status_code: int, content: dict[str, object], token: str
     return response
 
 
-def _clear_auth_cookie(response: Response) -> None:
-    config = get_config()
-    secure = config.app_env != "development"
-    response.delete_cookie(
-        key=COOKIE_NAME,
-        path="/",
-        httponly=True,
-        samesite="lax",
-        secure=secure,
-    )
-
-
-@router.get("/auth/registration-status")
-def registration_status(session: Session = Depends(get_session)) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={"registration_available": registration_is_available(session)},
-    )
-
-
 @router.post("/auth/register")
 def register(
     body: RegistrationRequest,
@@ -113,10 +94,16 @@ def register(
 ) -> JSONResponse:
     try:
         user, token = register_user(session, body.email, body.password)
+    except EmailAlreadyRegisteredError as exc:
+        logger.info("Registration failed: duplicate email")
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": str(exc)},
+        )
     except RegistrationError as exc:
         logger.info("Registration failed: %s", exc)
         return JSONResponse(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={"detail": str(exc)},
         )
     return _make_auth_response(
@@ -156,6 +143,6 @@ def me(current_user: User = Depends(get_current_user)) -> JSONResponse:
 
 @router.post("/auth/logout")
 def logout(response: Response) -> Response:
-    _clear_auth_cookie(response)
+    clear_auth_cookie(response)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
