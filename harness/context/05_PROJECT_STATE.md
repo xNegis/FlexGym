@@ -15,6 +15,8 @@ F05 — Exercise Catalog is implemented and validated.
 F06 — Custom Exercises was reviewed and intentionally skipped for the MVP. The rationale and
 reconsideration criteria are documented in `harness/features/06_custom_exercises.md`.
 
+F07 — Routine Creation is implemented and validated.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -22,6 +24,7 @@ reconsideration criteria are documented in `harness/features/06_custom_exercises
 * F03 — User Fitness Profile
 * F04 — Profile Management
 * F05 — Exercise Catalog
+* F07 — Routine Creation
 
 ## Skipped Features
 
@@ -29,7 +32,7 @@ reconsideration criteria are documented in `harness/features/06_custom_exercises
 
 ## Next Feature
 
-Define F07 — Routine Creation.
+Implement F08 — Training Day Management.
 
 ## Existing Feature Specifications
 
@@ -39,6 +42,7 @@ Define F07 — Routine Creation.
 * `harness/features/04_profile_management.md`
 * `harness/features/05_exercise_catalog.md`
 * `harness/features/06_custom_exercises.md` (skipped)
+* `harness/features/07_routine_creation.md`
 
 ## Current Technology
 

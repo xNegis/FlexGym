@@ -174,3 +174,20 @@ The feature may be reconsidered after routine planning and workout tracking show
 cannot reasonably be addressed by expanding the curated catalog. Skipping F06 does not prohibit a
 later custom-exercise feature; it preserves the feature number as an explicit product decision and
 moves the next planned increment to F07 — Routine Creation.
+
+---
+
+## DEC-013 — A routine is a complete training plan
+
+**Status:** Accepted
+
+In FlexGym, a routine represents a complete training plan such as Push/Pull/Legs or a four-day
+hypertrophy plan. It is not an individual training session.
+
+A routine may contain ordered training days, and each training day may contain configured exercises.
+Training-day management should therefore be introduced before routine-exercise configuration so
+exercises can be attached directly to their intended day.
+
+The number of days in a routine is derived from its actual training-day records. It must not be
+stored as independent routine metadata because the declared count could disagree with the routine's
+structure.

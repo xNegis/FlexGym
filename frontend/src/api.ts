@@ -1,4 +1,4 @@
-import type { ExerciseDetail, ExerciseSummary, FitnessProfile } from "./types";
+import type { ExerciseDetail, ExerciseSummary, FitnessProfile, Routine } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -424,4 +424,172 @@ export async function fetchExercise(slug: string): Promise<ExerciseDetail | { no
     throw new Error("Invalid exercise detail response");
   }
   return data;
+}
+
+function isRoutine(value: unknown): value is Routine {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "number" &&
+    typeof v.name === "string" &&
+    typeof v.objective === "string" &&
+    (v.description === null || typeof v.description === "string") &&
+    typeof v.created_at === "string" &&
+    typeof v.updated_at === "string"
+  );
+}
+
+function isRoutineArray(value: unknown): value is Routine[] {
+  if (!Array.isArray(value)) return false;
+  return value.every(isRoutine);
+}
+
+export async function fetchRoutines(): Promise<Routine[]> {
+  const response = await fetch(`${API_BASE_URL}/api/routines`, {
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load routines");
+  }
+  const data: unknown = await response.json();
+  if (!isRoutineArray(data)) {
+    throw new Error("Invalid routines response");
+  }
+  return data;
+}
+
+export async function fetchRoutine(routineId: number): Promise<Routine | { notFound: true }> {
+  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}`, {
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 404) {
+    return { notFound: true };
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load routine");
+  }
+  const data: unknown = await response.json();
+  if (!isRoutine(data)) {
+    throw new Error("Invalid routine response");
+  }
+  return data;
+}
+
+export type RoutineResult = Routine | { detail: string };
+
+export async function createRoutine(data: {
+  name: string;
+  objective: string;
+  description: string | null;
+}): Promise<RoutineResult> {
+  const response = await fetch(`${API_BASE_URL}/api/routines`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 409) {
+      return { detail: "Routine name already exists" };
+    }
+    if (response.status === 422) {
+      if (typeof result === "object" && result !== null && "detail" in result) {
+        const detail = result.detail;
+        if (Array.isArray(detail)) {
+          const messages = detail
+            .filter(
+              (item): item is { msg: string } =>
+                typeof item === "object" &&
+                item !== null &&
+                "msg" in item &&
+                typeof item.msg === "string",
+            )
+            .map((item) => item.msg);
+          return { detail: messages.length > 0 ? messages.join("; ") : "Invalid routine data" };
+        }
+        if (typeof detail === "string") {
+          return { detail };
+        }
+      }
+    }
+    return { detail: "Unable to create routine" };
+  }
+  if (!isRoutine(result)) {
+    throw new Error("Invalid routine response");
+  }
+  return result;
+}
+
+export async function updateRoutine(
+  routineId: number,
+  data: { name: string; objective: string; description: string | null },
+): Promise<RoutineResult> {
+  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return { detail: "Routine not found" };
+    }
+    if (response.status === 409) {
+      return { detail: "Routine name already exists" };
+    }
+    if (response.status === 422) {
+      if (typeof result === "object" && result !== null && "detail" in result) {
+        const detail = result.detail;
+        if (Array.isArray(detail)) {
+          const messages = detail
+            .filter(
+              (item): item is { msg: string } =>
+                typeof item === "object" &&
+                item !== null &&
+                "msg" in item &&
+                typeof item.msg === "string",
+            )
+            .map((item) => item.msg);
+          return { detail: messages.length > 0 ? messages.join("; ") : "Invalid routine data" };
+        }
+        if (typeof detail === "string") {
+          return { detail };
+        }
+      }
+    }
+    return { detail: "Unable to update routine" };
+  }
+  if (!isRoutine(result)) {
+    throw new Error("Invalid routine response");
+  }
+  return result;
+}
+
+export async function deleteRoutine(routineId: number): Promise<{ detail: string } | null> {
+  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (response.status === 204) {
+    return null;
+  }
+  if (response.status === 404) {
+    return { detail: "Routine not found" };
+  }
+  const result: unknown = await responseJson(response);
+  if (typeof result === "object" && result !== null && "detail" in result) {
+    const detail = result.detail;
+    if (typeof detail === "string") {
+      return { detail };
+    }
+  }
+  return { detail: "Unable to delete routine" };
 }

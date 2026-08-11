@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -61,3 +61,30 @@ class Exercise(Base):
     movement_pattern: Mapped[str] = mapped_column(String, nullable=False)
     execution_type: Mapped[str] = mapped_column(String, nullable=False)
     instructions: Mapped[str] = mapped_column(String(500), nullable=False)
+
+
+class Routine(Base):
+    __tablename__ = "routines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    user: Mapped["User"] = relationship("User")
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    objective: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "normalized_name", name="uq_routine_user_normalized_name"),
+    )

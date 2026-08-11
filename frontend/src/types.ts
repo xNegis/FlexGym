@@ -1,7 +1,7 @@
 type AuthScreen =
   "loading" | "unavailable" | "registration" | "login" | "onboarding" | "authenticated";
 
-type Section = "profile" | "exercises";
+type Section = "profile" | "exercises" | "routines";
 
 interface User {
   id: number;
@@ -25,6 +25,15 @@ interface FitnessProfile {
   updated_at: string;
 }
 
+interface Routine {
+  id: number;
+  name: string;
+  objective: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ExerciseSummary {
   slug: string;
   name: string;
@@ -44,6 +53,7 @@ export {
   type ExerciseDetail,
   type ExerciseSummary,
   type FitnessProfile,
+  type Routine,
   type Section,
   type User,
 };

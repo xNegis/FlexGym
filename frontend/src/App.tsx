@@ -6,6 +6,7 @@ import FitnessProfileForm from "./components/FitnessProfileForm";
 import LoginForm from "./components/LoginForm";
 import ProfileManagement from "./components/ProfileManagement";
 import RegistrationForm from "./components/RegistrationForm";
+import RoutineManager from "./components/RoutineManager";
 import type { AuthScreen, FitnessProfile, Section, User } from "./types";
 import "./App.css";
 
@@ -164,6 +165,13 @@ function App() {
             >
               Exercises
             </button>
+            <button
+              type="button"
+              className={`nav-tab${section === "routines" ? " nav-tab-active" : ""}`}
+              onClick={() => handleSectionChange("routines")}
+            >
+              Routines
+            </button>
           </nav>
 
           {section === "profile" && (
@@ -192,6 +200,12 @@ function App() {
                 />
               )}
             </>
+          )}
+          {section === "routines" && (
+            <RoutineManager
+              profileGoal={profile.primary_goal}
+              onUnauthenticated={handleLoggedOut}
+            />
           )}
         </>
       )}

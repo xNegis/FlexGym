@@ -7,6 +7,7 @@ from app.api.auth import router as auth_router
 from app.api.exercises import router as exercises_router
 from app.api.fitness_profile import router as fitness_profile_router
 from app.api.health import router as health_router
+from app.api.routines import router as routines_router
 from app.config import get_config
 
 logging.basicConfig(level=logging.INFO)
@@ -27,3 +28,4 @@ app.include_router(health_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(fitness_profile_router, prefix="/api")
 app.include_router(exercises_router, prefix="/api")
+app.include_router(routines_router, prefix="/api")
