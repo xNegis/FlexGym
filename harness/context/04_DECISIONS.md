@@ -191,3 +191,22 @@ exercises can be attached directly to their intended day.
 The number of days in a routine is derived from its actual training-day records. It must not be
 stored as independent routine metadata because the declared count could disagree with the routine's
 structure.
+
+---
+
+## DEC-014 — Training sessions and the seven-day routine cycle are separate concepts
+
+**Status:** Accepted
+
+A training day represents one planned workout session inside a routine, such as Push, Pull, or
+Legs. It is not itself a weekday or a rest day. A routine may contain up to seven training days.
+
+Routine scheduling is a separate concern. Every scheduled routine uses exactly seven ordered weekly
+positions. Each position is either rest or references one training day, and every training day must
+be allocated exactly once before the routine can become active. Until scheduling is implemented, a
+routine and its training days may remain an incomplete draft.
+
+Training-day display order is independent from future weekly allocation. Rest is represented by the
+absence of a training-day assignment in a weekly position, not by a persisted training-day record.
+If two weekly sessions have the same purpose, they remain separate training-day records and may use
+the same display name.

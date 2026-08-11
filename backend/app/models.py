@@ -84,7 +84,38 @@ class Routine(Base):
         default=datetime.datetime.utcnow,
         onupdate=datetime.datetime.utcnow,
     )
+    training_days: Mapped[list["TrainingDay"]] = relationship(
+        "TrainingDay",
+        back_populates="routine",
+        cascade="all, delete-orphan",
+        order_by="TrainingDay.position",
+    )
 
     __table_args__ = (
         UniqueConstraint("user_id", "normalized_name", name="uq_routine_user_normalized_name"),
+    )
+
+
+class TrainingDay(Base):
+    __tablename__ = "training_days"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    routine_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("routines.id", ondelete="CASCADE"), nullable=False
+    )
+    routine: Mapped["Routine"] = relationship("Routine", back_populates="training_days")
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("routine_id", "position", name="uq_training_day_routine_position"),
     )

@@ -724,6 +724,244 @@
   cursor: pointer;
 }
 
-.routine-back-button:hover {
+.routine-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.routine-item-meta {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: #666;
+}
+
+.routine-item-count {
+  flex-shrink: 0;
+}
+
+/* Training days section */
+
+.training-days-section {
+  margin-top: 1.5rem;
+  border-top: 1px solid #eee;
+  padding-top: 1rem;
+}
+
+.training-days-heading {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 0.375rem;
+}
+
+.training-days-hint {
+  font-size: 0.8125rem;
+  color: #666;
+  margin: 0 0 1rem;
+  line-height: 1.4;
+}
+
+.training-days-empty {
+  text-align: center;
+  padding: 1rem 0;
+  color: #666;
+}
+
+.training-days-empty p {
+  margin: 0 0 0.5rem;
+}
+
+.training-days-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.training-day-item {
+  border: 1px solid #eee;
+  border-radius: 0.375rem;
+  margin-bottom: 0.375rem;
+  padding: 0.5rem;
+}
+
+.training-day-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2rem;
+}
+
+.training-day-position {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #666;
+  min-width: 1.25rem;
+  text-align: right;
+}
+
+.training-day-name {
+  font-size: 0.875rem;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.training-day-controls {
+  display: flex;
+  gap: 0.125rem;
+  flex-shrink: 0;
+}
+
+.training-day-move-button {
+  padding: 0.25rem 0.375rem;
+  font-size: 0.625rem;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+  background: #fff;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.training-day-move-button:hover:not(:disabled) {
   background: #f0f0f0;
+}
+
+.training-day-move-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.training-day-action-button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid #4a90d9;
+  border-radius: 0.25rem;
+  background: #4a90d9;
+  color: #fff;
+  cursor: pointer;
+}
+
+.training-day-action-button:hover:not(:disabled) {
+  background: #3a7bc8;
+}
+
+.training-day-action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.training-day-delete-button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid #c62828;
+  border-radius: 0.25rem;
+  background: #fff;
+  color: #c62828;
+  cursor: pointer;
+}
+
+.training-day-delete-button:hover:not(:disabled) {
+  background: #fdecea;
+}
+
+.training-day-delete-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.training-day-cancel-button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+  background: #fff;
+  cursor: pointer;
+}
+
+.training-day-cancel-button:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.training-day-cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.training-day-rename {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.training-day-rename-input {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.training-day-rename-input:focus {
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
+.training-day-rename-actions {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.training-day-add {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.training-day-add-input {
+  flex: 1;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+  outline: none;
+}
+
+.training-day-add-input:focus {
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
+.training-day-add-input:disabled {
+  background: #f5f5f5;
+  color: #999;
+}
+
+.training-day-add-button {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  border: 1px solid #1a73e8;
+  border-radius: 0.25rem;
+  background: #1a73e8;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.training-day-add-button:hover:not(:disabled) {
+  background: #1557b0;
+}
+
+.training-day-add-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.training-days-limit-message {
+  font-size: 0.8125rem;
+  color: #666;
+  margin: 0 0 0.5rem;
+  text-align: center;
 }

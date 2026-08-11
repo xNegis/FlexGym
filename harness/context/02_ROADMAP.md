@@ -51,15 +51,23 @@ Allow the user to inspect and modify their fitness profile.
 
 Goal: represent the user's training plan.
 
-Planned areas:
+The planning model separates reusable exercise definitions, the training sessions that compose a
+routine, and the seven-day weekly cycle in which those sessions are performed.
 
-* Exercise catalog
-* Custom exercises
-* Routine creation
-* Routine exercise configuration
-* Training day management
-* Active routine
-* Routine schedule
+Current intended sequence:
+
+* F05 — Exercise Catalog
+* F06 — Custom Exercises (intentionally skipped for the current MVP)
+* F07 — Routine Creation
+* F08 — Training Day Management
+* Routine Exercise Configuration
+* Routine Schedule
+* Active Routine
+
+A training day is one planned workout session inside a routine, such as Push, Pull, or Legs. It is
+not a weekday. Routine Schedule will later provide exactly seven ordered weekly positions, each of
+which is either rest or references one training day. Every training day must be allocated exactly
+once before a routine can become active. A routine may remain incomplete while it is being designed.
 
 ---
 

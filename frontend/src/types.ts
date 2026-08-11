@@ -30,6 +30,15 @@ interface Routine {
   name: string;
   objective: string;
   description: string | null;
+  training_day_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface TrainingDay {
+  id: number;
+  name: string;
+  position: number;
   created_at: string;
   updated_at: string;
 }
@@ -55,5 +64,6 @@ export {
   type FitnessProfile,
   type Routine,
   type Section,
+  type TrainingDay,
   type User,
 };

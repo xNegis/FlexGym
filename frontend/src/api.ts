@@ -1,4 +1,10 @@
-import type { ExerciseDetail, ExerciseSummary, FitnessProfile, Routine } from "./types";
+import type {
+  ExerciseDetail,
+  ExerciseSummary,
+  FitnessProfile,
+  Routine,
+  TrainingDay,
+} from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -448,6 +454,9 @@ function isRoutine(value: unknown): value is Routine {
       (typeof v.description === "string" &&
         v.description.trim().length > 0 &&
         v.description.length <= 1000)) &&
+    typeof v.training_day_count === "number" &&
+    Number.isInteger(v.training_day_count) &&
+    v.training_day_count >= 0 &&
     typeof v.created_at === "string" &&
     v.created_at.length > 0 &&
     typeof v.updated_at === "string" &&
@@ -610,4 +619,184 @@ export async function deleteRoutine(routineId: number): Promise<{ detail: string
     return { detail: "Routine not found" };
   }
   return { detail: "Unable to delete routine" };
+}
+
+function isTrainingDay(value: unknown): value is TrainingDay {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "number" &&
+    Number.isInteger(v.id) &&
+    v.id > 0 &&
+    typeof v.name === "string" &&
+    v.name.trim().length > 0 &&
+    v.name.length <= 120 &&
+    typeof v.position === "number" &&
+    Number.isInteger(v.position) &&
+    v.position >= 1 &&
+    typeof v.created_at === "string" &&
+    v.created_at.length > 0 &&
+    typeof v.updated_at === "string" &&
+    v.updated_at.length > 0
+  );
+}
+
+function isTrainingDayArray(value: unknown): value is TrainingDay[] {
+  if (!Array.isArray(value)) return false;
+  return value.every(isTrainingDay);
+}
+
+export type TrainingDayResult = TrainingDay | { detail: string };
+export type TrainingDayListResult = TrainingDay[] | { detail: string };
+
+function trainingDayErrorMessage(
+  result: unknown,
+  status: number,
+  fallbacks: Record<number, string>,
+): string {
+  if (status in fallbacks && typeof result === "object" && result !== null && "detail" in result) {
+    const detail = (result as Record<string, unknown>).detail;
+    if (typeof detail === "string" && detail.trim().length > 0) {
+      return detail;
+    }
+  }
+  if (status === 422 && typeof result === "object" && result !== null && "detail" in result) {
+    const detail = (result as Record<string, unknown>).detail;
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .filter(
+          (item): item is { msg: string } =>
+            typeof item === "object" &&
+            item !== null &&
+            "msg" in item &&
+            typeof item.msg === "string",
+        )
+        .map((item) => item.msg);
+      return messages.length > 0 ? messages.join("; ") : "Invalid request";
+    }
+  }
+  return fallbacks[status] ?? "Unable to complete request";
+}
+
+export async function fetchTrainingDays(routineId: number): Promise<TrainingDayListResult> {
+  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}/days`, {
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return { detail: "Routine not found" };
+    }
+    return { detail: "Unable to load training days" };
+  }
+  if (!isTrainingDayArray(result)) {
+    throw new Error("Invalid training days response");
+  }
+  return result;
+}
+
+export async function createTrainingDay(
+  routineId: number,
+  name: string,
+): Promise<TrainingDayResult> {
+  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}/days`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    return {
+      detail: trainingDayErrorMessage(result, response.status, {
+        404: "Routine not found",
+        409: "Routine already has 7 training days",
+      }),
+    };
+  }
+  if (!isTrainingDay(result)) {
+    throw new Error("Invalid training day response");
+  }
+  return result;
+}
+
+export async function renameTrainingDay(
+  routineId: number,
+  dayId: number,
+  name: string,
+): Promise<TrainingDayResult> {
+  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}/days/${dayId}`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    return {
+      detail: trainingDayErrorMessage(result, response.status, {
+        404: "Training day not found",
+      }),
+    };
+  }
+  if (!isTrainingDay(result)) {
+    throw new Error("Invalid training day response");
+  }
+  return result;
+}
+
+export async function reorderTrainingDays(
+  routineId: number,
+  dayIds: number[],
+): Promise<TrainingDayListResult> {
+  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}/days/order`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ day_ids: dayIds }),
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    return {
+      detail: trainingDayErrorMessage(result, response.status, {
+        404: "Routine not found",
+      }),
+    };
+  }
+  if (!isTrainingDayArray(result)) {
+    throw new Error("Invalid training days response");
+  }
+  return result;
+}
+
+export async function deleteTrainingDay(
+  routineId: number,
+  dayId: number,
+): Promise<{ detail: string } | null> {
+  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}/days/${dayId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 204) {
+    return null;
+  }
+  if (response.status === 404) {
+    return { detail: "Training day not found" };
+  }
+  return { detail: "Unable to delete training day" };
 }

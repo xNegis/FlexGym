@@ -85,6 +85,7 @@ def _routine_out(routine: Routine) -> JSONResponse:
             "name": routine.name,
             "objective": routine.objective,
             "description": routine.description,
+            "training_day_count": len(routine.training_days),
             "created_at": routine.created_at.isoformat(),
             "updated_at": routine.updated_at.isoformat(),
         },
@@ -105,6 +106,7 @@ def list_routines_endpoint(
                 "name": r.name,
                 "objective": r.objective,
                 "description": r.description,
+                "training_day_count": len(r.training_days),
                 "created_at": r.created_at.isoformat(),
                 "updated_at": r.updated_at.isoformat(),
             }
@@ -139,6 +141,7 @@ def create_routine_endpoint(
             "name": routine.name,
             "objective": routine.objective,
             "description": routine.description,
+            "training_day_count": len(routine.training_days),
             "created_at": routine.created_at.isoformat(),
             "updated_at": routine.updated_at.isoformat(),
         },

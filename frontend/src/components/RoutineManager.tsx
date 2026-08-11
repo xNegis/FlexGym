@@ -1,12 +1,18 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   createRoutine,
+  createTrainingDay,
   deleteRoutine,
+  deleteTrainingDay,
   fetchRoutines,
+  fetchRoutine,
+  fetchTrainingDays,
+  renameTrainingDay,
+  reorderTrainingDays,
   UnauthenticatedError,
   updateRoutine,
 } from "../api";
-import type { Routine } from "../types";
+import type { Routine, TrainingDay } from "../types";
 import { labelFor, OBJECTIVE_OPTIONS } from "./routineConstants";
 
 interface Props {
@@ -30,6 +36,12 @@ function toFormState(routine: Routine): FormState {
     objective: routine.objective,
     description: routine.description ?? "",
   };
+}
+
+function trainingDayCountLabel(count: number): string {
+  if (count === 0) return "No training days";
+  if (count === 1) return "1 training day";
+  return `${count} training days`;
 }
 
 export default function RoutineManager({ profileGoal, onUnauthenticated }: Props) {
@@ -64,6 +76,60 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
       loadRoutines();
     }
   }, [viewMode, loadRoutines]);
+
+  // Training day state
+  const [trainingDays, setTrainingDays] = useState<TrainingDay[] | null>(null);
+  const [trainingDaysLoading, setTrainingDaysLoading] = useState(false);
+  const [trainingDayError, setTrainingDayError] = useState<string | null>(null);
+  const [trainingDayFormName, setTrainingDayFormName] = useState("");
+  const [renameDayId, setRenameDayId] = useState<number | null>(null);
+  const [deleteDayId, setDeleteDayId] = useState<number | null>(null);
+  const [reorderPending, setReorderPending] = useState(false);
+
+  const loadTrainingDays = useCallback(async (routineId: number, silent: boolean = false) => {
+    if (!silent) {
+      setTrainingDaysLoading(true);
+      setTrainingDayError(null);
+    }
+    try {
+      const result = await fetchTrainingDays(routineId);
+      if ("detail" in result) {
+        if (result.detail === "Routine not found") {
+          setSelectedId(null);
+          setSelectedRoutine(null);
+          setViewMode("list");
+          return;
+        }
+        if (!silent) setTrainingDayError(result.detail);
+      } else {
+        setTrainingDays(result);
+      }
+    } catch {
+      if (!silent) setTrainingDayError("Unable to load training days");
+    } finally {
+      if (!silent) setTrainingDaysLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (viewMode === "detail" && selectedId !== null) {
+      setTrainingDays(null);
+      loadTrainingDays(selectedId);
+    }
+  }, [viewMode, selectedId, loadTrainingDays]);
+
+  const refreshRoutineAndDays = useCallback(async () => {
+    if (selectedId === null) return;
+    const result = await fetchRoutine(selectedId);
+    if ("notFound" in result) {
+      setSelectedId(null);
+      setSelectedRoutine(null);
+      setViewMode("list");
+      return;
+    }
+    setSelectedRoutine(result);
+    loadTrainingDays(selectedId, true);
+  }, [selectedId, loadTrainingDays]);
 
   // -- List view -------------------------------------------------------
 
@@ -194,6 +260,158 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
     setError(null);
   };
 
+  // -- Training day actions --------------------------------------------
+
+  const canAddDay = (trainingDays?.length ?? 0) < 7 && !pending && !reorderPending;
+
+  const handleAddTrainingDay = async (e: FormEvent) => {
+    e.preventDefault();
+    const name = trainingDayFormName.trim();
+    if (!name || !canAddDay || selectedId === null) return;
+    setTrainingDayError(null);
+    setPending(true);
+    try {
+      const result = await createTrainingDay(selectedId, name);
+      if ("detail" in result) {
+        setTrainingDayError(result.detail);
+      } else {
+        setTrainingDayFormName("");
+        refreshRoutineAndDays();
+      }
+    } catch (e) {
+      if (e instanceof UnauthenticatedError) {
+        onUnauthenticated();
+        return;
+      }
+      setTrainingDayError("Unable to save training day");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const startRename = (day: TrainingDay) => {
+    setRenameDayId(day.id);
+    setTrainingDayFormName(day.name);
+    setTrainingDayError(null);
+  };
+
+  const cancelRename = () => {
+    setRenameDayId(null);
+    setTrainingDayFormName("");
+    setTrainingDayError(null);
+  };
+
+  const handleRename = async (e: FormEvent) => {
+    e.preventDefault();
+    const name = trainingDayFormName.trim();
+    if (!name || selectedId === null || renameDayId === null || pending) return;
+    setTrainingDayError(null);
+    setPending(true);
+    try {
+      const result = await renameTrainingDay(selectedId, renameDayId, name);
+      if ("detail" in result) {
+        setTrainingDayError(result.detail);
+      } else {
+        setRenameDayId(null);
+        setTrainingDayFormName("");
+        refreshRoutineAndDays();
+      }
+    } catch (e) {
+      if (e instanceof UnauthenticatedError) {
+        onUnauthenticated();
+        return;
+      }
+      setTrainingDayError("Unable to rename training day");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const handleMoveUp = async (day: TrainingDay) => {
+    if (!trainingDays || trainingDays.length < 2 || reorderPending || selectedId === null) return;
+    const index = trainingDays.findIndex((d) => d.id === day.id);
+    if (index <= 0) return;
+    const newOrder = [...trainingDays];
+    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+    await submitReorder(newOrder.map((d) => d.id));
+  };
+
+  const handleMoveDown = async (day: TrainingDay) => {
+    if (!trainingDays || trainingDays.length < 2 || reorderPending || selectedId === null) return;
+    const index = trainingDays.findIndex((d) => d.id === day.id);
+    if (index < 0 || index >= trainingDays.length - 1) return;
+    const newOrder = [...trainingDays];
+    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+    await submitReorder(newOrder.map((d) => d.id));
+  };
+
+  const submitReorder = async (dayIds: number[]) => {
+    if (selectedId === null) return;
+    const previous = trainingDays;
+    setTrainingDays((current) => {
+      if (!current) return current;
+      const sorted = dayIds
+        .map((id) => current.find((d) => d.id === id))
+        .filter((d): d is TrainingDay => d !== undefined);
+      return sorted.map((d, i) => ({ ...d, position: i + 1 }));
+    });
+    setReorderPending(true);
+    setTrainingDayError(null);
+    try {
+      const result = await reorderTrainingDays(selectedId, dayIds);
+      if ("detail" in result) {
+        setTrainingDays(previous);
+        setTrainingDayError(result.detail);
+      } else {
+        setTrainingDays(result);
+        setTrainingDayError(null);
+      }
+    } catch {
+      setTrainingDays(previous);
+      setTrainingDayError("Unable to reorder training days");
+    } finally {
+      setReorderPending(false);
+    }
+  };
+
+  const startDeleteDay = (day: TrainingDay) => {
+    setDeleteDayId(day.id);
+    setTrainingDayError(null);
+  };
+
+  const cancelDeleteDay = () => {
+    setDeleteDayId(null);
+    setTrainingDayError(null);
+  };
+
+  const handleDeleteDay = async () => {
+    if (selectedId === null || deleteDayId === null) return;
+    setTrainingDayError(null);
+    setPending(true);
+    try {
+      const result = await deleteTrainingDay(selectedId, deleteDayId);
+      if (result !== null) {
+        if (result.detail === "Training day not found") {
+          setDeleteDayId(null);
+          refreshRoutineAndDays();
+          return;
+        }
+        setTrainingDayError(result.detail);
+      } else {
+        setDeleteDayId(null);
+        refreshRoutineAndDays();
+      }
+    } catch (e) {
+      if (e instanceof UnauthenticatedError) {
+        onUnauthenticated();
+        return;
+      }
+      setTrainingDayError("Unable to delete training day");
+    } finally {
+      setPending(false);
+    }
+  };
+
   // -- Render: List view -----------------------------------------------
 
   if (viewMode === "list") {
@@ -243,8 +461,15 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
                   className="routine-item-button"
                   onClick={() => handleOpenRoutine(r)}
                 >
-                  <span className="routine-item-name">{r.name}</span>
-                  <span className="routine-item-objective">{labelFor(r.objective)}</span>
+                  <div className="routine-item-content">
+                    <span className="routine-item-name">{r.name}</span>
+                    <div className="routine-item-meta">
+                      <span className="routine-item-objective">{labelFor(r.objective)}</span>
+                      <span className="routine-item-count">
+                        {trainingDayCountLabel(r.training_day_count)}
+                      </span>
+                    </div>
+                  </div>
                 </button>
               </li>
             ))}
@@ -322,6 +547,47 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
   // -- Render: Detail view ---------------------------------------------
 
   if (viewMode === "detail") {
+    // Training day delete confirmation sub-view
+    if (deleteDayId !== null && selectedRoutine) {
+      const day = trainingDays?.find((d) => d.id === deleteDayId);
+      return (
+        <div className="routine-detail">
+          <h2 className="routine-detail-heading">{selectedRoutine.name}</h2>
+          <h3 className="routine-form-heading">Delete training day</h3>
+
+          <div className="delete-confirmation">
+            <p>
+              Are you sure you want to delete <strong>{day?.name}</strong>? This action is permanent
+              and cannot be undone.
+            </p>
+          </div>
+
+          {trainingDayError && (
+            <div className="routine-detail-error" role="alert">
+              {trainingDayError}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="auth-delete-confirm-button"
+            onClick={handleDeleteDay}
+            disabled={pending}
+          >
+            {pending ? "Deleting..." : "Delete training day"}
+          </button>
+          <button
+            type="button"
+            className="auth-cancel"
+            onClick={cancelDeleteDay}
+            disabled={pending}
+          >
+            Cancel
+          </button>
+        </div>
+      );
+    }
+
     if (!selectedRoutine) {
       return (
         <div className="routine-section">
@@ -332,6 +598,8 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
         </div>
       );
     }
+
+    const atLimit = (trainingDays?.length ?? 0) >= 7;
 
     return (
       <div className="routine-detail">
@@ -366,40 +634,186 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
             Back to routines
           </button>
         </div>
+
+        <div className="training-days-section">
+          <h3 className="training-days-heading">Training days</h3>
+          <p className="training-days-hint">
+            Training days are workout sessions inside this routine. Their weekly placement will be
+            configured in a later scheduling step.
+          </p>
+
+          {trainingDayError && (
+            <div className="routine-detail-error" role="alert">
+              {trainingDayError}
+            </div>
+          )}
+
+          {trainingDaysLoading ? (
+            <div className="routine-loading" role="status">
+              Loading training days...
+            </div>
+          ) : trainingDays === null ? null : trainingDays.length === 0 ? (
+            <div className="training-days-empty">
+              <p>No training days yet.</p>
+              <p className="routine-empty-hint">Add a training day to define a workout session.</p>
+            </div>
+          ) : (
+            <ul className="training-days-list">
+              {trainingDays.map((day) => (
+                <li key={day.id} className="training-day-item">
+                  {renameDayId === day.id ? (
+                    <form className="training-day-rename" onSubmit={handleRename} noValidate>
+                      <input
+                        type="text"
+                        className="training-day-rename-input"
+                        value={trainingDayFormName}
+                        onChange={(e) => setTrainingDayFormName(e.target.value)}
+                        maxLength={120}
+                        required
+                        disabled={pending}
+                        autoFocus
+                      />
+                      <div className="training-day-rename-actions">
+                        <button
+                          type="submit"
+                          className="training-day-action-button"
+                          disabled={!trainingDayFormName.trim() || pending}
+                        >
+                          {pending ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          className="training-day-cancel-button"
+                          onClick={cancelRename}
+                          disabled={pending}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="training-day-row">
+                      <span className="training-day-position">{day.position}.</span>
+                      <span className="training-day-name">{day.name}</span>
+                      <div className="training-day-controls">
+                        <button
+                          type="button"
+                          className="training-day-move-button"
+                          onClick={() => handleMoveUp(day)}
+                          disabled={day.position === 1 || reorderPending || pending}
+                          aria-label={`Move ${day.name} up`}
+                        >
+                          &#9650;
+                        </button>
+                        <button
+                          type="button"
+                          className="training-day-move-button"
+                          onClick={() => handleMoveDown(day)}
+                          disabled={
+                            day.position === (trainingDays?.length ?? 0) ||
+                            reorderPending ||
+                            pending
+                          }
+                          aria-label={`Move ${day.name} down`}
+                        >
+                          &#9660;
+                        </button>
+                        <button
+                          type="button"
+                          className="training-day-action-button"
+                          onClick={() => startRename(day)}
+                          disabled={reorderPending || pending}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          className="training-day-delete-button"
+                          onClick={() => startDeleteDay(day)}
+                          disabled={reorderPending || pending}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {atLimit ? (
+            <p className="training-days-limit-message">
+              This routine has the maximum of 7 training days. Delete an existing day to add a new
+              one.
+            </p>
+          ) : (
+            <form className="training-day-add" onSubmit={handleAddTrainingDay} noValidate>
+              <input
+                type="text"
+                className="training-day-add-input"
+                value={trainingDayFormName}
+                onChange={(e) => setTrainingDayFormName(e.target.value)}
+                maxLength={120}
+                placeholder="Day name (e.g. Push)"
+                required
+                disabled={!canAddDay || renameDayId !== null}
+              />
+              <button
+                type="submit"
+                className="training-day-add-button"
+                disabled={!trainingDayFormName.trim() || !canAddDay || renameDayId !== null}
+              >
+                {pending ? "Adding..." : "Add training day"}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     );
   }
 
-  // -- Render: Delete confirmation -------------------------------------
+  // -- Render: Delete routine confirmation -----------------------------
 
-  return (
-    <div className="routine-detail">
-      <h2 className="routine-form-heading">Delete routine</h2>
+  if (viewMode === "delete") {
+    return (
+      <div className="routine-detail">
+        <h2 className="routine-form-heading">Delete routine</h2>
 
-      <div className="delete-confirmation">
-        <p>
-          Are you sure you want to delete <strong>{selectedRoutine?.name}</strong>? This action is
-          permanent and cannot be undone.
-        </p>
-      </div>
-
-      {error && (
-        <div className="routine-detail-error" role="alert">
-          {error}
+        <div className="delete-confirmation">
+          <p>
+            Are you sure you want to delete <strong>{selectedRoutine?.name}</strong>?
+            {selectedRoutine && selectedRoutine.training_day_count > 0 && (
+              <>
+                {" "}
+                All {selectedRoutine.training_day_count} training days will also be permanently
+                deleted.
+              </>
+            )}{" "}
+            This action is permanent and cannot be undone.
+          </p>
         </div>
-      )}
 
-      <button
-        type="button"
-        className="auth-delete-confirm-button"
-        onClick={handleDelete}
-        disabled={pending}
-      >
-        {pending ? "Deleting..." : "Delete routine"}
-      </button>
-      <button type="button" className="auth-cancel" onClick={cancelDelete} disabled={pending}>
-        Cancel
-      </button>
-    </div>
-  );
+        {error && (
+          <div className="routine-detail-error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="auth-delete-confirm-button"
+          onClick={handleDelete}
+          disabled={pending}
+        >
+          {pending ? "Deleting..." : "Delete routine"}
+        </button>
+        <button type="button" className="auth-cancel" onClick={cancelDelete} disabled={pending}>
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return null;
 }

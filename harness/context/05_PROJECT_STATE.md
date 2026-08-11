@@ -17,6 +17,8 @@ reconsideration criteria are documented in `harness/features/06_custom_exercises
 
 F07 — Routine Creation is implemented and validated.
 
+F08 — Training Day Management is implemented and validated.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -25,6 +27,7 @@ F07 — Routine Creation is implemented and validated.
 * F04 — Profile Management
 * F05 — Exercise Catalog
 * F07 — Routine Creation
+* F08 — Training Day Management
 
 ## Skipped Features
 
@@ -32,7 +35,7 @@ F07 — Routine Creation is implemented and validated.
 
 ## Next Feature
 
-Implement F08 — Training Day Management.
+TBD — The next feature will be defined based on roadmap priorities.
 
 ## Existing Feature Specifications
 
@@ -43,6 +46,7 @@ Implement F08 — Training Day Management.
 * `harness/features/05_exercise_catalog.md`
 * `harness/features/06_custom_exercises.md` (skipped)
 * `harness/features/07_routine_creation.md`
+* `harness/features/08_training_day_management.md`
 
 ## Current Technology
 
