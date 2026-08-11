@@ -24,9 +24,7 @@ class TrainingDayOrderError(Exception):
     pass
 
 
-def _require_training_day(
-    session: Session, routine_id: int, day_id: int
-) -> TrainingDay:
+def _require_training_day(session: Session, routine_id: int, day_id: int) -> TrainingDay:
     day = (
         session.query(TrainingDay)
         .filter(TrainingDay.id == day_id, TrainingDay.routine_id == routine_id)
@@ -42,9 +40,7 @@ def _refresh_routine_timestamp(session: Session, routine: Routine) -> None:
     session.add(routine)
 
 
-def list_training_days(
-    session: Session, routine_id: int, user_id: int
-) -> list[TrainingDay]:
+def list_training_days(session: Session, routine_id: int, user_id: int) -> list[TrainingDay]:
     _require_routine(session, routine_id, user_id)
     return (
         session.query(TrainingDay)
@@ -54,16 +50,10 @@ def list_training_days(
     )
 
 
-def create_training_day(
-    session: Session, routine_id: int, user_id: int, name: str
-) -> TrainingDay:
+def create_training_day(session: Session, routine_id: int, user_id: int, name: str) -> TrainingDay:
     routine = _require_routine(session, routine_id, user_id)
 
-    count = (
-        session.query(TrainingDay)
-        .filter(TrainingDay.routine_id == routine_id)
-        .count()
-    )
+    count = session.query(TrainingDay).filter(TrainingDay.routine_id == routine_id).count()
     if count >= MAX_TRAINING_DAYS:
         raise TrainingDayLimitError("Routine already has 7 training days")
 
@@ -101,7 +91,8 @@ def reorder_training_days(
         .all()
     )
 
-    if {d.id for d in existing} != set(day_ids):
+    existing_ids = {day.id for day in existing}
+    if len(day_ids) != len(existing_ids) or set(day_ids) != existing_ids:
         raise TrainingDayOrderError("Day order must contain every training day exactly once")
 
     id_to_day = {d.id: d for d in existing}
@@ -125,9 +116,7 @@ def reorder_training_days(
     )
 
 
-def delete_training_day(
-    session: Session, routine_id: int, user_id: int, day_id: int
-) -> None:
+def delete_training_day(session: Session, routine_id: int, user_id: int, day_id: int) -> None:
     _require_routine(session, routine_id, user_id)
     day = _require_training_day(session, routine_id, day_id)
     routine = day.routine

@@ -5,7 +5,7 @@ from __future__ import annotations
 import unicodedata
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import Routine
 
@@ -71,6 +71,7 @@ def create_routine(
 def list_routines(session: Session, user_id: int) -> list[Routine]:
     return (
         session.query(Routine)
+        .options(selectinload(Routine.training_days))
         .filter(Routine.user_id == user_id)
         .order_by(Routine.name.collate("NOCASE").asc(), Routine.id.asc())
         .all()
@@ -79,7 +80,10 @@ def list_routines(session: Session, user_id: int) -> list[Routine]:
 
 def get_routine(session: Session, routine_id: int, user_id: int) -> Routine | None:
     return (
-        session.query(Routine).filter(Routine.id == routine_id, Routine.user_id == user_id).first()
+        session.query(Routine)
+        .options(selectinload(Routine.training_days))
+        .filter(Routine.id == routine_id, Routine.user_id == user_id)
+        .first()
     )
 
 

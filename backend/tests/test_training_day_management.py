@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+from collections.abc import Generator
+from pathlib import Path
+
 from fastapi.testclient import TestClient
-from sqlalchemy import text
-from sqlalchemy.engine import Engine
+from sqlalchemy import create_engine, inspect
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.db import get_session
+from app.main import app
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+F08_REVISION = "b61961abf6a5"
+PREVIOUS_REVISION = "a7b2c3d4e5f6"
 
 
 def _register(client: TestClient, email: str = "td@example.com") -> tuple[str, int]:
@@ -71,9 +84,7 @@ def test_create_and_list_training_days(client: TestClient) -> None:
     assert d2["position"] == 2
     assert d3["position"] == 3
 
-    response = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    )
+    response = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token))
     assert response.status_code == 200
     days = response.json()
     assert len(days) == 3
@@ -87,9 +98,7 @@ def test_empty_training_days_list(client: TestClient) -> None:
     token, _ = _register(client)
     routine = _create_routine(client, token)
 
-    response = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    )
+    response = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token))
     assert response.status_code == 200
     assert response.json() == []
 
@@ -98,17 +107,15 @@ def test_duplicate_names_accepted(client: TestClient) -> None:
     token, _ = _register(client)
     routine = _create_routine(client, token)
 
-    _create_day(client, token, routine["id"], "Full Body")
+    d1 = _create_day(client, token, routine["id"], "Full Body")
     d2 = _create_day(client, token, routine["id"], "Full Body")
 
     assert d2["name"] == "Full Body"
-    assert d2["id"] != _create_day.__name__  # different IDs
-    response = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    )
+    assert d2["id"] != d1["id"]
+    response = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token))
     days = response.json()
     assert len(days) == 2
-    assert {d["id"] for d in days} == {d["id"] for d in days}  # all distinct
+    assert {d["id"] for d in days} == {d1["id"], d2["id"]}
 
 
 # -- Seven-day limit --------------------------------------------------------
@@ -130,9 +137,7 @@ def test_seven_day_limit(client: TestClient) -> None:
     assert response.json() == {"detail": "Routine already has 7 training days"}
 
     # Verify seventh day still exists and no eighth was created
-    days = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    ).json()
+    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     assert len(days) == 7
 
 
@@ -143,9 +148,7 @@ def test_limit_resets_after_delete(client: TestClient) -> None:
     for i in range(7):
         _create_day(client, token, routine["id"], f"Day {i + 1}")
 
-    days = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    ).json()
+    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     client.delete(
         f"/api/routines/{routine['id']}/days/{days[0]['id']}",
         headers=_auth_headers(token),
@@ -166,17 +169,13 @@ def test_training_day_count_in_routine_output(client: TestClient) -> None:
     token, _ = _register(client)
     routine = _create_routine(client, token)
 
-    detail = client.get(
-        f"/api/routines/{routine['id']}", headers=_auth_headers(token)
-    ).json()
+    detail = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
     assert detail["training_day_count"] == 0
 
     _create_day(client, token, routine["id"], "Push")
     _create_day(client, token, routine["id"], "Pull")
 
-    detail = client.get(
-        f"/api/routines/{routine['id']}", headers=_auth_headers(token)
-    ).json()
+    detail = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
     assert detail["training_day_count"] == 2
 
     routines = client.get("/api/routines", headers=_auth_headers(token)).json()
@@ -205,9 +204,7 @@ def test_rename_training_day(client: TestClient) -> None:
     assert data["updated_at"] != day["updated_at"]
 
     # Verify via list
-    days = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    ).json()
+    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     assert days[0]["name"] == "Upper body"
 
 
@@ -286,10 +283,41 @@ def test_reorder_invalid_ids(client: TestClient) -> None:
     assert "exactly once" in response.json()["detail"]
 
     # Verify order unchanged
-    days = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    ).json()
+    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     assert len(days) == 2
+
+
+def test_reorder_rejects_duplicate_full_id_set(client: TestClient) -> None:
+    token, _ = _register(client)
+    routine = _create_routine(client, token)
+    d1 = _create_day(client, token, routine["id"], "Push")
+    d2 = _create_day(client, token, routine["id"], "Pull")
+    d3 = _create_day(client, token, routine["id"], "Legs")
+
+    response = client.put(
+        f"/api/routines/{routine['id']}/days/order",
+        json={"day_ids": [d1["id"], d1["id"], d2["id"], d3["id"]]},
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 422
+    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
+    assert [day["position"] for day in days] == [1, 2, 3]
+    assert [day["id"] for day in days] == [d1["id"], d2["id"], d3["id"]]
+
+
+def test_reorder_rejects_coerced_id_types(client: TestClient) -> None:
+    token, _ = _register(client)
+    routine = _create_routine(client, token)
+    day = _create_day(client, token, routine["id"], "Push")
+
+    response = client.put(
+        f"/api/routines/{routine['id']}/days/order",
+        json={"day_ids": [str(day["id"])]},
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 422
 
 
 def test_reorder_empty_list_when_no_days(client: TestClient) -> None:
@@ -310,9 +338,9 @@ def test_reorder_empty_list_when_no_days(client: TestClient) -> None:
 def test_delete_training_day(client: TestClient) -> None:
     token, _ = _register(client)
     routine = _create_routine(client, token)
-    d1 = _create_day(client, token, routine["id"], "Push")
+    _create_day(client, token, routine["id"], "Push")
     d2 = _create_day(client, token, routine["id"], "Pull")
-    d3 = _create_day(client, token, routine["id"], "Legs")
+    _create_day(client, token, routine["id"], "Legs")
 
     response = client.delete(
         f"/api/routines/{routine['id']}/days/{d2['id']}",
@@ -321,9 +349,7 @@ def test_delete_training_day(client: TestClient) -> None:
     assert response.status_code == 204
 
     # Verify position compaction
-    days = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    ).json()
+    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     assert len(days) == 2
     positions = [d["position"] for d in days]
     assert positions == [1, 2]
@@ -336,22 +362,16 @@ def test_delete_updates_count(client: TestClient) -> None:
     routine = _create_routine(client, token)
     _create_day(client, token, routine["id"], "Push")
 
-    before = client.get(
-        f"/api/routines/{routine['id']}", headers=_auth_headers(token)
-    ).json()
+    before = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
     assert before["training_day_count"] == 1
 
-    days = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    ).json()
+    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     client.delete(
         f"/api/routines/{routine['id']}/days/{days[0]['id']}",
         headers=_auth_headers(token),
     )
 
-    after = client.get(
-        f"/api/routines/{routine['id']}", headers=_auth_headers(token)
-    ).json()
+    after = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
     assert after["training_day_count"] == 0
 
 
@@ -367,9 +387,7 @@ def test_list_only_returns_owned_routine_days(client: TestClient) -> None:
     _create_day(client, token2, routine2["id"], "Pull")
 
     # User 2 sees User 1's routine as not found
-    response = client.get(
-        f"/api/routines/{routine1['id']}/days", headers=_auth_headers(token2)
-    )
+    response = client.get(f"/api/routines/{routine1['id']}/days", headers=_auth_headers(token2))
     assert response.status_code == 404
     assert response.json() == {"detail": "Routine not found"}
 
@@ -397,9 +415,7 @@ def test_other_user_routine_not_found(client: TestClient) -> None:
     day = _create_day(client, token2, routine2["id"], "Pull")
 
     # User 1 trying to access User 2's training days
-    response = client.get(
-        f"/api/routines/{routine2['id']}/days", headers=_auth_headers(token1)
-    )
+    response = client.get(f"/api/routines/{routine2['id']}/days", headers=_auth_headers(token1))
     assert response.status_code == 404
 
     response = client.post(
@@ -438,13 +454,9 @@ def test_routine_deletion_cascades_to_days(client: TestClient) -> None:
     routine = _create_routine(client, token)
     _create_day(client, token, routine["id"], "Push")
 
-    client.delete(
-        f"/api/routines/{routine['id']}", headers=_auth_headers(token)
-    )
+    client.delete(f"/api/routines/{routine['id']}", headers=_auth_headers(token))
 
-    response = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    )
+    response = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token))
     assert response.status_code == 404
 
 
@@ -464,9 +476,7 @@ def test_invalid_name_rejected(client: TestClient) -> None:
         assert response.status_code == 422
 
     # Verify nothing was created
-    days = client.get(
-        f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
-    ).json()
+    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     assert len(days) == 0
 
 
@@ -532,22 +542,9 @@ def test_invalid_routine_id_returns_422(client: TestClient) -> None:
 
 def test_training_day_endpoints_require_auth(client: TestClient) -> None:
     assert client.get("/api/routines/1/days").status_code == 401
-    assert (
-        client.post("/api/routines/1/days", json={"name": "Push"}).status_code
-        == 401
-    )
-    assert (
-        client.put(
-            "/api/routines/1/days/1", json={"name": "Upper"}
-        ).status_code
-        == 401
-    )
-    assert (
-        client.put(
-            "/api/routines/1/days/order", json={"day_ids": [1]}
-        ).status_code
-        == 401
-    )
+    assert client.post("/api/routines/1/days", json={"name": "Push"}).status_code == 401
+    assert client.put("/api/routines/1/days/1", json={"name": "Upper"}).status_code == 401
+    assert client.put("/api/routines/1/days/order", json={"day_ids": [1]}).status_code == 401
     assert client.delete("/api/routines/1/days/1").status_code == 401
 
 
@@ -561,9 +558,7 @@ def test_create_day_refreshes_routine_timestamp(client: TestClient) -> None:
 
     _create_day(client, token, routine["id"], "Push")
 
-    updated = client.get(
-        f"/api/routines/{routine['id']}", headers=_auth_headers(token)
-    ).json()
+    updated = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
     assert updated["updated_at"] != original_updated_at
 
 
@@ -572,18 +567,14 @@ def test_delete_day_refreshes_routine_timestamp(client: TestClient) -> None:
     routine = _create_routine(client, token)
     day = _create_day(client, token, routine["id"], "Push")
 
-    original = client.get(
-        f"/api/routines/{routine['id']}", headers=_auth_headers(token)
-    ).json()
+    original = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
 
     client.delete(
         f"/api/routines/{routine['id']}/days/{day['id']}",
         headers=_auth_headers(token),
     )
 
-    updated = client.get(
-        f"/api/routines/{routine['id']}", headers=_auth_headers(token)
-    ).json()
+    updated = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
     assert updated["updated_at"] != original["updated_at"]
 
 
@@ -593,9 +584,7 @@ def test_reorder_refreshes_routine_timestamp(client: TestClient) -> None:
     d1 = _create_day(client, token, routine["id"], "A")
     d2 = _create_day(client, token, routine["id"], "B")
 
-    original = client.get(
-        f"/api/routines/{routine['id']}", headers=_auth_headers(token)
-    ).json()
+    original = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
 
     client.put(
         f"/api/routines/{routine['id']}/days/order",
@@ -603,14 +592,89 @@ def test_reorder_refreshes_routine_timestamp(client: TestClient) -> None:
         headers=_auth_headers(token),
     )
 
-    updated = client.get(
-        f"/api/routines/{routine['id']}", headers=_auth_headers(token)
-    ).json()
+    updated = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
     assert updated["updated_at"] != original["updated_at"]
 
 
 # -- Migration tests --------------------------------------------------------
 
-# Tests above use Base.metadata.create_all() via conftest.py.
-# Migration integrity is validated separately using alembic commands.
-# This is documented per DEC-008 and the F08 spec migration gate.
+
+def _run_alembic(database_url: str, *arguments: str) -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    environment["DATABASE_URL"] = database_url
+    return subprocess.run(
+        [sys.executable, "-m", "alembic", *arguments],
+        cwd=BACKEND_ROOT,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_f08_migration_fresh_database(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'fresh.db').as_posix()}"
+
+    _run_alembic(database_url, "upgrade", "head")
+    current = _run_alembic(database_url, "current").stdout
+    heads = _run_alembic(database_url, "heads").stdout
+    _run_alembic(database_url, "upgrade", "head")
+
+    engine = create_engine(database_url)
+    schema = inspect(engine)
+    assert "training_days" in schema.get_table_names()
+    assert {column["name"] for column in schema.get_columns("training_days")} == {
+        "id",
+        "routine_id",
+        "name",
+        "position",
+        "created_at",
+        "updated_at",
+    }
+    assert any(
+        constraint.get("name") == "uq_training_day_routine_position"
+        and set(constraint["column_names"]) == {"routine_id", "position"}
+        for constraint in schema.get_unique_constraints("training_days")
+    )
+    foreign_keys = schema.get_foreign_keys("training_days")
+    assert len(foreign_keys) == 1
+    assert foreign_keys[0]["referred_table"] == "routines"
+    assert foreign_keys[0]["options"].get("ondelete") == "CASCADE"
+    assert F08_REVISION in current
+    assert F08_REVISION in heads
+    engine.dispose()
+
+
+def test_f08_migration_upgrade_and_real_api_flow(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'upgrade.db').as_posix()}"
+    _run_alembic(database_url, "upgrade", PREVIOUS_REVISION)
+
+    before_engine = create_engine(database_url)
+    assert "training_days" not in inspect(before_engine).get_table_names()
+    before_engine.dispose()
+
+    _run_alembic(database_url, "upgrade", "head")
+    migrated_engine = create_engine(database_url, connect_args={"check_same_thread": False})
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=migrated_engine)
+
+    def override_get_session() -> Generator[Session, None, None]:
+        session = session_factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        with TestClient(app) as migrated_client:
+            token, _ = _register(migrated_client, "migration@example.com")
+            routine = _create_routine(migrated_client, token, "Migrated routine")
+            day = _create_day(migrated_client, token, routine["id"], "Push")
+            response = migrated_client.get(
+                f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)
+            )
+            assert response.status_code == 200
+            assert response.json() == [day]
+    finally:
+        app.dependency_overrides.clear()
+        migrated_engine.dispose()

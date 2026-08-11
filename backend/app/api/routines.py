@@ -71,6 +71,7 @@ class RoutineOut(BaseModel):
     name: str
     objective: str
     description: str | None
+    training_day_count: int
     created_at: str
     updated_at: str
 

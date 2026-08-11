@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, status
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -46,17 +46,9 @@ class TrainingDayNameRequest(BaseModel):
 
 
 class TrainingDayOrderRequest(BaseModel):
-    day_ids: list[int]
+    day_ids: list[Annotated[int, Field(strict=True, gt=0)]]
 
     model_config = {"extra": "forbid"}
-
-    @field_validator("day_ids")
-    @classmethod
-    def validate_day_ids(cls, v: list[int]) -> list[int]:
-        for item in v:
-            if not isinstance(item, int) or item <= 0:
-                raise ValueError("day_ids must contain only positive integers")
-        return v
 
 
 class TrainingDayOut(BaseModel):
@@ -106,9 +98,7 @@ def create_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     try:
-        day = create_training_day(
-            session, routine_id, current_user.id, body.name
-        )
+        day = create_training_day(session, routine_id, current_user.id, body.name)
     except RoutineNotFoundError as exc:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -133,9 +123,7 @@ def reorder_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     try:
-        days = reorder_training_days(
-            session, routine_id, current_user.id, body.day_ids
-        )
+        days = reorder_training_days(session, routine_id, current_user.id, body.day_ids)
     except RoutineNotFoundError as exc:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -161,9 +149,7 @@ def rename_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
     try:
-        day = rename_training_day(
-            session, routine_id, current_user.id, day_id, body.name
-        )
+        day = rename_training_day(session, routine_id, current_user.id, day_id, body.name)
     except RoutineNotFoundError as exc:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,

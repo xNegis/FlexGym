@@ -457,6 +457,7 @@ function isRoutine(value: unknown): value is Routine {
     typeof v.training_day_count === "number" &&
     Number.isInteger(v.training_day_count) &&
     v.training_day_count >= 0 &&
+    v.training_day_count <= 7 &&
     typeof v.created_at === "string" &&
     v.created_at.length > 0 &&
     typeof v.updated_at === "string" &&
@@ -643,7 +644,9 @@ function isTrainingDay(value: unknown): value is TrainingDay {
 
 function isTrainingDayArray(value: unknown): value is TrainingDay[] {
   if (!Array.isArray(value)) return false;
-  return value.every(isTrainingDay);
+  if (value.length > 7 || !value.every(isTrainingDay)) return false;
+  const ids = new Set(value.map((day) => day.id));
+  return ids.size === value.length && value.every((day, index) => day.position === index + 1);
 }
 
 export type TrainingDayResult = TrainingDay | { detail: string };

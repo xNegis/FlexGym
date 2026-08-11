@@ -85,31 +85,42 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
   const [renameDayId, setRenameDayId] = useState<number | null>(null);
   const [deleteDayId, setDeleteDayId] = useState<number | null>(null);
   const [reorderPending, setReorderPending] = useState(false);
+  const trainingDayRequestSequence = useRef(0);
 
-  const loadTrainingDays = useCallback(async (routineId: number, silent: boolean = false) => {
-    if (!silent) {
-      setTrainingDaysLoading(true);
-      setTrainingDayError(null);
-    }
-    try {
-      const result = await fetchTrainingDays(routineId);
-      if ("detail" in result) {
-        if (result.detail === "Routine not found") {
-          setSelectedId(null);
-          setSelectedRoutine(null);
-          setViewMode("list");
+  const loadTrainingDays = useCallback(
+    async (routineId: number, silent: boolean = false) => {
+      const seq = ++trainingDayRequestSequence.current;
+      if (!silent) {
+        setTrainingDaysLoading(true);
+        setTrainingDayError(null);
+      }
+      try {
+        const result = await fetchTrainingDays(routineId);
+        if (seq !== trainingDayRequestSequence.current) return;
+        if ("detail" in result) {
+          if (result.detail === "Routine not found") {
+            setSelectedId(null);
+            setSelectedRoutine(null);
+            setViewMode("list");
+            return;
+          }
+          setTrainingDayError(result.detail);
+        } else {
+          setTrainingDays(result);
+        }
+      } catch (e) {
+        if (seq !== trainingDayRequestSequence.current) return;
+        if (e instanceof UnauthenticatedError) {
+          onUnauthenticated();
           return;
         }
-        if (!silent) setTrainingDayError(result.detail);
-      } else {
-        setTrainingDays(result);
+        setTrainingDayError("Unable to load training days");
+      } finally {
+        if (!silent && seq === trainingDayRequestSequence.current) setTrainingDaysLoading(false);
       }
-    } catch {
-      if (!silent) setTrainingDayError("Unable to load training days");
-    } finally {
-      if (!silent) setTrainingDaysLoading(false);
-    }
-  }, []);
+    },
+    [onUnauthenticated],
+  );
 
   useEffect(() => {
     if (viewMode === "detail" && selectedId !== null) {
@@ -120,16 +131,24 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
 
   const refreshRoutineAndDays = useCallback(async () => {
     if (selectedId === null) return;
-    const result = await fetchRoutine(selectedId);
-    if ("notFound" in result) {
-      setSelectedId(null);
-      setSelectedRoutine(null);
-      setViewMode("list");
-      return;
+    try {
+      const result = await fetchRoutine(selectedId);
+      if ("notFound" in result) {
+        setSelectedId(null);
+        setSelectedRoutine(null);
+        setViewMode("list");
+        return;
+      }
+      setSelectedRoutine(result);
+      await loadTrainingDays(selectedId, true);
+    } catch (e) {
+      if (e instanceof UnauthenticatedError) {
+        onUnauthenticated();
+        return;
+      }
+      setTrainingDayError("Unable to refresh routine");
     }
-    setSelectedRoutine(result);
-    loadTrainingDays(selectedId, true);
-  }, [selectedId, loadTrainingDays]);
+  }, [selectedId, loadTrainingDays, onUnauthenticated]);
 
   // -- List view -------------------------------------------------------
 
@@ -276,7 +295,7 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
         setTrainingDayError(result.detail);
       } else {
         setTrainingDayFormName("");
-        refreshRoutineAndDays();
+        await refreshRoutineAndDays();
       }
     } catch (e) {
       if (e instanceof UnauthenticatedError) {
@@ -314,7 +333,7 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
       } else {
         setRenameDayId(null);
         setTrainingDayFormName("");
-        refreshRoutineAndDays();
+        await refreshRoutineAndDays();
       }
     } catch (e) {
       if (e instanceof UnauthenticatedError) {
@@ -393,13 +412,13 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
       if (result !== null) {
         if (result.detail === "Training day not found") {
           setDeleteDayId(null);
-          refreshRoutineAndDays();
+          await refreshRoutineAndDays();
           return;
         }
         setTrainingDayError(result.detail);
       } else {
         setDeleteDayId(null);
-        refreshRoutineAndDays();
+        await refreshRoutineAndDays();
       }
     } catch (e) {
       if (e instanceof UnauthenticatedError) {

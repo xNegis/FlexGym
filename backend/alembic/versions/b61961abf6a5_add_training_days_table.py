@@ -29,9 +29,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.ForeignKeyConstraint(["routine_id"], ["routines.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "routine_id", "position", name="uq_training_day_routine_position"
-        ),
+        sa.UniqueConstraint("routine_id", "position", name="uq_training_day_routine_position"),
     )
 
 
