@@ -1,6 +1,8 @@
 type AuthScreen =
   "loading" | "unavailable" | "registration" | "login" | "onboarding" | "authenticated";
 
+type Section = "profile" | "exercises";
+
 interface User {
   id: number;
   email: string;
@@ -23,4 +25,25 @@ interface FitnessProfile {
   updated_at: string;
 }
 
-export { type AuthScreen, type FitnessProfile, type User };
+interface ExerciseSummary {
+  slug: string;
+  name: string;
+  primary_muscle: string;
+  secondary_muscles: string[];
+  equipment: string;
+  movement_pattern: string;
+  execution_type: string;
+}
+
+interface ExerciseDetail extends ExerciseSummary {
+  instructions: string;
+}
+
+export {
+  type AuthScreen,
+  type ExerciseDetail,
+  type ExerciseSummary,
+  type FitnessProfile,
+  type Section,
+  type User,
+};

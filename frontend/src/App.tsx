@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchFitnessProfile, fetchHealth, fetchMe } from "./api";
+import ExerciseCatalog from "./components/ExerciseCatalog";
+import ExerciseDetail from "./components/ExerciseDetail";
 import FitnessProfileForm from "./components/FitnessProfileForm";
 import LoginForm from "./components/LoginForm";
 import ProfileManagement from "./components/ProfileManagement";
 import RegistrationForm from "./components/RegistrationForm";
-import type { AuthScreen, FitnessProfile, User } from "./types";
+import type { AuthScreen, FitnessProfile, Section, User } from "./types";
 import "./App.css";
 
 function App() {
   const [screen, setScreen] = useState<AuthScreen>("loading");
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<FitnessProfile | null>(null);
+  const [section, setSection] = useState<Section>("profile");
+  const [catalogSlug, setCatalogSlug] = useState<string | null>(null);
 
   const bootstrap = useCallback(async () => {
     setScreen("loading");
@@ -84,7 +88,22 @@ function App() {
   const handleLoggedOut = () => {
     setUser(null);
     setProfile(null);
+    setSection("profile");
+    setCatalogSlug(null);
     setScreen("login");
+  };
+
+  const handleOpenExercise = (slug: string) => {
+    setCatalogSlug(slug);
+  };
+
+  const handleBackToCatalog = () => {
+    setCatalogSlug(null);
+  };
+
+  const handleSectionChange = (next: Section) => {
+    setSection(next);
+    setCatalogSlug(null);
   };
 
   if (screen === "loading") {
@@ -129,13 +148,52 @@ function App() {
         <FitnessProfileForm onProfileCreated={handleProfileCreated} onLoggedOut={handleLoggedOut} />
       )}
       {screen === "authenticated" && user && profile && (
-        <ProfileManagement
-          profile={profile}
-          email={user.email}
-          onLoggedOut={handleLoggedOut}
-          onProfileDeleted={handleProfileDeleted}
-          onProfileUpdated={handleProfileUpdated}
-        />
+        <>
+          <nav className="app-nav" aria-label="Main navigation">
+            <button
+              type="button"
+              className={`nav-tab${section === "profile" ? " nav-tab-active" : ""}`}
+              onClick={() => handleSectionChange("profile")}
+            >
+              Profile
+            </button>
+            <button
+              type="button"
+              className={`nav-tab${section === "exercises" ? " nav-tab-active" : ""}`}
+              onClick={() => handleSectionChange("exercises")}
+            >
+              Exercises
+            </button>
+          </nav>
+
+          {section === "profile" && (
+            <ProfileManagement
+              profile={profile}
+              email={user.email}
+              onLoggedOut={handleLoggedOut}
+              onProfileDeleted={handleProfileDeleted}
+              onProfileUpdated={handleProfileUpdated}
+            />
+          )}
+
+          {section === "exercises" && (
+            <>
+              <div hidden={catalogSlug !== null}>
+                <ExerciseCatalog
+                  onOpenExercise={handleOpenExercise}
+                  onUnauthenticated={handleLoggedOut}
+                />
+              </div>
+              {catalogSlug !== null && (
+                <ExerciseDetail
+                  slug={catalogSlug}
+                  onBack={handleBackToCatalog}
+                  onUnauthenticated={handleLoggedOut}
+                />
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   );

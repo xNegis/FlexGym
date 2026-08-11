@@ -594,31 +594,31 @@ The UI does not display slugs, database IDs, raw enum values, or raw `null` valu
 
 ## Acceptance Criteria
 
-* [ ] Applying migrations to a new database installs exactly the 74 specified system exercises.
-* [ ] Re-running the supported setup path does not duplicate catalog records.
-* [ ] Every seeded exercise matches its specified slug, name, primary muscle, ordered secondary
+* [x] Applying migrations to a new database installs exactly the 74 specified system exercises.
+* [x] Re-running the supported setup path does not duplicate catalog records.
+* [x] Every seeded exercise matches its specified slug, name, primary muscle, ordered secondary
   muscles, equipment, movement pattern, execution type, and instruction meaning.
-* [ ] An authenticated user can browse all exercises in deterministic alphabetical order.
-* [ ] Search is trimmed, case-insensitive, and matches name substrings.
-* [ ] Primary-muscle and equipment filters work independently and together with search.
-* [ ] A valid query with no matches returns `200 []` and produces a useful no-results UI.
-* [ ] Invalid filters and overlong search return `422` without exposing internal details.
-* [ ] An authenticated user can inspect every public field for an exercise by slug.
-* [ ] An unknown slug returns the documented `404` and leaves the UI usable.
-* [ ] Catalog endpoints return `401` when unauthenticated.
-* [ ] No user-facing endpoint can create, update, or delete system exercises.
-* [ ] Profile and Exercises navigation works after onboarding and identifies the active section.
-* [ ] Returning from detail preserves the catalog search and filters during the current frontend
+* [x] An authenticated user can browse all exercises in deterministic alphabetical order.
+* [x] Search is trimmed, case-insensitive, and matches name substrings.
+* [x] Primary-muscle and equipment filters work independently and together with search.
+* [x] A valid query with no matches returns `200 []` and produces a useful no-results UI.
+* [x] Invalid filters and overlong search return `422` without exposing internal details.
+* [x] An authenticated user can inspect every public field for an exercise by slug.
+* [x] An unknown slug returns the documented `404` and leaves the UI usable.
+* [x] Catalog endpoints return `401` when unauthenticated.
+* [x] No user-facing endpoint can create, update, or delete system exercises.
+* [x] Profile and Exercises navigation works after onboarding and identifies the active section.
+* [x] Returning from detail preserves the catalog search and filters during the current frontend
   session.
-* [ ] Loading, no-results, list failure, detail failure, and not-found states are distinct and
+* [x] Loading, no-results, list failure, detail failure, and not-found states are distinct and
   recoverable.
-* [ ] Unexpected or malformed API bodies are never rendered directly.
-* [ ] Registration, login, authentication restoration, profile onboarding, profile management,
+* [x] Unexpected or malformed API bodies are never rendered directly.
+* [x] Registration, login, authentication restoration, profile onboarding, profile management,
   profile deletion, logout, health, CORS, and backend-unavailable flows retain their documented
   behaviour.
-* [ ] Catalog and detail screens work at a common mobile viewport without horizontal overflow.
-* [ ] Backend formatting, linting, type checking, migrations, and tests pass.
-* [ ] Frontend formatting, linting, and type checking pass.
+* [x] Catalog and detail screens work at a common mobile viewport without horizontal overflow.
+* [x] Backend formatting, linting, type checking, migrations, and tests pass.
+* [x] Frontend formatting, linting, and type checking pass.
 
 ## Tests
 

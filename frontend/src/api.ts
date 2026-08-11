@@ -1,6 +1,65 @@
-import type { FitnessProfile } from "./types";
+import type { ExerciseDetail, ExerciseSummary, FitnessProfile } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
+const EXERCISE_MUSCLES = new Set([
+  "chest",
+  "lats",
+  "upper_back",
+  "shoulders",
+  "biceps",
+  "triceps",
+  "forearms",
+  "quadriceps",
+  "hamstrings",
+  "glutes",
+  "adductors",
+  "calves",
+  "core",
+  "full_body",
+]);
+const EXERCISE_EQUIPMENT = new Set([
+  "bodyweight",
+  "barbell",
+  "dumbbell",
+  "kettlebell",
+  "cable",
+  "machine",
+  "resistance_band",
+  "pull_up_bar",
+]);
+const EXERCISE_MOVEMENT_PATTERNS = new Set([
+  "horizontal_push",
+  "vertical_push",
+  "horizontal_pull",
+  "vertical_pull",
+  "horizontal_adduction",
+  "shoulder_abduction",
+  "elbow_flexion",
+  "elbow_extension",
+  "squat",
+  "lunge",
+  "hinge",
+  "hip_thrust",
+  "knee_extension",
+  "knee_flexion",
+  "hip_abduction",
+  "hip_adduction",
+  "calf_raise",
+  "trunk_flexion",
+  "trunk_anti_extension",
+  "trunk_anti_rotation",
+  "trunk_lateral_stability",
+  "carry",
+]);
+const EXERCISE_EXECUTION_TYPES = new Set(["bilateral", "unilateral", "alternating", "isometric"]);
+
+export class UnauthenticatedError extends Error {
+  constructor() {
+    super("Authentication is required");
+    this.name = "UnauthenticatedError";
+  }
+}
 
 export interface HealthResponse {
   status: "ok" | "unavailable";
@@ -279,4 +338,90 @@ export async function deleteFitnessProfile(): Promise<{ detail: string } | null>
     }
   }
   return { detail: "Unable to delete fitness profile" };
+}
+
+function isExerciseSummary(value: unknown): value is ExerciseSummary {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.slug === "string" &&
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v.slug) &&
+    v.slug.length <= 100 &&
+    typeof v.name === "string" &&
+    v.name.trim().length > 0 &&
+    v.name.length <= 120 &&
+    typeof v.primary_muscle === "string" &&
+    EXERCISE_MUSCLES.has(v.primary_muscle) &&
+    Array.isArray(v.secondary_muscles) &&
+    v.secondary_muscles.every(
+      (m): m is string => typeof m === "string" && EXERCISE_MUSCLES.has(m),
+    ) &&
+    new Set(v.secondary_muscles).size === v.secondary_muscles.length &&
+    !v.secondary_muscles.includes(v.primary_muscle) &&
+    typeof v.equipment === "string" &&
+    EXERCISE_EQUIPMENT.has(v.equipment) &&
+    typeof v.movement_pattern === "string" &&
+    EXERCISE_MOVEMENT_PATTERNS.has(v.movement_pattern) &&
+    typeof v.execution_type === "string" &&
+    EXERCISE_EXECUTION_TYPES.has(v.execution_type)
+  );
+}
+
+function isExerciseDetail(value: unknown): value is ExerciseDetail {
+  if (!isExerciseSummary(value)) return false;
+  const v = value as unknown as Record<string, unknown>;
+  return (
+    typeof v.instructions === "string" &&
+    v.instructions.trim().length > 0 &&
+    v.instructions.length <= 500
+  );
+}
+
+function isExerciseSummaryArray(value: unknown): value is ExerciseSummary[] {
+  if (!Array.isArray(value)) return false;
+  return value.every(isExerciseSummary);
+}
+
+export async function fetchExercises(params?: {
+  search?: string;
+  primary_muscle?: string;
+  equipment?: string;
+}): Promise<ExerciseSummary[]> {
+  const url = new URL(`${API_BASE_URL}/api/exercises`);
+  if (params?.search) url.searchParams.set("search", params.search);
+  if (params?.primary_muscle) url.searchParams.set("primary_muscle", params.primary_muscle);
+  if (params?.equipment) url.searchParams.set("equipment", params.equipment);
+
+  const response = await fetch(url.toString(), { credentials: "include" });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load exercises");
+  }
+  const data: unknown = await response.json();
+  if (!isExerciseSummaryArray(data)) {
+    throw new Error("Invalid exercise catalog response");
+  }
+  return data;
+}
+
+export async function fetchExercise(slug: string): Promise<ExerciseDetail | { notFound: true }> {
+  const response = await fetch(`${API_BASE_URL}/api/exercises/${encodeURIComponent(slug)}`, {
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 404) {
+    return { notFound: true };
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load exercise");
+  }
+  const data: unknown = await response.json();
+  if (!isExerciseDetail(data)) {
+    throw new Error("Invalid exercise detail response");
+  }
+  return data;
 }

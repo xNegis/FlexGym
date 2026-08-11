@@ -61,6 +61,27 @@ When implementing a feature:
 7. Run the relevant tests and validations.
 8. Report what changed and any important design decisions or limitations.
 
+### Migration validation gate
+
+Before marking any feature that adds or changes a database migration as completed:
+
+1. Apply the complete migration history to a new isolated database and verify the expected schema
+   and required reference data.
+2. Create or migrate an isolated database to the previously committed Alembic head, apply the new
+   migration, and verify the affected application flow against that upgraded database.
+3. Compare `alembic current` and `alembic heads` for the actual configured local development
+   database used by the application. If it is behind, do not report the feature as locally
+   operational or fully validated until the migration has been safely applied, or clearly report
+   the pending migration and exact remediation command.
+4. Exercise at least one real API or UI path using a migrated database rather than relying only on
+   mocked persistence or tables created directly from ORM metadata.
+5. Confirm that re-running the supported migration command is safe and does not duplicate required
+   reference data.
+
+Tests that use `Base.metadata.create_all()` or equivalent schema creation are useful for service and
+endpoint behaviour, but they do not validate Alembic migrations and must never be presented as doing
+so. A feature must not be marked completed merely because those tests pass.
+
 If a specification conflicts with an existing architectural decision, stop and raise the conflict instead of silently choosing one interpretation.
 
 ## Architecture Principles

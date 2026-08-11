@@ -10,7 +10,7 @@ Phase 1 — Training Planning
 
 Phase 0 — Foundation completed. F01 through F04 are implemented and validated.
 
-F05 — Exercise Catalog has a detailed draft specification awaiting product review.
+F05 — Exercise Catalog is implemented and validated.
 
 ## Completed Features
 
@@ -18,10 +18,11 @@ F05 — Exercise Catalog has a detailed draft specification awaiting product rev
 * F02 — User Authentication
 * F03 — User Fitness Profile
 * F04 — Profile Management
+* F05 — Exercise Catalog
 
 ## Next Feature
 
-Review and approve F05 — Exercise Catalog, then implement and validate it.
+Define F06 — Custom Exercises.
 
 ## Existing Feature Specifications
 

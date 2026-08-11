@@ -77,6 +77,16 @@ Explicit rules and invariants.
 
 Input validation and constraints.
 
+For features that add or modify database migrations, require validation of:
+
+* The complete migration history against a new isolated database.
+* Upgrade from the previously committed migration head using an isolated database.
+* Expected schema and reference data after upgrade.
+* A real affected API or UI flow against the migrated database.
+* The revision of the actual configured local development database before feature completion.
+
+Tests that create tables directly from ORM metadata do not satisfy migration validation.
+
 ## Acceptance Criteria
 
 Use independently verifiable criteria.

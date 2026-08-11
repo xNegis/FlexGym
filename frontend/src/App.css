@@ -349,3 +349,172 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* App navigation */
+
+.app-nav {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #ccc;
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 20rem;
+}
+
+.nav-tab {
+  flex: 1;
+  padding: 0.625rem 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+}
+
+.nav-tab:hover {
+  color: #333;
+}
+
+.nav-tab-active {
+  color: #4a90d9;
+  border-bottom-color: #4a90d9;
+}
+
+/* Exercise catalog */
+
+.catalog {
+  width: 100%;
+  max-width: 20rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.catalog-heading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
+}
+
+.catalog-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.catalog-filters .auth-field select {
+  background: #fff;
+}
+
+.catalog-count {
+  font-size: 0.875rem;
+  color: #666;
+  margin: 0;
+  text-align: center;
+}
+
+.catalog-message {
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+.catalog-message p {
+  margin: 0 0 0.5rem;
+}
+
+.catalog-loading {
+  color: #666;
+}
+
+.catalog-error {
+  color: #c62828;
+}
+
+.catalog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.catalog-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.5rem;
+  border: 1px solid #eee;
+  border-radius: 0.375rem;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  color: inherit;
+}
+
+.catalog-item:hover {
+  background: #f5f8fc;
+}
+
+.catalog-item-name {
+  font-weight: 500;
+}
+
+.catalog-item-meta {
+  font-size: 0.8125rem;
+  color: #666;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Exercise detail */
+
+.detail {
+  width: 100%;
+  max-width: 20rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detail-heading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-instructions {
+  padding: 0.75rem;
+  background: #f7f9fc;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.detail-instructions-heading {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.detail-instructions p {
+  margin: 0;
+}
+
+.detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}

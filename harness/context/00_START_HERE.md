@@ -62,6 +62,13 @@ Example:
 
 After a feature has been implemented and validated, update `05_PROJECT_STATE.md`.
 
+When a feature introduces a database migration, validation must cover both a fresh isolated
+database and an isolated upgrade from the previously committed migration head. Before closing the
+feature, compare the actual local development database revision with the repository head and
+exercise a real affected flow against a migrated database. Test schemas created directly from ORM
+metadata do not prove that migrations were applied or that an existing installation upgrades
+correctly.
+
 Important architectural/product decisions discovered during development must be added to `04_DECISIONS.md`.
 
 ## Important Principle

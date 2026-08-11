@@ -142,7 +142,7 @@ administration, and other multi-user collaboration features remain out of scope.
 
 ## DEC-011 — The initial exercise catalog is curated global reference data
 
-**Status:** Proposed
+**Status:** Accepted
 
 FlexGym's initial exercise catalog consists of global, system-managed exercise records with stable
 slugs. It is installed through the normal database migration/bootstrap path and is read-only through

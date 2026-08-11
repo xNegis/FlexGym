@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -47,3 +47,17 @@ class FitnessProfile(Base):
         default=datetime.datetime.utcnow,
         onupdate=datetime.datetime.utcnow,
     )
+
+
+class Exercise(Base):
+    __tablename__ = "exercises"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    primary_muscle: Mapped[str] = mapped_column(String, nullable=False)
+    secondary_muscles: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    equipment: Mapped[str] = mapped_column(String, nullable=False)
+    movement_pattern: Mapped[str] = mapped_column(String, nullable=False)
+    execution_type: Mapped[str] = mapped_column(String, nullable=False)
+    instructions: Mapped[str] = mapped_column(String(500), nullable=False)
