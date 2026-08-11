@@ -61,8 +61,8 @@ Current intended sequence:
 * F07 — Routine Creation
 * F08 — Training Day Management
 * F09 — Routine Exercise Configuration
-* Routine Schedule
-* Active Routine
+* F10 — Routine Schedule
+* F11 — Active Routine
 
 A training day is one planned workout session inside a routine, such as Push, Pull, or Legs. It is
 not a weekday. Routine Schedule provides exactly seven ordered weekly positions, each of which is
