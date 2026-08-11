@@ -21,6 +21,8 @@ F08 — Training Day Management is implemented and validated.
 
 F09 — Routine Exercise Configuration is implemented and validated.
 
+F10 — Routine Schedule is implemented and validated.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -31,6 +33,7 @@ F09 — Routine Exercise Configuration is implemented and validated.
 * F07 — Routine Creation
 * F08 — Training Day Management
 * F09 — Routine Exercise Configuration
+* F10 — Routine Schedule
 
 ## Skipped Features
 
@@ -38,7 +41,7 @@ F09 — Routine Exercise Configuration is implemented and validated.
 
 ## Next Feature
 
-F10 — Routine Schedule is specified and is next to be implemented in Phase 1.
+F11 — Active Routine is next in Phase 1 and remains to be specified.
 
 ## Existing Feature Specifications
 

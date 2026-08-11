@@ -9,15 +9,18 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db import get_session
 from app.main import app
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-F10_REVISION = "aab110d57981"
+F10_INITIAL_REVISION = "aab110d57981"
+F10_REVISION = "c31f5a8d2e04"
 PREVIOUS_REVISION = "273789964714"
 
 WEEKDAY_NAMES = [
@@ -144,7 +147,7 @@ def test_deletion_frees_position_for_reuse(client: TestClient) -> None:
 
     _create_day(client, token, routine["id"], "Push")
     _create_day(client, token, routine["id"], "Pull")
-    d3 = _create_day(client, token, routine["id"], "Legs")
+    _create_day(client, token, routine["id"], "Legs")
 
     schedule = _get_schedule(client, token, routine["id"])
     assert schedule[0]["type"] == "training"
@@ -359,10 +362,13 @@ def test_seven_day_limit_atomic(client: TestClient) -> None:
 
 def test_schedule_endpoints_require_auth(client: TestClient) -> None:
     assert client.get("/api/routines/1/schedule").status_code == 401
-    assert client.put(
-        "/api/routines/1/schedule",
-        json={"training_day_id": 1, "week_position": 1},
-    ).status_code == 401
+    assert (
+        client.put(
+            "/api/routines/1/schedule",
+            json={"training_day_id": 1, "week_position": 1},
+        ).status_code
+        == 401
+    )
 
 
 # -- Timestamps --------------------------------------------------------------
@@ -397,6 +403,7 @@ def test_swap_refreshes_both_days_timestamp(client: TestClient) -> None:
     td2 = schedule[0]["training_day"]
     td1 = schedule[1]["training_day"]
     assert td1["updated_at"] != d1["updated_at"]
+    assert td2["updated_at"] != d2["updated_at"]
 
 
 # -- Rename preserves placement ----------------------------------------------
@@ -455,6 +462,11 @@ def test_f10_migration_fresh_database(tmp_path: Path) -> None:
     constraint_names = {uc["name"] for uc in unique_constraints}
     assert "uq_schedule_assignment_routine_pos" in constraint_names
 
+    check_constraints = schema.get_check_constraints("routine_schedule_assignments")
+    assert {constraint["name"] for constraint in check_constraints} >= {
+        "ck_schedule_assignment_week_position"
+    }
+
     foreign_keys = schema.get_foreign_keys("routine_schedule_assignments")
     fk_tables = {fk["referred_table"] for fk in foreign_keys}
     assert "routines" in fk_tables
@@ -464,9 +476,134 @@ def test_f10_migration_fresh_database(tmp_path: Path) -> None:
     assert fk_routines["options"].get("ondelete") == "CASCADE"
     fk_days = next(fk for fk in foreign_keys if fk["referred_table"] == "training_days")
     assert fk_days["options"].get("ondelete") == "CASCADE"
+    assert any(
+        fk["name"] == "fk_schedule_assignment_day_routine"
+        and fk["constrained_columns"] == ["training_day_id", "routine_id"]
+        and fk["referred_columns"] == ["id", "routine_id"]
+        for fk in foreign_keys
+    )
 
     assert F10_REVISION in current
     engine.dispose()
+
+
+def test_f10_migration_rejects_invalid_position_and_cross_routine_assignment(
+    tmp_path: Path,
+) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'f10_constraints.db').as_posix()}"
+    _run_alembic(database_url, "upgrade", "head")
+    engine = create_engine(database_url)
+
+    with engine.begin() as connection:
+        user_id = connection.execute(
+            text(
+                "INSERT INTO users (email, password_hash, created_at) "
+                "VALUES ('constraints@example.com', 'x', CURRENT_TIMESTAMP)"
+            )
+        ).lastrowid
+        first_routine_id = connection.execute(
+            text(
+                "INSERT INTO routines "
+                "(user_id, name, normalized_name, objective, created_at, updated_at) "
+                "VALUES (:user_id, 'First', 'first', 'build_muscle', "
+                "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            ),
+            {"user_id": user_id},
+        ).lastrowid
+        second_routine_id = connection.execute(
+            text(
+                "INSERT INTO routines "
+                "(user_id, name, normalized_name, objective, created_at, updated_at) "
+                "VALUES (:user_id, 'Second', 'second', 'build_muscle', "
+                "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            ),
+            {"user_id": user_id},
+        ).lastrowid
+        first_day_id = connection.execute(
+            text(
+                "INSERT INTO training_days (routine_id, name, created_at, updated_at) "
+                "VALUES (:routine_id, 'Push', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            ),
+            {"routine_id": first_routine_id},
+        ).lastrowid
+        second_day_id = connection.execute(
+            text(
+                "INSERT INTO training_days (routine_id, name, created_at, updated_at) "
+                "VALUES (:routine_id, 'Pull', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            ),
+            {"routine_id": second_routine_id},
+        ).lastrowid
+
+    with pytest.raises(IntegrityError), engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO routine_schedule_assignments "
+                "(routine_id, training_day_id, week_position) VALUES (:routine, :day, 8)"
+            ),
+            {"routine": first_routine_id, "day": first_day_id},
+        )
+
+    with pytest.raises(IntegrityError), engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO routine_schedule_assignments "
+                "(routine_id, training_day_id, week_position) VALUES (:routine, :day, 1)"
+            ),
+            {"routine": first_routine_id, "day": second_day_id},
+        )
+
+    engine.dispose()
+
+
+def test_f10_integrity_migration_upgrades_initial_f10_head(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'f10_integrity_upgrade.db').as_posix()}"
+    _run_alembic(database_url, "upgrade", F10_INITIAL_REVISION)
+    _run_alembic(database_url, "upgrade", "head")
+    assert F10_REVISION in _run_alembic(database_url, "current").stdout
+
+
+def test_f10_downgrade_preserves_multiple_training_day_positions(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'f10_downgrade.db').as_posix()}"
+    _run_alembic(database_url, "upgrade", PREVIOUS_REVISION)
+    engine = create_engine(database_url)
+
+    with engine.begin() as connection:
+        user_id = connection.execute(
+            text(
+                "INSERT INTO users (email, password_hash, created_at) "
+                "VALUES ('downgrade@example.com', 'x', CURRENT_TIMESTAMP)"
+            )
+        ).lastrowid
+        routine_id = connection.execute(
+            text(
+                "INSERT INTO routines "
+                "(user_id, name, normalized_name, objective, created_at, updated_at) "
+                "VALUES (:user_id, 'Downgrade', 'downgrade', 'build_muscle', "
+                "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            ),
+            {"user_id": user_id},
+        ).lastrowid
+        connection.execute(
+            text(
+                "INSERT INTO training_days "
+                "(routine_id, name, position, created_at, updated_at) VALUES "
+                "(:routine_id, 'Push', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), "
+                "(:routine_id, 'Pull', 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            ),
+            {"routine_id": routine_id},
+        )
+    engine.dispose()
+
+    _run_alembic(database_url, "upgrade", "head")
+    _run_alembic(database_url, "downgrade", PREVIOUS_REVISION)
+
+    downgraded_engine = create_engine(database_url)
+    with downgraded_engine.connect() as connection:
+        positions = connection.execute(
+            text("SELECT name, position FROM training_days ORDER BY position")
+        ).all()
+    assert positions == [("Push", 1), ("Pull", 2)]
+    downgraded_engine.dispose()
 
 
 def test_f10_migration_upgrade_and_real_api_flow(tmp_path: Path) -> None:

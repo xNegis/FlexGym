@@ -234,7 +234,7 @@ def test_delete_training_day(client: TestClient) -> None:
     routine = _create_routine(client, token)
     d1 = _create_day(client, token, routine["id"], "Push")
     d2 = _create_day(client, token, routine["id"], "Pull")
-    _create_day(client, token, routine["id"], "Legs")
+    d3 = _create_day(client, token, routine["id"], "Legs")
 
     response = client.delete(
         f"/api/routines/{routine['id']}/days/{d2['id']}",
@@ -245,7 +245,7 @@ def test_delete_training_day(client: TestClient) -> None:
     days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     assert len(days) == 2
     remaining_ids = {d["id"] for d in days}
-    assert remaining_ids == {d1["id"], d3["id"] if "d3" in dir() else days[1]["id"]}
+    assert remaining_ids == {d1["id"], d3["id"]}
 
 
 def test_delete_updates_count(client: TestClient) -> None:

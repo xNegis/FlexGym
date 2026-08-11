@@ -20,7 +20,7 @@ from app.models import Exercise
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 F09_REVISION = "273789964714"
-F10_REVISION = "aab110d57981"
+LATEST_REVISION = "c31f5a8d2e04"
 PREVIOUS_REVISION = "b61961abf6a5"
 
 
@@ -1152,8 +1152,8 @@ def test_f09_migration_fresh_database(tmp_path: Path) -> None:
             == 0
         )
 
-    assert F10_REVISION in current
-    assert F10_REVISION in heads
+    assert LATEST_REVISION in current
+    assert LATEST_REVISION in heads
     engine.dispose()
 
 

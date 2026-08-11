@@ -1,6 +1,17 @@
 import datetime
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -93,6 +104,7 @@ class Routine(Base):
         "RoutineScheduleAssignment",
         back_populates="routine",
         cascade="all, delete-orphan",
+        foreign_keys="RoutineScheduleAssignment.routine_id",
     )
 
     __table_args__ = (
@@ -130,7 +142,10 @@ class TrainingDay(Base):
         back_populates="training_day",
         uselist=False,
         cascade="all, delete-orphan",
+        foreign_keys="RoutineScheduleAssignment.training_day_id",
     )
+
+    __table_args__ = (UniqueConstraint("id", "routine_id", name="uq_training_day_id_routine"),)
 
 
 class RoutineScheduleAssignment(Base):
@@ -142,15 +157,30 @@ class RoutineScheduleAssignment(Base):
     )
     routine: Mapped["Routine"] = relationship("Routine", back_populates="schedule_assignments")
     training_day_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("training_days.id", ondelete="CASCADE"), nullable=False, unique=True
+        Integer,
+        ForeignKey("training_days.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
     )
     training_day: Mapped["TrainingDay"] = relationship(
-        "TrainingDay", back_populates="schedule_assignment"
+        "TrainingDay",
+        back_populates="schedule_assignment",
+        foreign_keys=[training_day_id],
     )
     week_position: Mapped[int] = mapped_column(Integer, nullable=False)
 
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["training_day_id", "routine_id"],
+            ["training_days.id", "training_days.routine_id"],
+            name="fk_schedule_assignment_day_routine",
+            ondelete="CASCADE",
+        ),
         UniqueConstraint("routine_id", "week_position", name="uq_schedule_assignment_routine_pos"),
+        CheckConstraint(
+            "week_position >= 1 AND week_position <= 7",
+            name="ck_schedule_assignment_week_position",
+        ),
     )
 
 

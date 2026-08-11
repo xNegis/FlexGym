@@ -28,12 +28,8 @@ def _training_day_slot(day: TrainingDay) -> dict[str, object]:
     return {
         "id": day.id,
         "name": day.name,
-        "week_position": day.schedule_assignment.week_position
-        if day.schedule_assignment
-        else 0,
-        "exercise_count": len(day.exercise_configurations)
-        if day.exercise_configurations
-        else 0,
+        "week_position": day.schedule_assignment.week_position if day.schedule_assignment else 0,
+        "exercise_count": len(day.exercise_configurations) if day.exercise_configurations else 0,
         "created_at": day.created_at.isoformat(),
         "updated_at": day.updated_at.isoformat(),
     }
@@ -45,7 +41,11 @@ def get_schedule(session: Session, routine_id: int, user_id: int) -> list[dict[s
     assignments: dict[int, RoutineScheduleAssignment] = {
         a.week_position: a
         for a in session.query(RoutineScheduleAssignment)
-        .options(selectinload(RoutineScheduleAssignment.training_day).selectinload(TrainingDay.exercise_configurations))
+        .options(
+            selectinload(RoutineScheduleAssignment.training_day).selectinload(
+                TrainingDay.exercise_configurations
+            )
+        )
         .filter(RoutineScheduleAssignment.routine_id == routine_id)
         .all()
     }
@@ -54,18 +54,22 @@ def get_schedule(session: Session, routine_id: int, user_id: int) -> list[dict[s
     for pos in range(1, 8):
         assignment = assignments.get(pos)
         if assignment is not None and assignment.training_day is not None:
-            slots.append({
-                "position": pos,
-                "weekday": _weekday_name(pos),
-                "type": "training",
-                "training_day": _training_day_slot(assignment.training_day),
-            })
+            slots.append(
+                {
+                    "position": pos,
+                    "weekday": _weekday_name(pos),
+                    "type": "training",
+                    "training_day": _training_day_slot(assignment.training_day),
+                }
+            )
         else:
-            slots.append({
-                "position": pos,
-                "weekday": _weekday_name(pos),
-                "type": "rest",
-            })
+            slots.append(
+                {
+                    "position": pos,
+                    "weekday": _weekday_name(pos),
+                    "type": "rest",
+                }
+            )
 
     return slots
 
@@ -91,7 +95,6 @@ def move_training_day(
         raise ValueError("Training day not found")
 
     if source_assignment.week_position == week_position:
-        session.commit()
         return get_schedule(session, routine_id, user_id)
 
     target_assignment = (
@@ -106,39 +109,34 @@ def move_training_day(
     if target_assignment is not None:
         old_source_pos = source_assignment.week_position
         old_target_pos = target_assignment.week_position
+        source_day = source_assignment.training_day
+        target_day = target_assignment.training_day
 
-        source_assignment.week_position = -1
+        session.delete(source_assignment)
+        session.delete(target_assignment)
         session.flush()
 
-        target_assignment.week_position = old_source_pos
-        session.flush()
-
-        source_assignment.week_position = old_target_pos
-
-        source_day = (
-            session.query(TrainingDay)
-            .filter(TrainingDay.id == source_assignment.training_day_id)
-            .first()
+        session.add(
+            RoutineScheduleAssignment(
+                routine_id=routine_id,
+                training_day_id=source_day.id,
+                week_position=old_target_pos,
+            )
         )
-        target_day = (
-            session.query(TrainingDay)
-            .filter(TrainingDay.id == target_assignment.training_day_id)
-            .first()
+        session.add(
+            RoutineScheduleAssignment(
+                routine_id=routine_id,
+                training_day_id=target_day.id,
+                week_position=old_source_pos,
+            )
         )
         now = datetime.datetime.utcnow()
-        if source_day:
-            source_day.updated_at = now
-        if target_day:
-            target_day.updated_at = now
+        source_day.updated_at = now
+        target_day.updated_at = now
     else:
         source_assignment.week_position = week_position
-        source_day = (
-            session.query(TrainingDay)
-            .filter(TrainingDay.id == source_assignment.training_day_id)
-            .first()
-        )
-        if source_day:
-            source_day.updated_at = datetime.datetime.utcnow()
+        source_day = source_assignment.training_day
+        source_day.updated_at = datetime.datetime.utcnow()
         session.add(source_day)
 
     routine.updated_at = datetime.datetime.utcnow()

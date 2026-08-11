@@ -1418,6 +1418,142 @@
   cursor: not-allowed;
 }
 
+/* Weekly routine schedule */
+
+.schedule-list {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedule-slot {
+  padding: 0.75rem;
+  border: 1px solid #d9dee7;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+.schedule-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.625rem;
+}
+
+.schedule-weekday {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.schedule-slot-type {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.schedule-slot-training {
+  background: #e8f0fe;
+  color: #1557a0;
+}
+
+.schedule-slot-rest {
+  background: #f1f3f4;
+  color: #5f6368;
+}
+
+.schedule-training-day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.schedule-training-day-info {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.schedule-training-day-name {
+  overflow: hidden;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-exercise-count,
+.schedule-rest-text {
+  color: #666;
+  font-size: 0.75rem;
+}
+
+.schedule-move-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.schedule-move-label-text {
+  flex: 0 0 auto;
+  color: #555;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.schedule-move-select {
+  min-width: 0;
+  width: 100%;
+  padding: 0.4375rem 0.5rem;
+  border: 1px solid #b8c1cc;
+  border-radius: 0.375rem;
+  background: #fff;
+  color: #202124;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+.schedule-move-select:focus {
+  border-color: #1a73e8;
+  outline: 2px solid rgba(26, 115, 232, 0.2);
+  outline-offset: 1px;
+}
+
+.schedule-move-select:disabled {
+  background: #f5f5f5;
+  color: #888;
+}
+
+.schedule-training-day-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.schedule-rest-day {
+  padding: 0.25rem 0;
+}
+
+@media (min-width: 42rem) {
+  .schedule-training-day {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(11rem, 0.8fr);
+    align-items: center;
+  }
+
+  .schedule-training-day-actions {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Catalog filters layout for exercise config */
 .catalog-filters {
   display: flex;

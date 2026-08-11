@@ -30,7 +30,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["routine_id"], ["routines.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["training_day_id"], ["training_days.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("routine_id", "week_position", name="uq_schedule_assignment_routine_pos"),
+        sa.UniqueConstraint(
+            "routine_id", "week_position", name="uq_schedule_assignment_routine_pos"
+        ),
         sa.UniqueConstraint("training_day_id"),
     )
 
@@ -48,10 +50,7 @@ def downgrade() -> None:
     """Downgrade schema."""
     with op.batch_alter_table("training_days") as batch_op:
         batch_op.add_column(
-            sa.Column("position", sa.Integer(), nullable=False, server_default="1"),
-        )
-        batch_op.create_unique_constraint(
-            "uq_training_day_routine_position", ["routine_id", "position"]
+            sa.Column("position", sa.Integer(), nullable=True),
         )
 
     op.execute(
@@ -62,6 +61,9 @@ def downgrade() -> None:
     )
 
     with op.batch_alter_table("training_days") as batch_op:
-        batch_op.alter_column("position", server_default=None)
+        batch_op.alter_column("position", existing_type=sa.Integer(), nullable=False)
+        batch_op.create_unique_constraint(
+            "uq_training_day_routine_position", ["routine_id", "position"]
+        )
 
     op.drop_table("routine_schedule_assignments")
