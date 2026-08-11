@@ -271,3 +271,33 @@ Switching replaces the selection atomically after explicit frontend confirmation
 deactivate without deleting the plan. Deleting the active routine or its final training day clears
 the selection atomically. F11 records only when the current selection was activated; activation
 history, plan snapshots, commitment periods, and adherence are deferred.
+
+---
+
+## DEC-018 — Mobile-first UI system before workout tracking
+
+**Status:** Accepted
+
+Before Phase 2 begins, FlexGym will replace its incrementally accumulated proof-of-concept UI with
+a shared mobile-first design and interaction system.
+
+The product character is `Quiet Strength`: calm, precise, professional, restrained, and optimized
+for comprehension rather than decoration or gamification. The permanent design contract is stored
+in `harness/context/07_UI_DESIGN_SYSTEM.md` and is mandatory for every future UI-affecting feature.
+
+Consistency will be enforced through both documentation and code. Semantic tokens and shared
+frontend primitives own generic appearance, accessibility, and interaction states. Feature
+components own domain-specific composition and must not create parallel button, field, feedback, or
+layout conventions locally.
+
+Authenticated navigation is mobile-first and uses meaningful URLs. The current primary destinations
+are Plan, Exercises, and Profile. A Today or workout destination will be introduced only when Phase
+2 implements a real corresponding flow.
+
+F12 performs the complete Phase 0–1 UI migration without changing backend APIs, persistence, domain
+rules, activation semantics, scheduling semantics, or prescription meaning. A mixed permanent
+old/new visual system is not an acceptable completion state.
+
+F12 also ends DEC-008's blanket frontend browser-test deferral for stable cross-feature shell,
+navigation, responsive, and dialog behaviour. Coverage remains deliberately focused; business-rule
+variants continue to belong primarily in backend tests.

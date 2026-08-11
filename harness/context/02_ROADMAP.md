@@ -72,6 +72,23 @@ training days therefore has seven derived rest positions.
 
 ---
 
+## Cross-phase UI Stabilization
+
+Goal: establish a professional mobile-first product interface before workout execution increases
+frontend interaction complexity.
+
+### F12 — Mobile-first UI System and Phase 1 UX Refresh
+
+Introduce the shared design-token and primitive system, authenticated application shell, mobile
+navigation, URL-backed flows, and a complete visual and interaction migration of F02 through F11.
+
+F12 is a frontend stabilization feature. It preserves existing domain and API behaviour and does
+not introduce workout tracking, a dashboard, analytics, recommendations, or AI functionality.
+
+The normative visual and interaction contract lives in `07_UI_DESIGN_SYSTEM.md`.
+
+---
+
 ## Phase 2 — Workout Tracking
 
 Goal: make the application usable during real gym sessions.

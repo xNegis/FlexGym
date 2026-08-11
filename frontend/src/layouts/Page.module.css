@@ -1,0 +1,29 @@
+.page {
+  padding: var(--space-4) var(--gutter);
+  width: 100%;
+}
+
+.compact {
+  max-width: var(--content-width-compact);
+  margin: 0 auto;
+}
+
+.reading {
+  max-width: var(--content-width-reading);
+  margin: 0 auto;
+}
+
+.planning {
+  max-width: var(--content-width-planning);
+  margin: 0 auto;
+}
+
+.full {
+  max-width: none;
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding: var(--space-6) var(--gutter);
+  }
+}

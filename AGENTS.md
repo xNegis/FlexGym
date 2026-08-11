@@ -39,10 +39,15 @@ Important files include:
 * `harness/context/04_DECISIONS.md`
 * `harness/context/05_PROJECT_STATE.md`
 * `harness/context/06_FEATURE_TEMPLATE.md`
+* `harness/context/07_UI_DESIGN_SYSTEM.md` for every feature that creates or changes user-facing UI
 
 Existing feature specifications live under `/harness/features`.
 
 Read relevant existing features before implementing new behaviour.
+
+For UI work, read `harness/context/07_UI_DESIGN_SYSTEM.md` completely before proposing or changing
+the frontend. Reuse its tokens, primitives, responsive rules, content conventions, and interaction
+patterns. Do not add feature-local visual conventions when the shared system covers the need.
 
 ## Development Workflow
 
@@ -60,6 +65,11 @@ When implementing a feature:
 6. Add or update meaningful tests.
 7. Run the relevant tests and validations.
 8. Report what changed and any important design decisions or limitations.
+
+For UI work, validation must exercise the relevant loading, empty, error, pending, unavailable, and
+confirmation states. Inspect changed flows at 360 px, 390 px, 430 px, and a representative desktop
+width; verify keyboard focus and browser Back where navigation changes; and confirm that no page
+introduces document-level horizontal overflow.
 
 ### Migration validation gate
 

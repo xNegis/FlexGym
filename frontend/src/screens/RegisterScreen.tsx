@@ -1,13 +1,16 @@
 import { type FormEvent, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../api";
-import type { UserResponse } from "../api";
+import { useAuth } from "../context";
+import Button from "../ui/Button";
+import { Field, TextInput } from "../ui/Field";
+import Alert from "../ui/Alert";
+import styles from "./Screen.module.css";
 
-interface Props {
-  onRegistered: (user: UserResponse) => void;
-  onLoginRequested: () => void;
-}
+export default function RegisterScreen() {
+  const { setUser } = useAuth();
+  const navigate = useNavigate();
 
-export default function RegistrationForm({ onRegistered, onLoginRequested }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -36,7 +39,8 @@ export default function RegistrationForm({ onRegistered, onLoginRequested }: Pro
       if ("detail" in result) {
         setError(result.detail);
       } else {
-        onRegistered(result);
+        await setUser(result);
+        navigate("/onboarding", { replace: true });
       }
     } catch {
       setError("Unable to reach the server. Please try again.");
@@ -46,27 +50,30 @@ export default function RegistrationForm({ onRegistered, onLoginRequested }: Pro
   };
 
   return (
-    <form className="auth-form" onSubmit={handleSubmit} noValidate>
-      <h2 className="auth-title">Create your account</h2>
-      {error && (
-        <div className="auth-error" role="alert">
-          {error}
-        </div>
-      )}
-      <label className="auth-field">
-        <span>Email</span>
-        <input
+    <form onSubmit={handleSubmit} noValidate className={styles.stack5}>
+      <div>
+        <h2 className={styles.screenTitle}>Create your account</h2>
+        <p className={styles.textBodyMuted}>Set up your FlexGym account to get started</p>
+      </div>
+
+      {error && <Alert variant="error">{error}</Alert>}
+
+      <Field htmlFor="reg-email" label="Email">
+        <TextInput
+          id="reg-email"
           type="email"
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
           disabled={pending}
+          placeholder="your@email.com"
         />
-      </label>
-      <label className="auth-field">
-        <span>Password</span>
-        <input
+      </Field>
+
+      <Field htmlFor="reg-password" label="Password" hint="At least 15 characters">
+        <TextInput
+          id="reg-password"
           type="password"
           autoComplete="new-password"
           value={password}
@@ -76,10 +83,15 @@ export default function RegistrationForm({ onRegistered, onLoginRequested }: Pro
           maxLength={128}
           disabled={pending}
         />
-      </label>
-      <label className="auth-field">
-        <span>Confirm password</span>
-        <input
+      </Field>
+
+      <Field
+        htmlFor="reg-password-confirm"
+        label="Confirm password"
+        error={passwordMatchError ?? undefined}
+      >
+        <TextInput
+          id="reg-password-confirm"
           type="password"
           autoComplete="new-password"
           value={passwordConfirmation}
@@ -88,17 +100,19 @@ export default function RegistrationForm({ onRegistered, onLoginRequested }: Pro
           minLength={15}
           maxLength={128}
           disabled={pending}
+          error={passwordMatchError ?? undefined}
         />
-        {passwordMatchError && <span className="auth-field-error">{passwordMatchError}</span>}
-      </label>
-      <button type="submit" className="auth-button" disabled={!canSubmit}>
+      </Field>
+
+      <Button type="submit" variant="primary" fullWidth disabled={!canSubmit}>
         {pending ? "Creating account..." : "Register"}
-      </button>
-      <p className="auth-switch">
+      </Button>
+
+      <p className={styles.authSwitch}>
         Already have an account?{" "}
-        <button type="button" onClick={onLoginRequested} disabled={pending}>
+        <Link to="/login" className={styles.authLink}>
           Log in
-        </button>
+        </Link>
       </p>
     </form>
   );

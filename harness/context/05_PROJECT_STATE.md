@@ -4,7 +4,8 @@
 
 ## Current Phase
 
-Phase 1 — Training Planning completed
+Phase 0 — Foundation and Phase 1 — Training Planning are completed successfully. Phase 2 — Workout
+Tracking is next.
 
 ## Current Status
 
@@ -25,9 +26,13 @@ F10 — Routine Schedule is implemented and validated.
 
 F11 — Active Routine is implemented and validated.
 
-Phase 1 — Training Planning is completed. The application now supports user-owned routines,
-scheduled training days, structured exercise prescriptions, and an explicit active-routine
-selection.
+Phase 1 — Training Planning is completed.
+
+F12 — Mobile-first UI System and Phase 1 UX Refresh is implemented. The frontend now uses a shared
+design-token system (CSS custom properties), a reusable UI primitive layer, React Router with
+canonical routes, authentication and profile guards, a mobile-first app shell with bottom navigation,
+and the Quiet Strength visual direction. All F02–F11 flows have been migrated and validated with
+authenticated Playwright coverage at 360, 390, and 430 px.
 
 ## Completed Features
 
@@ -41,6 +46,7 @@ selection.
 * F09 — Routine Exercise Configuration
 * F10 — Routine Schedule
 * F11 — Active Routine
+* F12 — Mobile-first UI System and Phase 1 UX Refresh
 
 ## Skipped Features
 
@@ -64,6 +70,7 @@ specified.
 * `harness/features/09_routine_exercise_configuration.md`
 * `harness/features/10_routine_schedule.md`
 * `harness/features/11_active_routine.md`
+* `harness/features/12_mobile_ui_system.md` (completed)
 
 ## Current Technology
 
@@ -71,7 +78,7 @@ Backend:
 Python 3.11+ / FastAPI / uv
 
 Frontend:
-React 19 / TypeScript 6 / Vite / npm
+React 19 / TypeScript 6 / Vite / npm / React Router 7 / Lucide React
 
 Persistence:
 SQLite / SQLAlchemy 2 / Alembic
@@ -80,7 +87,7 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (basic backend tests) / Playwright deferred
+pytest (177 backend tests) / focused authenticated Playwright coverage introduced by F12
 
 Code Quality:
 Backend: Ruff (lint + format), mypy (type checking)

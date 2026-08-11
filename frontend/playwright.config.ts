@@ -10,7 +10,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "cd ../backend && .venv\\Scripts\\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
+        "cd ../backend && .venv\\Scripts\\python -m alembic upgrade head && .venv\\Scripts\\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
       port: 8000,
       reuseExistingServer: true,
       env: {

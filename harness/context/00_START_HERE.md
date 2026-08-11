@@ -19,8 +19,13 @@ Before proposing or writing a feature, read:
 4. `04_DECISIONS.md`
 5. `05_PROJECT_STATE.md`
 6. `06_FEATURE_TEMPLATE.md`
+7. `07_UI_DESIGN_SYSTEM.md` when the feature creates or changes user-facing UI.
 
 Also read any existing features relevant to the feature currently being designed.
+
+UI-affecting features must reuse the visual tokens, primitives, responsive rules, and interaction
+patterns defined by `07_UI_DESIGN_SYSTEM.md`. A feature specification must not introduce a parallel
+visual language implicitly.
 
 ## Working Method
 

@@ -69,6 +69,20 @@ Frontend API code must treat response bodies as untrusted runtime values, normal
 returning them to components, and provide a safe generic fallback. UI components must not render
 raw server payloads.
 
+When the feature creates or changes user-facing UI, it must reference
+`harness/context/07_UI_DESIGN_SYSTEM.md` and define:
+
+* The mobile information hierarchy and single dominant action for each screen or contained task.
+* Existing shared primitives that will be reused.
+* Any genuinely new reusable primitive and why existing primitives do not cover the need.
+* Applicable loading, empty, error, pending, success, unavailable, and confirmation states.
+* Browser Back and refresh behaviour when meaningful navigation changes.
+* Keyboard, visible-focus, touch-target, safe-area, zoom, and horizontal-overflow behaviour.
+* Validation at 360 px, 390 px, 430 px, and a representative desktop width.
+
+Feature-specific styles must use semantic design tokens. Raw colors, ad-hoc spacing scales, and new
+button or field treatments require an explicit design-system change rather than local invention.
+
 ## Business Rules
 
 Explicit rules and invariants.
