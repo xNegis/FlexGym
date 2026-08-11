@@ -65,9 +65,10 @@ Current intended sequence:
 * Active Routine
 
 A training day is one planned workout session inside a routine, such as Push, Pull, or Legs. It is
-not a weekday. Routine Schedule will later provide exactly seven ordered weekly positions, each of
-which is either rest or references one training day. Every training day must be allocated exactly
-once before a routine can become active. A routine may remain incomplete while it is being designed.
+not a weekday. Routine Schedule provides exactly seven ordered weekly positions, each of which is
+either derived rest or references one training day. Every training day is allocated exactly once as
+part of its creation, and weekly placement is its canonical display order. A routine with no
+training days therefore has seven derived rest positions.
 
 ---
 

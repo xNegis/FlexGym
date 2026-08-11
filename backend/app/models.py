@@ -88,7 +88,11 @@ class Routine(Base):
         "TrainingDay",
         back_populates="routine",
         cascade="all, delete-orphan",
-        order_by="TrainingDay.position",
+    )
+    schedule_assignments: Mapped[list["RoutineScheduleAssignment"]] = relationship(
+        "RoutineScheduleAssignment",
+        back_populates="routine",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -105,7 +109,6 @@ class TrainingDay(Base):
     )
     routine: Mapped["Routine"] = relationship("Routine", back_populates="training_days")
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    position: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.datetime.utcnow
     )
@@ -116,15 +119,38 @@ class TrainingDay(Base):
         onupdate=datetime.datetime.utcnow,
     )
 
-    __table_args__ = (
-        UniqueConstraint("routine_id", "position", name="uq_training_day_routine_position"),
-    )
-
     exercise_configurations: Mapped[list["ExerciseConfiguration"]] = relationship(
         "ExerciseConfiguration",
         back_populates="training_day",
         cascade="all, delete-orphan",
         order_by="ExerciseConfiguration.position",
+    )
+    schedule_assignment: Mapped["RoutineScheduleAssignment | None"] = relationship(
+        "RoutineScheduleAssignment",
+        back_populates="training_day",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+
+class RoutineScheduleAssignment(Base):
+    __tablename__ = "routine_schedule_assignments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    routine_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("routines.id", ondelete="CASCADE"), nullable=False
+    )
+    routine: Mapped["Routine"] = relationship("Routine", back_populates="schedule_assignments")
+    training_day_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("training_days.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    training_day: Mapped["TrainingDay"] = relationship(
+        "TrainingDay", back_populates="schedule_assignment"
+    )
+    week_position: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("routine_id", "week_position", name="uq_schedule_assignment_routine_pos"),
     )
 
 

@@ -38,11 +38,37 @@ interface Routine {
 interface TrainingDay {
   id: number;
   name: string;
-  position: number;
+  week_position: number;
   exercise_count: number;
   created_at: string;
   updated_at: string;
 }
+
+interface ScheduleSlotTrainingDay {
+  id: number;
+  name: string;
+  week_position: number;
+  exercise_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+type ScheduleSlotType = "training" | "rest";
+
+interface ScheduleTrainingSlot {
+  position: number;
+  weekday: string;
+  type: "training";
+  training_day: ScheduleSlotTrainingDay;
+}
+
+interface ScheduleRestSlot {
+  position: number;
+  weekday: string;
+  type: "rest";
+}
+
+type ScheduleSlot = ScheduleTrainingSlot | ScheduleRestSlot;
 
 interface ExerciseSummary {
   slug: string;
@@ -96,6 +122,11 @@ export {
   type ExerciseSummary,
   type FitnessProfile,
   type Routine,
+  type ScheduleRestSlot,
+  type ScheduleSlot,
+  type ScheduleSlotTrainingDay,
+  type ScheduleSlotType,
+  type ScheduleTrainingSlot,
   type Section,
   type TrainingDay,
   type User,

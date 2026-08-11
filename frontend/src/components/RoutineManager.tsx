@@ -6,13 +6,13 @@ import {
   deleteTrainingDay,
   fetchRoutines,
   fetchRoutine,
-  fetchTrainingDays,
+  fetchSchedule,
+  moveTrainingDay,
   renameTrainingDay,
-  reorderTrainingDays,
   UnauthenticatedError,
   updateRoutine,
 } from "../api";
-import type { Routine, TrainingDay } from "../types";
+import type { Routine, ScheduleSlot, ScheduleTrainingSlot, TrainingDay } from "../types";
 import ExerciseConfiguration from "./ExerciseConfiguration";
 import { labelFor, OBJECTIVE_OPTIONS } from "./routineConstants";
 
@@ -30,6 +30,8 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = { name: "", objective: "", description: "" };
+
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 function toFormState(routine: Routine): FormState {
   return {
@@ -85,26 +87,26 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
     }
   }, [viewMode, loadRoutines]);
 
-  // Training day state
-  const [trainingDays, setTrainingDays] = useState<TrainingDay[] | null>(null);
-  const [trainingDaysLoading, setTrainingDaysLoading] = useState(false);
-  const [trainingDayError, setTrainingDayError] = useState<string | null>(null);
+  // Schedule state
+  const [schedule, setSchedule] = useState<ScheduleSlot[] | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [trainingDayFormName, setTrainingDayFormName] = useState("");
   const [renameDayId, setRenameDayId] = useState<number | null>(null);
   const [deleteDayId, setDeleteDayId] = useState<number | null>(null);
-  const [reorderPending, setReorderPending] = useState(false);
-  const trainingDayRequestSequence = useRef(0);
+  const [movePending, setMovePending] = useState(false);
+  const scheduleRequestSequence = useRef(0);
 
-  const loadTrainingDays = useCallback(
+  const loadSchedule = useCallback(
     async (routineId: number, silent: boolean = false) => {
-      const seq = ++trainingDayRequestSequence.current;
+      const seq = ++scheduleRequestSequence.current;
       if (!silent) {
-        setTrainingDaysLoading(true);
-        setTrainingDayError(null);
+        setScheduleLoading(true);
+        setScheduleError(null);
       }
       try {
-        const result = await fetchTrainingDays(routineId);
-        if (seq !== trainingDayRequestSequence.current) return;
+        const result = await fetchSchedule(routineId);
+        if (seq !== scheduleRequestSequence.current) return;
         if ("detail" in result) {
           if (result.detail === "Routine not found") {
             setSelectedId(null);
@@ -112,19 +114,19 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
             setViewMode("list");
             return;
           }
-          setTrainingDayError(result.detail);
+          setScheduleError(result.detail);
         } else {
-          setTrainingDays(result);
+          setSchedule(result);
         }
       } catch (e) {
-        if (seq !== trainingDayRequestSequence.current) return;
+        if (seq !== scheduleRequestSequence.current) return;
         if (e instanceof UnauthenticatedError) {
           onUnauthenticated();
           return;
         }
-        setTrainingDayError("Unable to load training days");
+        setScheduleError("Unable to load schedule");
       } finally {
-        if (seq === trainingDayRequestSequence.current) setTrainingDaysLoading(false);
+        if (seq === scheduleRequestSequence.current) setScheduleLoading(false);
       }
     },
     [onUnauthenticated],
@@ -132,12 +134,12 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
 
   useEffect(() => {
     if (viewMode === "detail" && selectedId !== null) {
-      setTrainingDays(null);
-      loadTrainingDays(selectedId);
+      setSchedule(null);
+      loadSchedule(selectedId);
     }
-  }, [viewMode, selectedId, loadTrainingDays]);
+  }, [viewMode, selectedId, loadSchedule]);
 
-  const refreshRoutineAndDays = useCallback(async () => {
+  const refreshRoutineAndSchedule = useCallback(async () => {
     if (selectedId === null) return;
     try {
       const result = await fetchRoutine(selectedId);
@@ -148,15 +150,15 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
         return;
       }
       setSelectedRoutine(result);
-      await loadTrainingDays(selectedId, true);
+      await loadSchedule(selectedId, true);
     } catch (e) {
       if (e instanceof UnauthenticatedError) {
         onUnauthenticated();
         return;
       }
-      setTrainingDayError("Unable to refresh routine");
+      setScheduleError("Unable to refresh routine");
     }
-  }, [selectedId, loadTrainingDays, onUnauthenticated]);
+  }, [selectedId, loadSchedule, onUnauthenticated]);
 
   // -- List view -------------------------------------------------------
 
@@ -289,151 +291,130 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
 
   // -- Training day actions --------------------------------------------
 
-  const canAddDay = (trainingDays?.length ?? 0) < 7 && !pending && !reorderPending;
+  const canAddDay = (() => {
+    if (!schedule) return false;
+    const trainingCount = schedule.filter((s) => s.type === "training").length;
+    return trainingCount < 7 && !pending && !movePending;
+  })();
 
   const handleAddTrainingDay = async (e: FormEvent) => {
     e.preventDefault();
     const name = trainingDayFormName.trim();
     if (!name || !canAddDay || selectedId === null) return;
-    setTrainingDayError(null);
+    setScheduleError(null);
     setPending(true);
     try {
       const result = await createTrainingDay(selectedId, name);
       if ("detail" in result) {
-        setTrainingDayError(result.detail);
+        setScheduleError(result.detail);
       } else {
         setTrainingDayFormName("");
-        await refreshRoutineAndDays();
+        await refreshRoutineAndSchedule();
       }
     } catch (e) {
       if (e instanceof UnauthenticatedError) {
         onUnauthenticated();
         return;
       }
-      setTrainingDayError("Unable to save training day");
+      setScheduleError("Unable to save training day");
     } finally {
       setPending(false);
     }
   };
 
-  const startRename = (day: TrainingDay) => {
-    setRenameDayId(day.id);
-    setTrainingDayFormName(day.name);
-    setTrainingDayError(null);
+  const startRename = (slot: ScheduleTrainingSlot) => {
+    setRenameDayId(slot.training_day.id);
+    setTrainingDayFormName(slot.training_day.name);
+    setScheduleError(null);
   };
 
   const cancelRename = () => {
     setRenameDayId(null);
     setTrainingDayFormName("");
-    setTrainingDayError(null);
+    setScheduleError(null);
   };
 
   const handleRename = async (e: FormEvent) => {
     e.preventDefault();
     const name = trainingDayFormName.trim();
     if (!name || selectedId === null || renameDayId === null || pending) return;
-    setTrainingDayError(null);
+    setScheduleError(null);
     setPending(true);
     try {
       const result = await renameTrainingDay(selectedId, renameDayId, name);
       if ("detail" in result) {
-        setTrainingDayError(result.detail);
+        setScheduleError(result.detail);
       } else {
         setRenameDayId(null);
         setTrainingDayFormName("");
-        await refreshRoutineAndDays();
+        await refreshRoutineAndSchedule();
       }
     } catch (e) {
       if (e instanceof UnauthenticatedError) {
         onUnauthenticated();
         return;
       }
-      setTrainingDayError("Unable to rename training day");
+      setScheduleError("Unable to rename training day");
     } finally {
       setPending(false);
     }
   };
 
-  const handleMoveUp = async (day: TrainingDay) => {
-    if (!trainingDays || trainingDays.length < 2 || reorderPending || selectedId === null) return;
-    const index = trainingDays.findIndex((d) => d.id === day.id);
-    if (index <= 0) return;
-    const newOrder = [...trainingDays];
-    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-    await submitReorder(newOrder.map((d) => d.id));
-  };
-
-  const handleMoveDown = async (day: TrainingDay) => {
-    if (!trainingDays || trainingDays.length < 2 || reorderPending || selectedId === null) return;
-    const index = trainingDays.findIndex((d) => d.id === day.id);
-    if (index < 0 || index >= trainingDays.length - 1) return;
-    const newOrder = [...trainingDays];
-    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-    await submitReorder(newOrder.map((d) => d.id));
-  };
-
-  const submitReorder = async (dayIds: number[]) => {
-    if (selectedId === null) return;
-    const previous = trainingDays;
-    setTrainingDays((current) => {
-      if (!current) return current;
-      const sorted = dayIds
-        .map((id) => current.find((d) => d.id === id))
-        .filter((d): d is TrainingDay => d !== undefined);
-      return sorted.map((d, i) => ({ ...d, position: i + 1 }));
-    });
-    setReorderPending(true);
-    setTrainingDayError(null);
+  const handleMove = async (dayId: number, targetPosition: number) => {
+    if (selectedId === null || movePending || pending) return;
+    const previous = schedule;
+    setMovePending(true);
+    setScheduleError(null);
     try {
-      const result = await reorderTrainingDays(selectedId, dayIds);
+      const result = await moveTrainingDay(selectedId, dayId, targetPosition);
       if ("detail" in result) {
-        setTrainingDays(previous);
-        setTrainingDayError(result.detail);
+        setSchedule(previous);
+        setScheduleError(result.detail);
       } else {
-        setTrainingDays(result);
-        setTrainingDayError(null);
+        setSchedule(result);
+        await refreshRoutineAndSchedule();
       }
     } catch {
-      setTrainingDays(previous);
-      setTrainingDayError("Unable to reorder training days");
+      setSchedule(previous);
+      setScheduleError("Unable to move training day");
     } finally {
-      setReorderPending(false);
+      setMovePending(false);
     }
   };
 
-  const startDeleteDay = (day: TrainingDay) => {
-    setDeleteDayId(day.id);
-    setTrainingDayError(null);
+  const startDeleteDay = (slot: ScheduleTrainingSlot) => {
+    setDeleteDayId(slot.training_day.id);
+    setScheduleError(null);
   };
 
   const cancelDeleteDay = () => {
     setDeleteDayId(null);
-    setTrainingDayError(null);
+    setScheduleError(null);
   };
 
   const handleDeleteDay = async () => {
     if (selectedId === null || deleteDayId === null) return;
-    setTrainingDayError(null);
+    setScheduleError(null);
     setPending(true);
     try {
       const result = await deleteTrainingDay(selectedId, deleteDayId);
       if (result !== null) {
         if (result.detail === "Training day not found") {
           setDeleteDayId(null);
-          await refreshRoutineAndDays();
+          await refreshRoutineAndSchedule();
           return;
         }
-        setTrainingDayError(result.detail);
+        setScheduleError(result.detail);
       } else {
         setDeleteDayId(null);
-        await refreshRoutineAndDays();
+        await refreshRoutineAndSchedule();
       }
     } catch (e) {
       if (e instanceof UnauthenticatedError) {
         onUnauthenticated();
         return;
       }
-      setTrainingDayError("Unable to delete training day");
+      setScheduleError("Unable to delete training day");
     } finally {
       setPending(false);
     }
@@ -441,8 +422,15 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
 
   // -- Exercise configuration ------------------------------------------
 
-  const openConfigExercises = (day: TrainingDay) => {
-    setConfigDay(day);
+  const openConfigExercises = (slot: ScheduleTrainingSlot) => {
+    setConfigDay({
+      id: slot.training_day.id,
+      name: slot.training_day.name,
+      week_position: slot.training_day.week_position,
+      exercise_count: slot.training_day.exercise_count,
+      created_at: slot.training_day.created_at,
+      updated_at: slot.training_day.updated_at,
+    });
     setViewMode("configExercises");
   };
 
@@ -587,8 +575,10 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
 
   if (viewMode === "detail") {
     // Training day delete confirmation sub-view
-    if (deleteDayId !== null && selectedRoutine) {
-      const day = trainingDays?.find((d) => d.id === deleteDayId);
+    if (deleteDayId !== null && selectedRoutine && schedule) {
+      const slot = schedule.find(
+        (s) => s.type === "training" && s.training_day.id === deleteDayId,
+      ) as ScheduleTrainingSlot | undefined;
       return (
         <div className="routine-detail">
           <h2 className="routine-detail-heading">{selectedRoutine.name}</h2>
@@ -596,15 +586,16 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
 
           <div className="delete-confirmation">
             <p>
-              Are you sure you want to delete <strong>{day?.name}</strong>? All configured exercises
-              and planned sets inside it will also be permanently deleted. This action is permanent
-              and cannot be undone.
+              Are you sure you want to delete <strong>{slot?.training_day.name}</strong> from{" "}
+              <strong>{slot ? WEEKDAYS[slot.position - 1] : "unknown weekday"}</strong>? All
+              configured exercises and planned sets inside it will also be permanently deleted. That
+              weekday will become a rest day. This action is permanent and cannot be undone.
             </p>
           </div>
 
-          {trainingDayError && (
+          {scheduleError && (
             <div className="routine-detail-error" role="alert">
-              {trainingDayError}
+              {scheduleError}
             </div>
           )}
 
@@ -639,7 +630,7 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
       );
     }
 
-    const atLimit = (trainingDays?.length ?? 0) >= 7;
+    const atLimit = schedule ? schedule.filter((s) => s.type === "training").length >= 7 : false;
 
     return (
       <div className="routine-detail">
@@ -676,118 +667,144 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
         </div>
 
         <div className="training-days-section">
-          <h3 className="training-days-heading">Training days</h3>
+          <h3 className="training-days-heading">Weekly schedule</h3>
           <p className="training-days-hint">
-            Training days are workout sessions inside this routine. Their weekly placement will be
-            configured in a later scheduling step.
+            Each weekday is either a training session or a rest day. New sessions are automatically
+            placed in the earliest available weekday.
           </p>
 
-          {trainingDayError && (
+          {scheduleError && (
             <div className="routine-detail-error" role="alert">
-              {trainingDayError}
+              {scheduleError}
             </div>
           )}
 
-          {trainingDaysLoading ? (
+          {scheduleLoading ? (
             <div className="routine-loading" role="status">
-              Loading training days...
+              Loading schedule...
             </div>
-          ) : trainingDays === null ? null : trainingDays.length === 0 ? (
-            <div className="training-days-empty">
-              <p>No training days yet.</p>
-              <p className="routine-empty-hint">Add a training day to define a workout session.</p>
-            </div>
-          ) : (
-            <ul className="training-days-list">
-              {trainingDays.map((day) => (
-                <li key={day.id} className="training-day-item">
-                  {renameDayId === day.id ? (
-                    <form className="training-day-rename" onSubmit={handleRename} noValidate>
-                      <input
-                        type="text"
-                        className="training-day-rename-input"
-                        value={trainingDayFormName}
-                        onChange={(e) => setTrainingDayFormName(e.target.value)}
-                        maxLength={120}
-                        required
-                        disabled={pending}
-                        autoFocus
-                      />
-                      <div className="training-day-rename-actions">
-                        <button
-                          type="submit"
-                          className="training-day-action-button"
-                          disabled={!trainingDayFormName.trim() || pending}
-                        >
-                          {pending ? "Saving..." : "Save"}
-                        </button>
-                        <button
-                          type="button"
-                          className="training-day-cancel-button"
-                          onClick={cancelRename}
-                          disabled={pending}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
+          ) : schedule === null ? null : (
+            <ul className="schedule-list">
+              {schedule.map((slot) => (
+                <li key={slot.position} className="schedule-slot">
+                  <div className="schedule-slot-header">
+                    <span className="schedule-weekday">{WEEKDAYS[slot.position - 1]}</span>
+                    {slot.type === "training" ? (
+                      <span className="schedule-slot-type schedule-slot-training">Training</span>
+                    ) : (
+                      <span className="schedule-slot-type schedule-slot-rest">Rest</span>
+                    )}
+                  </div>
+
+                  {slot.type === "training" ? (
+                    <>
+                      {renameDayId === slot.training_day.id ? (
+                        <form className="training-day-rename" onSubmit={handleRename} noValidate>
+                          <input
+                            type="text"
+                            className="training-day-rename-input"
+                            value={trainingDayFormName}
+                            onChange={(e) => setTrainingDayFormName(e.target.value)}
+                            maxLength={120}
+                            required
+                            disabled={pending}
+                            autoFocus
+                          />
+                          <div className="training-day-rename-actions">
+                            <button
+                              type="submit"
+                              className="training-day-action-button"
+                              disabled={!trainingDayFormName.trim() || pending}
+                            >
+                              {pending ? "Saving..." : "Save"}
+                            </button>
+                            <button
+                              type="button"
+                              className="training-day-cancel-button"
+                              onClick={cancelRename}
+                              disabled={pending}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="schedule-training-day">
+                          <div className="schedule-training-day-info">
+                            <span className="schedule-training-day-name">
+                              {slot.training_day.name}
+                            </span>
+                            <span className="schedule-exercise-count">
+                              {exerciseCountLabel(slot.training_day.exercise_count)}
+                            </span>
+                          </div>
+                          <div className="schedule-training-day-move">
+                            <label className="schedule-move-label">
+                              <span className="schedule-move-label-text">Move to:</span>
+                              <select
+                                className="schedule-move-select"
+                                value={slot.position}
+                                onChange={(e) => {
+                                  const newPos = parseInt(e.target.value, 10);
+                                  if (newPos !== slot.position) {
+                                    handleMove(slot.training_day.id, newPos);
+                                  }
+                                }}
+                                disabled={movePending || pending || renameDayId !== null}
+                              >
+                                {WEEKDAYS.map((day, i) => {
+                                  const pos = i + 1;
+                                  const isTargetOccupied =
+                                    pos !== slot.position &&
+                                    schedule?.some(
+                                      (s) => s.type === "training" && s.position === pos,
+                                    );
+                                  const label = isTargetOccupied
+                                    ? `${day} (swap)`
+                                    : pos === slot.position
+                                      ? `${day} (current)`
+                                      : day;
+                                  return (
+                                    <option key={pos} value={pos}>
+                                      {label}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </label>
+                          </div>
+                          <div className="schedule-training-day-actions">
+                            <button
+                              type="button"
+                              className="training-day-config-button"
+                              onClick={() => openConfigExercises(slot)}
+                              disabled={movePending || pending || renameDayId !== null}
+                            >
+                              Exercises
+                            </button>
+                            <button
+                              type="button"
+                              className="training-day-action-button"
+                              onClick={() => startRename(slot)}
+                              disabled={movePending || pending}
+                            >
+                              Rename
+                            </button>
+                            <button
+                              type="button"
+                              className="training-day-delete-button"
+                              onClick={() => startDeleteDay(slot)}
+                              disabled={movePending || pending}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : (
-                    <div className="training-day-row">
-                      <span className="training-day-position">{day.position}.</span>
-                      <div className="training-day-info">
-                        <span className="training-day-name">{day.name}</span>
-                        <span className="training-day-exercise-count">
-                          {exerciseCountLabel(day.exercise_count)}
-                        </span>
-                      </div>
-                      <div className="training-day-controls">
-                        <button
-                          type="button"
-                          className="training-day-config-button"
-                          onClick={() => openConfigExercises(day)}
-                          disabled={reorderPending || pending || renameDayId !== null}
-                        >
-                          Exercises
-                        </button>
-                        <button
-                          type="button"
-                          className="training-day-move-button"
-                          onClick={() => handleMoveUp(day)}
-                          disabled={day.position === 1 || reorderPending || pending}
-                          aria-label={`Move ${day.name} up`}
-                        >
-                          &#9650;
-                        </button>
-                        <button
-                          type="button"
-                          className="training-day-move-button"
-                          onClick={() => handleMoveDown(day)}
-                          disabled={
-                            day.position === (trainingDays?.length ?? 0) ||
-                            reorderPending ||
-                            pending
-                          }
-                          aria-label={`Move ${day.name} down`}
-                        >
-                          &#9660;
-                        </button>
-                        <button
-                          type="button"
-                          className="training-day-action-button"
-                          onClick={() => startRename(day)}
-                          disabled={reorderPending || pending}
-                        >
-                          Rename
-                        </button>
-                        <button
-                          type="button"
-                          className="training-day-delete-button"
-                          onClick={() => startDeleteDay(day)}
-                          disabled={reorderPending || pending}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                    <div className="schedule-rest-day">
+                      <span className="schedule-rest-text">No training session scheduled.</span>
                     </div>
                   )}
                 </li>

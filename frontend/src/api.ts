@@ -6,6 +6,8 @@ import type {
   ExerciseSummary,
   FitnessProfile,
   Routine,
+  ScheduleSlot,
+  ScheduleSlotType,
   TrainingDay,
 } from "./types";
 
@@ -635,9 +637,10 @@ function isTrainingDay(value: unknown): value is TrainingDay {
     typeof v.name === "string" &&
     v.name.trim().length > 0 &&
     v.name.length <= 120 &&
-    typeof v.position === "number" &&
-    Number.isInteger(v.position) &&
-    v.position >= 1 &&
+    typeof v.week_position === "number" &&
+    Number.isInteger(v.week_position) &&
+    v.week_position >= 1 &&
+    v.week_position <= 7 &&
     typeof v.exercise_count === "number" &&
     Number.isInteger(v.exercise_count) &&
     v.exercise_count >= 0 &&
@@ -652,7 +655,7 @@ function isTrainingDayArray(value: unknown): value is TrainingDay[] {
   if (!Array.isArray(value)) return false;
   if (value.length > 7 || !value.every(isTrainingDay)) return false;
   const ids = new Set(value.map((day) => day.id));
-  return ids.size === value.length && value.every((day, index) => day.position === index + 1);
+  return ids.size === value.length;
 }
 
 export type TrainingDayResult = TrainingDay | { detail: string };
@@ -763,33 +766,6 @@ export async function renameTrainingDay(
   return result;
 }
 
-export async function reorderTrainingDays(
-  routineId: number,
-  dayIds: number[],
-): Promise<TrainingDayListResult> {
-  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}/days/order`, {
-    method: "PUT",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ day_ids: dayIds }),
-  });
-  if (response.status === 401) {
-    throw new UnauthenticatedError();
-  }
-  const result: unknown = await responseJson(response);
-  if (!response.ok) {
-    return {
-      detail: trainingDayErrorMessage(result, response.status, {
-        404: "Routine not found",
-      }),
-    };
-  }
-  if (!isTrainingDayArray(result)) {
-    throw new Error("Invalid training days response");
-  }
-  return result;
-}
-
 export async function deleteTrainingDay(
   routineId: number,
   dayId: number,
@@ -808,6 +784,162 @@ export async function deleteTrainingDay(
     return { detail: "Training day not found" };
   }
   return { detail: "Unable to delete training day" };
+}
+
+const WEEKDAYS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
+
+const VALID_SLOT_TYPES: Set<ScheduleSlotType> = new Set(["training", "rest"]);
+
+function isScheduleSlotTrainingDay(value: unknown): value is {
+  id: number;
+  name: string;
+  week_position: number;
+  exercise_count: number;
+  created_at: string;
+  updated_at: string;
+} {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "number" &&
+    Number.isInteger(v.id) &&
+    v.id > 0 &&
+    typeof v.name === "string" &&
+    v.name.trim().length > 0 &&
+    v.name.length <= 120 &&
+    typeof v.week_position === "number" &&
+    Number.isInteger(v.week_position) &&
+    v.week_position >= 1 &&
+    v.week_position <= 7 &&
+    typeof v.exercise_count === "number" &&
+    Number.isInteger(v.exercise_count) &&
+    v.exercise_count >= 0 &&
+    typeof v.created_at === "string" &&
+    v.created_at.length > 0 &&
+    typeof v.updated_at === "string" &&
+    v.updated_at.length > 0
+  );
+}
+
+function isScheduleSlot(value: unknown): value is ScheduleSlot {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.position !== "number" ||
+    !Number.isInteger(v.position) ||
+    v.position < 1 ||
+    v.position > 7
+  )
+    return false;
+  if (typeof v.weekday !== "string" || !WEEKDAYS.includes(v.weekday as (typeof WEEKDAYS)[number]))
+    return false;
+  if (typeof v.type !== "string" || !VALID_SLOT_TYPES.has(v.type as ScheduleSlotType)) return false;
+  if (v.type === "training") {
+    return isScheduleSlotTrainingDay(v.training_day);
+  }
+  return !("training_day" in v);
+}
+
+function isScheduleSlotArray(value: unknown): value is ScheduleSlot[] {
+  if (!Array.isArray(value)) return false;
+  if (value.length !== 7) return false;
+  if (!value.every(isScheduleSlot)) return false;
+  const positions = new Set(value.map((s) => s.position));
+  if (positions.size !== 7) return false;
+  return value.every(
+    (slot, index) => slot.position === index + 1 && slot.weekday === WEEKDAYS[index],
+  );
+}
+
+export type ScheduleResult = ScheduleSlot[] | { detail: string };
+
+export async function fetchSchedule(routineId: number): Promise<ScheduleResult> {
+  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}/schedule`, {
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return { detail: "Routine not found" };
+    }
+    return { detail: "Unable to load schedule" };
+  }
+  if (!isScheduleSlotArray(result)) {
+    throw new Error("Invalid schedule response");
+  }
+  return result;
+}
+
+export type MoveTrainingDayResult = ScheduleSlot[] | { detail: string };
+
+export async function moveTrainingDay(
+  routineId: number,
+  trainingDayId: number,
+  weekPosition: number,
+): Promise<MoveTrainingDayResult> {
+  const response = await fetch(`${API_BASE_URL}/api/routines/${routineId}/schedule`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      training_day_id: trainingDayId,
+      week_position: weekPosition,
+    }),
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) {
+      if (typeof result === "object" && result !== null && "detail" in result) {
+        const detail = (result as Record<string, unknown>).detail;
+        if (typeof detail === "string" && detail.trim().length > 0) {
+          return { detail };
+        }
+      }
+      return { detail: "Training day not found" };
+    }
+    if (
+      response.status === 422 &&
+      typeof result === "object" &&
+      result !== null &&
+      "detail" in result
+    ) {
+      const detail = (result as Record<string, unknown>).detail;
+      if (Array.isArray(detail)) {
+        const messages = detail
+          .filter(
+            (item): item is { msg: string } =>
+              typeof item === "object" &&
+              item !== null &&
+              "msg" in item &&
+              typeof item.msg === "string",
+          )
+          .map((item) => item.msg);
+        return { detail: messages.length > 0 ? messages.join("; ") : "Invalid request" };
+      }
+      if (typeof detail === "string") {
+        return { detail };
+      }
+    }
+    return { detail: "Unable to move training day" };
+  }
+  if (!isScheduleSlotArray(result)) {
+    throw new Error("Invalid schedule response");
+  }
+  return result;
 }
 
 function isConfiguredSetTempo(value: unknown): value is ConfiguredSetTempo {

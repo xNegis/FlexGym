@@ -1,4 +1,4 @@
-"""Training day endpoints: list, create, rename, reorder, and delete."""
+"""Training day endpoints: list, create, rename, and delete."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, status
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -16,12 +16,10 @@ from app.services.routine_service import RoutineNotFoundError
 from app.services.training_day_service import (
     TrainingDayLimitError,
     TrainingDayNotFoundError,
-    TrainingDayOrderError,
     create_training_day,
     delete_training_day,
     list_training_days,
     rename_training_day,
-    reorder_training_days,
 )
 
 __all__ = ["router"]
@@ -45,16 +43,10 @@ class TrainingDayNameRequest(BaseModel):
         return trimmed
 
 
-class TrainingDayOrderRequest(BaseModel):
-    day_ids: list[Annotated[int, Field(strict=True, gt=0)]]
-
-    model_config = {"extra": "forbid"}
-
-
 class TrainingDayOut(BaseModel):
     id: int
     name: str
-    position: int
+    week_position: int
     exercise_count: int
     created_at: str
     updated_at: str
@@ -63,10 +55,11 @@ class TrainingDayOut(BaseModel):
 
 
 def _training_day_out(day: TrainingDay) -> dict[str, object]:
+    week_position = day.schedule_assignment.week_position if day.schedule_assignment else 0
     return {
         "id": day.id,
         "name": day.name,
-        "position": day.position,
+        "week_position": week_position,
         "exercise_count": len(day.exercise_configurations) if day.exercise_configurations else 0,
         "created_at": day.created_at.isoformat(),
         "updated_at": day.updated_at.isoformat(),
@@ -114,31 +107,6 @@ def create_endpoint(
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content=_training_day_out(day),
-    )
-
-
-@router.put("/routines/{routine_id}/days/order")
-def reorder_endpoint(
-    routine_id: Annotated[int, Path(gt=0)],
-    body: TrainingDayOrderRequest,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-) -> JSONResponse:
-    try:
-        days = reorder_training_days(session, routine_id, current_user.id, body.day_ids)
-    except RoutineNotFoundError as exc:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": str(exc)},
-        )
-    except TrainingDayOrderError as exc:
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"detail": str(exc)},
-        )
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=[_training_day_out(d) for d in days],
     )
 
 

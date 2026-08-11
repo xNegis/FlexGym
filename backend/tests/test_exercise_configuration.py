@@ -20,6 +20,7 @@ from app.models import Exercise
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 F09_REVISION = "273789964714"
+F10_REVISION = "aab110d57981"
 PREVIOUS_REVISION = "b61961abf6a5"
 
 
@@ -1089,8 +1090,8 @@ def test_f09_migration_fresh_database(tmp_path: Path) -> None:
         ).scalar_one()
         connection.execute(
             text(
-                "INSERT INTO training_days (routine_id, name, position, created_at, updated_at) "
-                "VALUES (:routine_id, 'Push', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+                "INSERT INTO training_days (routine_id, name, created_at, updated_at) "
+                "VALUES (:routine_id, 'Push', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
             ),
             {"routine_id": routine_id},
         )
@@ -1098,6 +1099,14 @@ def test_f09_migration_fresh_database(tmp_path: Path) -> None:
             text("SELECT id FROM training_days WHERE routine_id = :routine_id"),
             {"routine_id": routine_id},
         ).scalar_one()
+        connection.execute(
+            text(
+                "INSERT INTO routine_schedule_assignments "
+                "(routine_id, training_day_id, week_position) "
+                "VALUES (:routine_id, :day_id, 1)"
+            ),
+            {"routine_id": routine_id, "day_id": day_id},
+        )
         exercise_id = connection.execute(
             text("SELECT id FROM exercises WHERE slug = 'barbell-bench-press'")
         ).scalar_one()
@@ -1143,8 +1152,8 @@ def test_f09_migration_fresh_database(tmp_path: Path) -> None:
             == 0
         )
 
-    assert F09_REVISION in current
-    assert F09_REVISION in heads
+    assert F10_REVISION in current
+    assert F10_REVISION in heads
     engine.dispose()
 
 

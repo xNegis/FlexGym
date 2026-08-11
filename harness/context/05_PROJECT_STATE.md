@@ -38,7 +38,7 @@ F09 — Routine Exercise Configuration is implemented and validated.
 
 ## Next Feature
 
-F10 — Routine Schedule is next in Phase 1 and remains to be specified.
+F10 — Routine Schedule is specified and is next to be implemented in Phase 1.
 
 ## Existing Feature Specifications
 
@@ -51,6 +51,7 @@ F10 — Routine Schedule is next in Phase 1 and remains to be specified.
 * `harness/features/07_routine_creation.md`
 * `harness/features/08_training_day_management.md`
 * `harness/features/09_routine_exercise_configuration.md`
+* `harness/features/10_routine_schedule.md`
 
 ## Current Technology
 

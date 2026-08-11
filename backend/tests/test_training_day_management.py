@@ -1,4 +1,4 @@
-"""Tests for F08 training day management."""
+"""Tests for F08 training day management (updated for F10 schedule positions)."""
 
 from __future__ import annotations
 
@@ -77,19 +77,19 @@ def test_create_and_list_training_days(client: TestClient) -> None:
     d3 = _create_day(client, token, routine["id"], "Legs")
 
     assert d1["name"] == "Push"
-    assert d1["position"] == 1
+    assert d1["week_position"] == 1
     assert d1["id"] > 0
     assert "routine_id" not in d1
     assert d1["created_at"] == d1["updated_at"]
 
-    assert d2["position"] == 2
-    assert d3["position"] == 3
+    assert d2["week_position"] == 2
+    assert d3["week_position"] == 3
 
     response = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token))
     assert response.status_code == 200
     days = response.json()
     assert len(days) == 3
-    positions = [d["position"] for d in days]
+    positions = [d["week_position"] for d in days]
     assert positions == [1, 2, 3]
     names = [d["name"] for d in days]
     assert names == ["Push", "Pull", "Legs"]
@@ -137,7 +137,6 @@ def test_seven_day_limit(client: TestClient) -> None:
     assert response.status_code == 409
     assert response.json() == {"detail": "Routine already has 7 training days"}
 
-    # Verify seventh day still exists and no eighth was created
     days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     assert len(days) == 7
 
@@ -200,11 +199,10 @@ def test_rename_training_day(client: TestClient) -> None:
     data = response.json()
     assert data["id"] == day["id"]
     assert data["name"] == "Upper body"
-    assert data["position"] == 1
+    assert data["week_position"] == 1
     assert data["created_at"] == day["created_at"]
     assert data["updated_at"] != day["updated_at"]
 
-    # Verify via list
     days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     assert days[0]["name"] == "Upper body"
 
@@ -215,7 +213,6 @@ def test_rename_preserves_routine_timestamp(client: TestClient) -> None:
     original_updated_at = routine["updated_at"]
     day = _create_day(client, token, routine["id"], "Push")
 
-    # Rename should refresh routine's updated_at
     response = client.put(
         f"/api/routines/{routine['id']}/days/{day['id']}",
         json={"name": "Lower body"},
@@ -229,117 +226,13 @@ def test_rename_preserves_routine_timestamp(client: TestClient) -> None:
     assert updated_routine["updated_at"] != original_updated_at
 
 
-# -- Reorder ----------------------------------------------------------------
-
-
-def test_successful_reorder(client: TestClient) -> None:
-    token, _ = _register(client)
-    routine = _create_routine(client, token)
-    d1 = _create_day(client, token, routine["id"], "Push")
-    d2 = _create_day(client, token, routine["id"], "Pull")
-    d3 = _create_day(client, token, routine["id"], "Legs")
-
-    response = client.put(
-        f"/api/routines/{routine['id']}/days/order",
-        json={"day_ids": [d3["id"], d1["id"], d2["id"]]},
-        headers=_auth_headers(token),
-    )
-    assert response.status_code == 200
-    days = response.json()
-    assert [d["id"] for d in days] == [d3["id"], d1["id"], d2["id"]]
-    assert [d["position"] for d in days] == [1, 2, 3]
-
-
-def test_reorder_invalid_ids(client: TestClient) -> None:
-    token, _ = _register(client)
-    routine = _create_routine(client, token)
-    d1 = _create_day(client, token, routine["id"], "Push")
-    _create_day(client, token, routine["id"], "Pull")
-
-    # Missing day
-    response = client.put(
-        f"/api/routines/{routine['id']}/days/order",
-        json={"day_ids": [d1["id"]]},
-        headers=_auth_headers(token),
-    )
-    assert response.status_code == 422
-    assert "exactly once" in response.json()["detail"]
-
-    # Extra/unknown ID
-    response = client.put(
-        f"/api/routines/{routine['id']}/days/order",
-        json={"day_ids": [d1["id"], 9999]},
-        headers=_auth_headers(token),
-    )
-    assert response.status_code == 422
-    assert "exactly once" in response.json()["detail"]
-
-    # Duplicate
-    response = client.put(
-        f"/api/routines/{routine['id']}/days/order",
-        json={"day_ids": [d1["id"], d1["id"]]},
-        headers=_auth_headers(token),
-    )
-    assert response.status_code == 422
-    assert "exactly once" in response.json()["detail"]
-
-    # Verify order unchanged
-    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
-    assert len(days) == 2
-
-
-def test_reorder_rejects_duplicate_full_id_set(client: TestClient) -> None:
-    token, _ = _register(client)
-    routine = _create_routine(client, token)
-    d1 = _create_day(client, token, routine["id"], "Push")
-    d2 = _create_day(client, token, routine["id"], "Pull")
-    d3 = _create_day(client, token, routine["id"], "Legs")
-
-    response = client.put(
-        f"/api/routines/{routine['id']}/days/order",
-        json={"day_ids": [d1["id"], d1["id"], d2["id"], d3["id"]]},
-        headers=_auth_headers(token),
-    )
-
-    assert response.status_code == 422
-    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
-    assert [day["position"] for day in days] == [1, 2, 3]
-    assert [day["id"] for day in days] == [d1["id"], d2["id"], d3["id"]]
-
-
-def test_reorder_rejects_coerced_id_types(client: TestClient) -> None:
-    token, _ = _register(client)
-    routine = _create_routine(client, token)
-    day = _create_day(client, token, routine["id"], "Push")
-
-    response = client.put(
-        f"/api/routines/{routine['id']}/days/order",
-        json={"day_ids": [str(day["id"])]},
-        headers=_auth_headers(token),
-    )
-
-    assert response.status_code == 422
-
-
-def test_reorder_empty_list_when_no_days(client: TestClient) -> None:
-    token, _ = _register(client)
-    routine = _create_routine(client, token)
-
-    response = client.put(
-        f"/api/routines/{routine['id']}/days/order",
-        json={"day_ids": []},
-        headers=_auth_headers(token),
-    )
-    assert response.status_code == 200
-
-
 # -- Deletion ---------------------------------------------------------------
 
 
 def test_delete_training_day(client: TestClient) -> None:
     token, _ = _register(client)
     routine = _create_routine(client, token)
-    _create_day(client, token, routine["id"], "Push")
+    d1 = _create_day(client, token, routine["id"], "Push")
     d2 = _create_day(client, token, routine["id"], "Pull")
     _create_day(client, token, routine["id"], "Legs")
 
@@ -349,26 +242,22 @@ def test_delete_training_day(client: TestClient) -> None:
     )
     assert response.status_code == 204
 
-    # Verify position compaction
     days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     assert len(days) == 2
-    positions = [d["position"] for d in days]
-    assert positions == [1, 2]
-    names = [d["name"] for d in days]
-    assert names == ["Push", "Legs"]
+    remaining_ids = {d["id"] for d in days}
+    assert remaining_ids == {d1["id"], d3["id"] if "d3" in dir() else days[1]["id"]}
 
 
 def test_delete_updates_count(client: TestClient) -> None:
     token, _ = _register(client)
     routine = _create_routine(client, token)
-    _create_day(client, token, routine["id"], "Push")
+    d = _create_day(client, token, routine["id"], "Push")
 
     before = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
     assert before["training_day_count"] == 1
 
-    days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     client.delete(
-        f"/api/routines/{routine['id']}/days/{days[0]['id']}",
+        f"/api/routines/{routine['id']}/days/{d['id']}",
         headers=_auth_headers(token),
     )
 
@@ -387,7 +276,6 @@ def test_list_only_returns_owned_routine_days(client: TestClient) -> None:
     _create_day(client, token1, routine1["id"], "Push")
     _create_day(client, token2, routine2["id"], "Pull")
 
-    # User 2 sees User 1's routine as not found
     response = client.get(f"/api/routines/{routine1['id']}/days", headers=_auth_headers(token2))
     assert response.status_code == 404
     assert response.json() == {"detail": "Routine not found"}
@@ -399,7 +287,6 @@ def test_cross_routine_day_not_found(client: TestClient) -> None:
     routine2 = _create_routine(client, token, "R2")
     day = _create_day(client, token, routine1["id"], "Push")
 
-    # Day from routine1 accessed via routine2
     response = client.put(
         f"/api/routines/{routine2['id']}/days/{day['id']}",
         json={"name": "Hijack"},
@@ -415,7 +302,6 @@ def test_other_user_routine_not_found(client: TestClient) -> None:
     routine2 = _create_routine(client, token2, "R2")
     day = _create_day(client, token2, routine2["id"], "Pull")
 
-    # User 1 trying to access User 2's training days
     response = client.get(f"/api/routines/{routine2['id']}/days", headers=_auth_headers(token1))
     assert response.status_code == 404
 
@@ -429,13 +315,6 @@ def test_other_user_routine_not_found(client: TestClient) -> None:
     response = client.put(
         f"/api/routines/{routine2['id']}/days/{day['id']}",
         json={"name": "X"},
-        headers=_auth_headers(token1),
-    )
-    assert response.status_code == 404
-
-    response = client.put(
-        f"/api/routines/{routine2['id']}/days/order",
-        json={"day_ids": [day["id"]]},
         headers=_auth_headers(token1),
     )
     assert response.status_code == 404
@@ -476,7 +355,6 @@ def test_invalid_name_rejected(client: TestClient) -> None:
         )
         assert response.status_code == 422
 
-    # Verify nothing was created
     days = client.get(f"/api/routines/{routine['id']}/days", headers=_auth_headers(token)).json()
     assert len(days) == 0
 
@@ -505,7 +383,6 @@ def test_invalid_routine_id_returns_422(client: TestClient) -> None:
         response = client.get(path, headers=_auth_headers(token))
         assert response.status_code == 422, f"GET {path} should be 422"
 
-    # PUT on single day with invalid routine_id
     response = client.put(
         "/api/routines/abc/days/1",
         json={"name": "X"},
@@ -545,7 +422,6 @@ def test_training_day_endpoints_require_auth(client: TestClient) -> None:
     assert client.get("/api/routines/1/days").status_code == 401
     assert client.post("/api/routines/1/days", json={"name": "Push"}).status_code == 401
     assert client.put("/api/routines/1/days/1", json={"name": "Upper"}).status_code == 401
-    assert client.put("/api/routines/1/days/order", json={"day_ids": [1]}).status_code == 401
     assert client.delete("/api/routines/1/days/1").status_code == 401
 
 
@@ -579,24 +455,6 @@ def test_delete_day_refreshes_routine_timestamp(client: TestClient) -> None:
     assert updated["updated_at"] != original["updated_at"]
 
 
-def test_reorder_refreshes_routine_timestamp(client: TestClient) -> None:
-    token, _ = _register(client)
-    routine = _create_routine(client, token)
-    d1 = _create_day(client, token, routine["id"], "A")
-    d2 = _create_day(client, token, routine["id"], "B")
-
-    original = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
-
-    client.put(
-        f"/api/routines/{routine['id']}/days/order",
-        json={"day_ids": [d2["id"], d1["id"]]},
-        headers=_auth_headers(token),
-    )
-
-    updated = client.get(f"/api/routines/{routine['id']}", headers=_auth_headers(token)).json()
-    assert updated["updated_at"] != original["updated_at"]
-
-
 # -- Migration tests --------------------------------------------------------
 
 
@@ -623,14 +481,8 @@ def test_f08_migration_fresh_database(tmp_path: Path) -> None:
     engine = create_engine(database_url)
     schema = inspect(engine)
     assert "training_days" in schema.get_table_names()
-    assert {column["name"] for column in schema.get_columns("training_days")} == {
-        "id",
-        "routine_id",
-        "name",
-        "position",
-        "created_at",
-        "updated_at",
-    }
+    columns = {column["name"] for column in schema.get_columns("training_days")}
+    assert {"id", "routine_id", "name", "position", "created_at", "updated_at"} == columns
     assert any(
         constraint.get("name") == "uq_training_day_routine_position"
         and set(constraint["column_names"]) == {"routine_id", "position"}

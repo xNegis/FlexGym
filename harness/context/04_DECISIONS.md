@@ -229,3 +229,25 @@ observed fact.
 All routine prescription values are plans. Future workout execution records actual performance as
 separate facts and does not silently overwrite the plan. Supersets, circuits, and formal drop-set or
 set-type semantics are deferred until their workflows justify dedicated domain concepts.
+
+---
+
+## DEC-016 — Weekly placement is the canonical training-day order
+
+**Status:** Accepted
+
+Every persisted training day is assigned exactly once to one of its routine's seven fixed weekly
+positions, ordered Monday through Sunday. Training-day creation and its first-free weekly assignment
+occur atomically. A training day cannot exist unassigned.
+
+Weekly position replaces the independent training-day display position introduced by F08. Training
+days are displayed in weekly order, and changing their order means changing their weekly placement.
+Moving a session to a rest position leaves its previous position as rest; moving it to an occupied
+position swaps both sessions atomically.
+
+Only training assignments are persisted. Positions without assignments are derived rest positions.
+The public `rest` / `training` slot type is also derived and is not stored. No null or sentinel
+training-day reference represents rest.
+
+This decision supersedes the parts of DEC-014 and F08 that made training-day display order
+independent from weekly allocation or allowed a persisted training day to remain unassigned.
