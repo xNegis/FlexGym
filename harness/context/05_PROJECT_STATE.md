@@ -12,6 +12,9 @@ Phase 0 — Foundation completed. F01 through F04 are implemented and validated.
 
 F05 — Exercise Catalog is implemented and validated.
 
+F06 — Custom Exercises was reviewed and intentionally skipped for the MVP. The rationale and
+reconsideration criteria are documented in `harness/features/06_custom_exercises.md`.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -20,9 +23,13 @@ F05 — Exercise Catalog is implemented and validated.
 * F04 — Profile Management
 * F05 — Exercise Catalog
 
+## Skipped Features
+
+* F06 — Custom Exercises
+
 ## Next Feature
 
-Define F06 — Custom Exercises.
+Define F07 — Routine Creation.
 
 ## Existing Feature Specifications
 
@@ -31,6 +38,7 @@ Define F06 — Custom Exercises.
 * `harness/features/03_user_fitness_profile.md`
 * `harness/features/04_profile_management.md`
 * `harness/features/05_exercise_catalog.md`
+* `harness/features/06_custom_exercises.md` (skipped)
 
 ## Current Technology
 

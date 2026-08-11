@@ -154,3 +154,23 @@ makes fresh installations useful without an administrator import step.
 
 User-created exercises remain a separate, user-owned capability for a later feature. The shared
 catalog does not infer exercise suitability from profile data and does not represent medical advice.
+
+---
+
+## DEC-012 — Skip custom exercises in the current MVP sequence
+
+**Status:** Accepted
+
+F06 — Custom Exercises will not be implemented in the current MVP sequence. The curated global
+catalog introduced by F05 is sufficient to validate routine planning before adding a user-facing
+exercise-authoring workflow.
+
+Custom exercise creation addresses valid but currently unproven needs such as uncommon machines,
+specialized variants, rehabilitation movements, and personal naming. It would also require decisions
+about structured metadata quality, duplicate concepts, ownership, and the lifecycle of exercises
+referenced by future routines and workout history.
+
+The feature may be reconsidered after routine planning and workout tracking show repeated gaps that
+cannot reasonably be addressed by expanding the curated catalog. Skipping F06 does not prohibit a
+later custom-exercise feature; it preserves the feature number as an explicit product decision and
+moves the next planned increment to F07 — Routine Creation.
