@@ -39,6 +39,7 @@ interface TrainingDay {
   id: number;
   name: string;
   position: number;
+  exercise_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -57,8 +58,40 @@ interface ExerciseDetail extends ExerciseSummary {
   instructions: string;
 }
 
+interface ConfiguredSetTempo {
+  eccentric_seconds: number;
+  stretched_pause_seconds: number;
+  concentric_seconds: number;
+  peak_contraction_seconds: number;
+}
+
+interface ConfiguredSet {
+  position: number;
+  target_value: number;
+  target_weight_kg: number | null;
+  target_rir: number | null;
+  tempo: ConfiguredSetTempo | null;
+  rest_after_set_seconds: number | null;
+  notes: string | null;
+}
+
+interface ConfiguredExercise {
+  id: number;
+  position: number;
+  exercise: ExerciseSummary;
+  target_type: "repetitions" | "duration_seconds" | "distance_meters";
+  rest_after_exercise_seconds: number | null;
+  notes: string | null;
+  sets: ConfiguredSet[];
+  created_at: string;
+  updated_at: string;
+}
+
 export {
   type AuthScreen,
+  type ConfiguredExercise,
+  type ConfiguredSet,
+  type ConfiguredSetTempo,
   type ExerciseDetail,
   type ExerciseSummary,
   type FitnessProfile,

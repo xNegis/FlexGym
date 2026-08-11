@@ -7,6 +7,7 @@ import subprocess
 import sys
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any, cast
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect
@@ -39,14 +40,14 @@ def _create_routine(
     client: TestClient,
     token: str,
     name: str = "Push Pull Legs",
-) -> dict:
+) -> dict[str, Any]:
     response = client.post(
         "/api/routines",
         json={"name": name, "objective": "build_muscle"},
         headers=_auth_headers(token),
     )
     assert response.status_code == 201, response.text
-    return response.json()
+    return cast(dict[str, Any], response.json())
 
 
 def _create_day(
@@ -54,14 +55,14 @@ def _create_day(
     token: str,
     routine_id: int,
     name: str = "Push",
-) -> dict:
+) -> dict[str, Any]:
     response = client.post(
         f"/api/routines/{routine_id}/days",
         json={"name": name},
         headers=_auth_headers(token),
     )
     assert response.status_code == 201, response.text
-    return response.json()
+    return cast(dict[str, Any], response.json())
 
 
 # -- Creation and listing ---------------------------------------------------
@@ -615,10 +616,9 @@ def _run_alembic(database_url: str, *arguments: str) -> subprocess.CompletedProc
 def test_f08_migration_fresh_database(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'fresh.db').as_posix()}"
 
-    _run_alembic(database_url, "upgrade", "head")
+    _run_alembic(database_url, "upgrade", F08_REVISION)
     current = _run_alembic(database_url, "current").stdout
-    heads = _run_alembic(database_url, "heads").stdout
-    _run_alembic(database_url, "upgrade", "head")
+    _run_alembic(database_url, "upgrade", F08_REVISION)
 
     engine = create_engine(database_url)
     schema = inspect(engine)
@@ -641,7 +641,6 @@ def test_f08_migration_fresh_database(tmp_path: Path) -> None:
     assert foreign_keys[0]["referred_table"] == "routines"
     assert foreign_keys[0]["options"].get("ondelete") == "CASCADE"
     assert F08_REVISION in current
-    assert F08_REVISION in heads
     engine.dispose()
 
 

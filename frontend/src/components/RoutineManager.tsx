@@ -13,6 +13,7 @@ import {
   updateRoutine,
 } from "../api";
 import type { Routine, TrainingDay } from "../types";
+import ExerciseConfiguration from "./ExerciseConfiguration";
 import { labelFor, OBJECTIVE_OPTIONS } from "./routineConstants";
 
 interface Props {
@@ -20,7 +21,7 @@ interface Props {
   onUnauthenticated: () => void;
 }
 
-type ViewMode = "list" | "create" | "detail" | "edit" | "delete";
+type ViewMode = "list" | "create" | "detail" | "edit" | "delete" | "configExercises";
 
 interface FormState {
   name: string;
@@ -44,6 +45,12 @@ function trainingDayCountLabel(count: number): string {
   return `${count} training days`;
 }
 
+function exerciseCountLabel(count: number): string {
+  if (count === 0) return "No exercises";
+  if (count === 1) return "1 exercise";
+  return `${count} exercises`;
+}
+
 export default function RoutineManager({ profileGoal, onUnauthenticated }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [routines, setRoutines] = useState<Routine[] | null>(null);
@@ -53,6 +60,7 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const requestSequence = useRef(0);
+  const [configDay, setConfigDay] = useState<TrainingDay | null>(null);
 
   const loadRoutines = useCallback(async () => {
     const seq = ++requestSequence.current;
@@ -116,7 +124,7 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
         }
         setTrainingDayError("Unable to load training days");
       } finally {
-        if (!silent && seq === trainingDayRequestSequence.current) setTrainingDaysLoading(false);
+        if (seq === trainingDayRequestSequence.current) setTrainingDaysLoading(false);
       }
     },
     [onUnauthenticated],
@@ -431,6 +439,18 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
     }
   };
 
+  // -- Exercise configuration ------------------------------------------
+
+  const openConfigExercises = (day: TrainingDay) => {
+    setConfigDay(day);
+    setViewMode("configExercises");
+  };
+
+  const closeConfigExercises = () => {
+    setConfigDay(null);
+    setViewMode("detail");
+  };
+
   // -- Render: List view -----------------------------------------------
 
   if (viewMode === "list") {
@@ -576,7 +596,8 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
 
           <div className="delete-confirmation">
             <p>
-              Are you sure you want to delete <strong>{day?.name}</strong>? This action is permanent
+              Are you sure you want to delete <strong>{day?.name}</strong>? All configured exercises
+              and planned sets inside it will also be permanently deleted. This action is permanent
               and cannot be undone.
             </p>
           </div>
@@ -713,8 +734,21 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
                   ) : (
                     <div className="training-day-row">
                       <span className="training-day-position">{day.position}.</span>
-                      <span className="training-day-name">{day.name}</span>
+                      <div className="training-day-info">
+                        <span className="training-day-name">{day.name}</span>
+                        <span className="training-day-exercise-count">
+                          {exerciseCountLabel(day.exercise_count)}
+                        </span>
+                      </div>
                       <div className="training-day-controls">
+                        <button
+                          type="button"
+                          className="training-day-config-button"
+                          onClick={() => openConfigExercises(day)}
+                          disabled={reorderPending || pending || renameDayId !== null}
+                        >
+                          Exercises
+                        </button>
                         <button
                           type="button"
                           className="training-day-move-button"
@@ -805,8 +839,8 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
             {selectedRoutine && selectedRoutine.training_day_count > 0 && (
               <>
                 {" "}
-                All {selectedRoutine.training_day_count} training days will also be permanently
-                deleted.
+                All {selectedRoutine.training_day_count} training days, their configured exercises,
+                and planned sets will also be permanently deleted.
               </>
             )}{" "}
             This action is permanent and cannot be undone.
@@ -831,6 +865,23 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
           Cancel
         </button>
       </div>
+    );
+  }
+
+  if (
+    viewMode === "configExercises" &&
+    selectedId !== null &&
+    configDay !== null &&
+    selectedRoutine
+  ) {
+    return (
+      <ExerciseConfiguration
+        routineId={selectedId}
+        trainingDay={configDay}
+        routineName={selectedRoutine.name}
+        onUnauthenticated={onUnauthenticated}
+        onBack={closeConfigExercises}
+      />
     );
   }
 

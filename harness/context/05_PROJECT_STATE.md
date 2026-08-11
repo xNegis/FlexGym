@@ -19,6 +19,8 @@ F07 — Routine Creation is implemented and validated.
 
 F08 — Training Day Management is implemented and validated.
 
+F09 — Routine Exercise Configuration is implemented and validated.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -28,6 +30,7 @@ F08 — Training Day Management is implemented and validated.
 * F05 — Exercise Catalog
 * F07 — Routine Creation
 * F08 — Training Day Management
+* F09 — Routine Exercise Configuration
 
 ## Skipped Features
 
@@ -35,7 +38,7 @@ F08 — Training Day Management is implemented and validated.
 
 ## Next Feature
 
-TBD — The next feature will be defined based on roadmap priorities.
+F10 — Routine Schedule is next in Phase 1 and remains to be specified.
 
 ## Existing Feature Specifications
 
@@ -47,6 +50,7 @@ TBD — The next feature will be defined based on roadmap priorities.
 * `harness/features/06_custom_exercises.md` (skipped)
 * `harness/features/07_routine_creation.md`
 * `harness/features/08_training_day_management.md`
+* `harness/features/09_routine_exercise_configuration.md`
 
 ## Current Technology
 

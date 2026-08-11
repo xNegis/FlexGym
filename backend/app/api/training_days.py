@@ -55,6 +55,7 @@ class TrainingDayOut(BaseModel):
     id: int
     name: str
     position: int
+    exercise_count: int
     created_at: str
     updated_at: str
 
@@ -66,6 +67,7 @@ def _training_day_out(day: TrainingDay) -> dict[str, object]:
         "id": day.id,
         "name": day.name,
         "position": day.position,
+        "exercise_count": len(day.exercise_configurations) if day.exercise_configurations else 0,
         "created_at": day.created_at.isoformat(),
         "updated_at": day.updated_at.isoformat(),
     }

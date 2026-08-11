@@ -1,4 +1,7 @@
 import type {
+  ConfiguredExercise,
+  ConfiguredSet,
+  ConfiguredSetTempo,
   ExerciseDetail,
   ExerciseSummary,
   FitnessProfile,
@@ -635,6 +638,9 @@ function isTrainingDay(value: unknown): value is TrainingDay {
     typeof v.position === "number" &&
     Number.isInteger(v.position) &&
     v.position >= 1 &&
+    typeof v.exercise_count === "number" &&
+    Number.isInteger(v.exercise_count) &&
+    v.exercise_count >= 0 &&
     typeof v.created_at === "string" &&
     v.created_at.length > 0 &&
     typeof v.updated_at === "string" &&
@@ -802,4 +808,341 @@ export async function deleteTrainingDay(
     return { detail: "Training day not found" };
   }
   return { detail: "Unable to delete training day" };
+}
+
+function isConfiguredSetTempo(value: unknown): value is ConfiguredSetTempo {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const components = [
+    v.eccentric_seconds,
+    v.stretched_pause_seconds,
+    v.concentric_seconds,
+    v.peak_contraction_seconds,
+  ];
+  return (
+    typeof v.eccentric_seconds === "number" &&
+    Number.isInteger(v.eccentric_seconds) &&
+    v.eccentric_seconds >= 0 &&
+    v.eccentric_seconds <= 60 &&
+    typeof v.stretched_pause_seconds === "number" &&
+    Number.isInteger(v.stretched_pause_seconds) &&
+    v.stretched_pause_seconds >= 0 &&
+    v.stretched_pause_seconds <= 60 &&
+    typeof v.concentric_seconds === "number" &&
+    Number.isInteger(v.concentric_seconds) &&
+    v.concentric_seconds >= 0 &&
+    v.concentric_seconds <= 60 &&
+    typeof v.peak_contraction_seconds === "number" &&
+    Number.isInteger(v.peak_contraction_seconds) &&
+    v.peak_contraction_seconds >= 0 &&
+    v.peak_contraction_seconds <= 60 &&
+    components.some((component) => component !== 0)
+  );
+}
+
+function hasAtMostTwoDecimalPlaces(value: number): boolean {
+  return Math.abs(value * 100 - Math.round(value * 100)) < 1e-9;
+}
+
+function isTargetType(value: unknown): value is ConfiguredExercise["target_type"] {
+  return (
+    typeof value === "string" &&
+    ["repetitions", "duration_seconds", "distance_meters"].includes(value)
+  );
+}
+
+function isConfiguredSet(
+  value: unknown,
+  targetType: ConfiguredExercise["target_type"],
+): value is ConfiguredSet {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.target_value !== "number" || !Number.isFinite(v.target_value)) return false;
+  const targetIsValid =
+    targetType === "repetitions"
+      ? Number.isInteger(v.target_value) && v.target_value >= 1 && v.target_value <= 1000
+      : targetType === "duration_seconds"
+        ? Number.isInteger(v.target_value) && v.target_value >= 1 && v.target_value <= 86400
+        : v.target_value > 0 &&
+          v.target_value <= 100000 &&
+          hasAtMostTwoDecimalPlaces(v.target_value);
+  return (
+    typeof v.position === "number" &&
+    Number.isInteger(v.position) &&
+    v.position >= 1 &&
+    targetIsValid &&
+    (v.target_weight_kg === null ||
+      (typeof v.target_weight_kg === "number" &&
+        Number.isFinite(v.target_weight_kg) &&
+        v.target_weight_kg >= 0 &&
+        v.target_weight_kg <= 5000 &&
+        hasAtMostTwoDecimalPlaces(v.target_weight_kg))) &&
+    (v.target_rir === null ||
+      (typeof v.target_rir === "number" &&
+        Number.isInteger(v.target_rir) &&
+        v.target_rir >= 0 &&
+        v.target_rir <= 10)) &&
+    (v.tempo === null || isConfiguredSetTempo(v.tempo)) &&
+    (v.rest_after_set_seconds === null ||
+      (typeof v.rest_after_set_seconds === "number" &&
+        Number.isInteger(v.rest_after_set_seconds) &&
+        v.rest_after_set_seconds >= 0 &&
+        v.rest_after_set_seconds <= 3600)) &&
+    (v.notes === null ||
+      (typeof v.notes === "string" && v.notes.trim().length > 0 && v.notes.length <= 500))
+  );
+}
+
+function isConfiguredExercise(value: unknown): value is ConfiguredExercise {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (!isTargetType(v.target_type)) return false;
+  const targetType = v.target_type;
+  return (
+    typeof v.id === "number" &&
+    Number.isInteger(v.id) &&
+    v.id > 0 &&
+    typeof v.position === "number" &&
+    Number.isInteger(v.position) &&
+    v.position >= 1 &&
+    isExerciseSummary(v.exercise) &&
+    (v.rest_after_exercise_seconds === null ||
+      (typeof v.rest_after_exercise_seconds === "number" &&
+        Number.isInteger(v.rest_after_exercise_seconds) &&
+        v.rest_after_exercise_seconds >= 0 &&
+        v.rest_after_exercise_seconds <= 3600)) &&
+    (v.notes === null ||
+      (typeof v.notes === "string" && v.notes.trim().length > 0 && v.notes.length <= 1000)) &&
+    Array.isArray(v.sets) &&
+    v.sets.length >= 1 &&
+    v.sets.length <= 20 &&
+    v.sets.every((set, index) => isConfiguredSet(set, targetType) && set.position === index + 1) &&
+    typeof v.created_at === "string" &&
+    v.created_at.length > 0 &&
+    typeof v.updated_at === "string" &&
+    v.updated_at.length > 0
+  );
+}
+
+function isConfiguredExerciseArray(value: unknown): value is ConfiguredExercise[] {
+  if (!Array.isArray(value)) return false;
+  if (value.length > 20 || !value.every(isConfiguredExercise)) return false;
+  const ids = new Set(value.map((c) => c.id));
+  return ids.size === value.length && value.every((c, index) => c.position === index + 1);
+}
+
+export type ConfiguredExerciseResult = ConfiguredExercise | { detail: string };
+export type ConfiguredExerciseListResult = ConfiguredExercise[] | { detail: string };
+
+function configErrorMessage(
+  result: unknown,
+  status: number,
+  fallbacks: Record<number, string>,
+): string {
+  if (
+    [404, 409, 422].includes(status) &&
+    typeof result === "object" &&
+    result !== null &&
+    "detail" in result
+  ) {
+    const detail = (result as Record<string, unknown>).detail;
+    if (typeof detail === "string" && detail.trim().length > 0) {
+      return detail;
+    }
+  }
+  if (status === 422 && typeof result === "object" && result !== null && "detail" in result) {
+    const detail = (result as Record<string, unknown>).detail;
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .filter(
+          (item): item is { msg: string } =>
+            typeof item === "object" &&
+            item !== null &&
+            "msg" in item &&
+            typeof item.msg === "string",
+        )
+        .map((item) => item.msg);
+      return messages.length > 0 ? messages.join("; ") : "Invalid request";
+    }
+  }
+  return fallbacks[status] ?? "Unable to complete request";
+}
+
+export async function fetchExerciseConfigs(
+  routineId: number,
+  dayId: number,
+): Promise<ConfiguredExerciseListResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/routines/${routineId}/days/${dayId}/exercises`,
+    { credentials: "include" },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return { detail: "Training day not found" };
+    }
+    return { detail: "Unable to load exercises" };
+  }
+  if (!isConfiguredExerciseArray(result)) {
+    throw new Error("Invalid exercise configurations response");
+  }
+  return result;
+}
+
+export interface CreateExerciseConfigPayload {
+  exercise_slug: string;
+  target_type: string;
+  rest_after_exercise_seconds: number | null;
+  notes: string | null;
+  sets: {
+    target_value: number;
+    target_weight_kg: number | null;
+    target_rir: number | null;
+    tempo: {
+      eccentric_seconds: number;
+      stretched_pause_seconds: number;
+      concentric_seconds: number;
+      peak_contraction_seconds: number;
+    } | null;
+    rest_after_set_seconds: number | null;
+    notes: string | null;
+  }[];
+}
+
+export async function createExerciseConfig(
+  routineId: number,
+  dayId: number,
+  payload: CreateExerciseConfigPayload,
+): Promise<ConfiguredExerciseResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/routines/${routineId}/days/${dayId}/exercises`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    return {
+      detail: configErrorMessage(result, response.status, {
+        404: "Training day not found",
+        409: "Exercise already configured",
+      }),
+    };
+  }
+  if (!isConfiguredExercise(result)) {
+    throw new Error("Invalid exercise configuration response");
+  }
+  return result;
+}
+
+export interface UpdateExerciseConfigPayload {
+  target_type: string;
+  rest_after_exercise_seconds: number | null;
+  notes: string | null;
+  sets: {
+    target_value: number;
+    target_weight_kg: number | null;
+    target_rir: number | null;
+    tempo: {
+      eccentric_seconds: number;
+      stretched_pause_seconds: number;
+      concentric_seconds: number;
+      peak_contraction_seconds: number;
+    } | null;
+    rest_after_set_seconds: number | null;
+    notes: string | null;
+  }[];
+}
+
+export async function updateExerciseConfig(
+  routineId: number,
+  dayId: number,
+  configId: number,
+  payload: UpdateExerciseConfigPayload,
+): Promise<ConfiguredExerciseResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/routines/${routineId}/days/${dayId}/exercises/${configId}`,
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    return {
+      detail: configErrorMessage(result, response.status, {
+        404: "Configured exercise not found",
+      }),
+    };
+  }
+  if (!isConfiguredExercise(result)) {
+    throw new Error("Invalid exercise configuration response");
+  }
+  return result;
+}
+
+export async function reorderExerciseConfigs(
+  routineId: number,
+  dayId: number,
+  configIds: number[],
+): Promise<ConfiguredExerciseListResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/routines/${routineId}/days/${dayId}/exercises/order`,
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ exercise_configuration_ids: configIds }),
+    },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    return {
+      detail: configErrorMessage(result, response.status, {
+        404: "Training day not found",
+      }),
+    };
+  }
+  if (!isConfiguredExerciseArray(result)) {
+    throw new Error("Invalid exercise configurations response");
+  }
+  return result;
+}
+
+export async function deleteExerciseConfig(
+  routineId: number,
+  dayId: number,
+  configId: number,
+): Promise<{ detail: string } | null> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/routines/${routineId}/days/${dayId}/exercises/${configId}`,
+    { method: "DELETE", credentials: "include" },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 204) {
+    return null;
+  }
+  if (response.status === 404) {
+    return { detail: "Configured exercise not found" };
+  }
+  return { detail: "Unable to delete exercise" };
 }

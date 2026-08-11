@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import Routine, TrainingDay
 from app.services.routine_service import _require_routine
@@ -44,6 +44,7 @@ def list_training_days(session: Session, routine_id: int, user_id: int) -> list[
     _require_routine(session, routine_id, user_id)
     return (
         session.query(TrainingDay)
+        .options(selectinload(TrainingDay.exercise_configurations))
         .filter(TrainingDay.routine_id == routine_id)
         .order_by(TrainingDay.position.asc(), TrainingDay.id.asc())
         .all()
@@ -110,6 +111,7 @@ def reorder_training_days(
 
     return (
         session.query(TrainingDay)
+        .options(selectinload(TrainingDay.exercise_configurations))
         .filter(TrainingDay.routine_id == routine_id)
         .order_by(TrainingDay.position.asc(), TrainingDay.id.asc())
         .all()

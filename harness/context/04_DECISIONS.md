@@ -210,3 +210,22 @@ Training-day display order is independent from future weekly allocation. Rest is
 absence of a training-day assignment in a weekly position, not by a persisted training-day record.
 If two weekly sessions have the same purpose, they remain separate training-day records and may use
 the same display name.
+
+---
+
+## DEC-015 — Routine prescriptions use structured per-set targets
+
+**Status:** Accepted
+
+A configured routine exercise contains ordered set records rather than one shared set count and
+prescription. Each set may therefore have a different target, load, Repetitions in Reserve, tempo,
+rest, and note. The number of sets is derived from those records.
+
+The frontend may accept a compact comma-separated target shorthand such as `12, 12, 10, 8`, but the
+delimiter string is not domain data and must not be persisted. Movement-phase seconds are modelled
+as four structured Tempo components; total Time Under Tension is not stored as though it were an
+observed fact.
+
+All routine prescription values are plans. Future workout execution records actual performance as
+separate facts and does not silently overwrite the plan. Supersets, circuits, and formal drop-set or
+set-type semantics are deferred until their workflows justify dedicated domain concepts.

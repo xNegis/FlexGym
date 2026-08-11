@@ -1,5 +1,7 @@
 """Tests for F07 routine creation."""
 
+from typing import Any, cast
+
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -45,14 +47,14 @@ def _create_routine(
     name: str = "Push Pull Legs",
     objective: str = "build_muscle",
     description: str | None = "A classic PPL split",
-) -> dict:
+) -> dict[str, Any]:
     response = client.post(
         "/api/routines",
         json={"name": name, "objective": objective, "description": description},
         headers=_auth_headers(token),
     )
     assert response.status_code == 201, response.text
-    return response.json()
+    return cast(dict[str, Any], response.json())
 
 
 # -- Creation, listing, and detail ----------------------------------------

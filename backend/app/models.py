@@ -119,3 +119,83 @@ class TrainingDay(Base):
     __table_args__ = (
         UniqueConstraint("routine_id", "position", name="uq_training_day_routine_position"),
     )
+
+    exercise_configurations: Mapped[list["ExerciseConfiguration"]] = relationship(
+        "ExerciseConfiguration",
+        back_populates="training_day",
+        cascade="all, delete-orphan",
+        order_by="ExerciseConfiguration.position",
+    )
+
+
+class ExerciseConfiguration(Base):
+    __tablename__ = "exercise_configurations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    training_day_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("training_days.id", ondelete="CASCADE"), nullable=False
+    )
+    training_day: Mapped["TrainingDay"] = relationship(
+        "TrainingDay", back_populates="exercise_configurations"
+    )
+    exercise_id: Mapped[int] = mapped_column(Integer, ForeignKey("exercises.id"), nullable=False)
+    exercise: Mapped["Exercise"] = relationship("Exercise")
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_type: Mapped[str] = mapped_column(String, nullable=False)
+    rest_after_exercise_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+    )
+
+    configured_sets: Mapped[list["ConfiguredSet"]] = relationship(
+        "ConfiguredSet",
+        back_populates="exercise_configuration",
+        cascade="all, delete-orphan",
+        order_by="ConfiguredSet.position",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "training_day_id", "position", name="uq_exercise_config_training_day_position"
+        ),
+        UniqueConstraint(
+            "training_day_id", "exercise_id", name="uq_exercise_config_training_day_exercise"
+        ),
+    )
+
+
+class ConfiguredSet(Base):
+    __tablename__ = "configured_sets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    exercise_configuration_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("exercise_configurations.id", ondelete="CASCADE"), nullable=False
+    )
+    exercise_configuration: Mapped["ExerciseConfiguration"] = relationship(
+        "ExerciseConfiguration", back_populates="configured_sets"
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_value: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
+    target_weight_kg: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    target_rir: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    eccentric_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stretched_pause_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    concentric_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    peak_contraction_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rest_after_set_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "exercise_configuration_id",
+            "position",
+            name="uq_configured_set_config_position",
+        ),
+    )

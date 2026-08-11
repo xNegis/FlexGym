@@ -60,7 +60,7 @@ Current intended sequence:
 * F06 — Custom Exercises (intentionally skipped for the current MVP)
 * F07 — Routine Creation
 * F08 — Training Day Management
-* Routine Exercise Configuration
+* F09 — Routine Exercise Configuration
 * Routine Schedule
 * Active Routine
 
