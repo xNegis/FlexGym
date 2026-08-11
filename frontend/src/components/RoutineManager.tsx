@@ -117,7 +117,11 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
           setViewMode("detail");
         }
       }
-    } catch {
+    } catch (e) {
+      if (e instanceof UnauthenticatedError) {
+        onUnauthenticated();
+        return;
+      }
       setError("Unable to reach the server. Please try again.");
     } finally {
       setPending(false);
@@ -172,7 +176,11 @@ export default function RoutineManager({ profileGoal, onUnauthenticated }: Props
         setSelectedRoutine(null);
         setViewMode("list");
       }
-    } catch {
+    } catch (e) {
+      if (e instanceof UnauthenticatedError) {
+        onUnauthenticated();
+        return;
+      }
       setError("Unable to reach the server. Please try again.");
     } finally {
       setPending(false);

@@ -27,19 +27,11 @@ def upgrade() -> None:
         sa.Column("normalized_name", sa.String(length=120), nullable=False),
         sa.Column("objective", sa.String(), nullable=False),
         sa.Column("description", sa.String(length=1000), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
-        ),
-        sa.Column(
-            "updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
-        ),
-        sa.ForeignKeyConstraint(
-            ["user_id"], ["users.id"], ondelete="CASCADE"
-        ),
+        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "user_id", "normalized_name", name="uq_routine_user_normalized_name"
-        ),
+        sa.UniqueConstraint("user_id", "normalized_name", name="uq_routine_user_normalized_name"),
     )
 
 

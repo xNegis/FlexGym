@@ -53,6 +53,12 @@ const EXERCISE_MOVEMENT_PATTERNS = new Set([
   "carry",
 ]);
 const EXERCISE_EXECUTION_TYPES = new Set(["bilateral", "unilateral", "alternating", "isometric"]);
+const ROUTINE_OBJECTIVES = new Set([
+  "build_muscle",
+  "lose_fat",
+  "increase_strength",
+  "general_fitness",
+]);
 
 export class UnauthenticatedError extends Error {
   constructor() {
@@ -431,11 +437,21 @@ function isRoutine(value: unknown): value is Routine {
   const v = value as Record<string, unknown>;
   return (
     typeof v.id === "number" &&
+    Number.isInteger(v.id) &&
+    v.id > 0 &&
     typeof v.name === "string" &&
+    v.name.trim().length > 0 &&
+    v.name.length <= 120 &&
     typeof v.objective === "string" &&
-    (v.description === null || typeof v.description === "string") &&
+    ROUTINE_OBJECTIVES.has(v.objective) &&
+    (v.description === null ||
+      (typeof v.description === "string" &&
+        v.description.trim().length > 0 &&
+        v.description.length <= 1000)) &&
     typeof v.created_at === "string" &&
-    typeof v.updated_at === "string"
+    v.created_at.length > 0 &&
+    typeof v.updated_at === "string" &&
+    v.updated_at.length > 0
   );
 }
 
@@ -494,6 +510,9 @@ export async function createRoutine(data: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
   const result: unknown = await responseJson(response);
   if (!response.ok) {
     if (response.status === 409) {
@@ -537,6 +556,9 @@ export async function updateRoutine(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
   const result: unknown = await responseJson(response);
   if (!response.ok) {
     if (response.status === 404) {
@@ -578,18 +600,14 @@ export async function deleteRoutine(routineId: number): Promise<{ detail: string
     method: "DELETE",
     credentials: "include",
   });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
   if (response.status === 204) {
     return null;
   }
   if (response.status === 404) {
     return { detail: "Routine not found" };
-  }
-  const result: unknown = await responseJson(response);
-  if (typeof result === "object" && result !== null && "detail" in result) {
-    const detail = result.detail;
-    if (typeof detail === "string") {
-      return { detail };
-    }
   }
   return { detail: "Unable to delete routine" };
 }

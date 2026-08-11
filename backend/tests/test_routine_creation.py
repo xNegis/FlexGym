@@ -1,6 +1,27 @@
 """Tests for F07 routine creation."""
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.engine import Engine
+
+
+def test_sqlite_foreign_keys_are_enabled(test_engine: Engine) -> None:
+    with test_engine.connect() as connection:
+        assert connection.execute(text("PRAGMA foreign_keys")).scalar_one() == 1
+
+
+def test_deleting_user_cascades_owned_routines(client: TestClient, test_engine: Engine) -> None:
+    token, user_id = _register(client, "cascade@example.com")
+    _create_routine(client, token, "Cascade Routine")
+
+    with test_engine.begin() as connection:
+        connection.execute(text("DELETE FROM users WHERE id = :user_id"), {"user_id": user_id})
+        remaining = connection.execute(
+            text("SELECT COUNT(*) FROM routines WHERE user_id = :user_id"),
+            {"user_id": user_id},
+        ).scalar_one()
+
+    assert remaining == 0
 
 
 def _register(client: TestClient, email: str = "routines@example.com") -> tuple[str, int]:

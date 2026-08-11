@@ -112,8 +112,8 @@ not delete the user's routines.
 
 ### FR-9 — Request-state and error behaviour
 
-The UI has explicit loading, empty, loaded, create, detail, edit, confirmation, pending, not-found,
-and request-failure states.
+The UI has explicit loading, empty, loaded, create, detail, edit, confirmation, pending, and
+request-failure states.
 
 Create, save, and delete controls prevent duplicate submissions while pending. Expected failures and
 malformed or unexpected server responses are normalized at the frontend API boundary; React
@@ -198,9 +198,9 @@ Returns:
 
 * `200` with a JSON array of owned routines in the documented order, including `[]` when none exist.
 * `401` when unauthenticated.
-* `422` for unsupported or repeated query parameters.
 
-F07 defines no list query parameters.
+F07 defines no list query parameters. Unused query parameters do not affect routine selection and
+need not be rejected explicitly.
 
 ### `POST /api/routines`
 
@@ -314,8 +314,10 @@ Detail shows:
 * Delete action.
 * Back-to-routines action.
 
-Detail does not show a fake day count or an unusable training-day editor. An unknown or inaccessible
-routine shows `Routine not found` and a back-to-routines action. Other failures allow retry or return.
+Detail does not show a fake day count or an unusable training-day editor. Because the list response
+already contains the complete F07 representation, the UI may open detail from its validated list
+state without issuing a redundant detail request. The detail API remains available for direct
+retrieval and future flows.
 
 ### Delete confirmation
 
@@ -385,8 +387,8 @@ not satisfy the migration-validation gate.
   deletion.
 * [ ] Deletion requires explicit confirmation, removes only the selected owned routine, and returns
   the UI to the refreshed list.
-* [ ] Loading, empty, list failure, detail failure, not-found, conflict, and mutation-failure states
-  are distinct and recoverable.
+* [ ] Loading, empty, list failure, conflict, and mutation-failure states are distinct and
+  recoverable.
 * [ ] All routine endpoints return `401` when unauthenticated.
 * [ ] Invalid or unexpected request fields return `422` without partial mutation.
 * [ ] Malformed success and error responses are not rendered directly by the UI.
@@ -431,7 +433,7 @@ they are deferred, focused manual execution or code inspection must verify:
 * Navigation among Profile, Exercises, and Routines.
 * Empty-list, create, detail, edit, cancellation, delete-confirmation, and successful-deletion flows.
 * One duplicate-name failure preserving form values.
-* One list or detail failure and one mutation failure leaving the current screen recoverable.
+* One list failure and one mutation failure leaving the current screen recoverable.
 * Safe handling of malformed routine success and error payloads.
 * Friendly objective and missing-description labels.
 * Absence of a fake day count, activation controls, or schedule controls.
@@ -478,4 +480,3 @@ Do not couple routine lifecycle to fitness-profile lifecycle.
 
 Training-day management should precede routine-exercise configuration so exercises can be attached
 directly to their intended day rather than temporarily attached to a routine and migrated later.
-
