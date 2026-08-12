@@ -42,6 +42,7 @@ const SKIP_REASON_LABELS: Record<string, string> = {
   too_fatigued: "Too fatigued",
   equipment_unavailable: "Equipment unavailable",
   unable_to_perform: "Unable to perform",
+  pain_or_discomfort: "Pain or discomfort",
   other: "Other",
 };
 

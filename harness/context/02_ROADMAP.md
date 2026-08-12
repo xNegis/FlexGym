@@ -99,7 +99,8 @@ Current intended sequence:
 * F14 — Live Workout Timeline and Set Tracking
 * F14.2 — Explicit Set Start and Accurate Set Timing
 * F15 — Workout Exceptions and Feedback
-* F16 — Discomfort and Pain Reporting
+* F15.1 — Pain or Discomfort Skip Reason
+* F16 — Discomfort and Pain Reporting (intentionally omitted from the current MVP)
 * F17 — Workout Completion
 * F18 — Workout History
 
@@ -108,8 +109,10 @@ accept planned set values as performed or adjust them, record each set while adv
 rest between sets, observe transitions between exercises, and recover the timeline after
 interruption. F14.2 corrects the set lifecycle by requiring an explicit set start after rest and
 recording observed start-to-completion timing. F15 adds workout exceptions such as skipped sets or
-exercises and their reasons. F16 adds structured discomfort or pain reporting whether the user stops
-or continues. F17 closes the active workout and presents its immediate summary. F18 makes completed
+exercises and their reasons. F15.1 adds pain or discomfort as a structured skip reason with optional
+natural-language details. The broader F16 model for reporting discomfort whether the user stops or
+continues is intentionally omitted from the current MVP. F17 closes the active workout and presents
+its immediate summary. F18 makes completed
 and cancelled workouts available through historical browsing.
 
 These boundaries are intentionally incremental. Later features build on persisted workout facts

@@ -1605,6 +1605,7 @@ const SUPPORTED_REASON_CODES = new Set([
   "too_fatigued",
   "equipment_unavailable",
   "unable_to_perform",
+  "pain_or_discomfort",
   "other",
 ]);
 

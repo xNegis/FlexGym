@@ -537,7 +537,8 @@ class WorkoutException(Base):
         ),
         CheckConstraint(
             "reason_code IS NULL OR reason_code IN ("
-            "'not_enough_time','too_fatigued','equipment_unavailable','unable_to_perform','other'"
+            "'not_enough_time','too_fatigued','equipment_unavailable','unable_to_perform',"
+            "'pain_or_discomfort','other'"
             ")",
             name="ck_workout_exceptions_reason_code",
         ),

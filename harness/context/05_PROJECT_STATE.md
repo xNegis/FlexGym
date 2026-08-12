@@ -5,7 +5,7 @@
 ## Current Phase
 
 Phase 0 — Foundation and Phase 1 — Training Planning are completed successfully. Phase 2 — Workout
-Tracking is in progress with F15 completed.
+Tracking is in progress with F15 and F15.1 completed.
 
 ## Current Status
 
@@ -55,6 +55,10 @@ migration, frontend static validation, and an intensive product-owner manual ses
 persisted session audit confirmed a contiguous chronological timeline, readable skip/reversal
 history, consistent effective projections, valid foreign keys, and no performed/skipped overlap.
 
+F15.1 — Pain or Discomfort Skip Reason is implemented and validated. Set and exercise skips accept
+the stable `pain_or_discomfort` reason with optional notes. The migration preserves existing
+exception/event history, and the configured local database is at repository head.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -72,16 +76,16 @@ history, consistent effective projections, valid foreign keys, and no performed/
 * F14 — Live Workout Timeline and Set Tracking
 * F14.2 — Explicit Set Start and Accurate Set Timing
 * F15 — Workout Exceptions and Feedback
+* F15.1 — Pain or Discomfort Skip Reason
 
 ## Skipped Features
 
 * F06 — Custom Exercises
+* F16 — Discomfort and Pain Reporting (omitted from the current MVP)
 
 ## Next Feature
 
-F16 — Discomfort and Pain Reporting. It adds structured discomfort/pain facts independently of
-whether the user continues, skips, or stops. Workout completion and history remain sequenced as F17
-and F18.
+F17 — Workout Completion.
 
 ## Existing Feature Specifications
 
@@ -101,6 +105,8 @@ and F18.
 * `harness/features/14_live_workout_timeline_and_set_tracking.md` (completed)
 * `harness/features/14_2_explicit_set_start_timing.md` (completed corrective follow-up)
 * `harness/features/15_workout_exceptions_and_feedback.md` (completed)
+* `harness/features/15_1_pain_or_discomfort_skip_reason.md` (completed corrective follow-up)
+* `harness/features/16_discomfort_and_pain_reporting.md` (intentionally omitted from current MVP)
 
 ## Current Technology
 

@@ -461,7 +461,14 @@ def _append_event(
 # ────────────────── exception helpers ──────────────────
 
 SUPPORTED_REASON_CODES = frozenset(
-    {"not_enough_time", "too_fatigued", "equipment_unavailable", "unable_to_perform", "other"}
+    {
+        "not_enough_time",
+        "too_fatigued",
+        "equipment_unavailable",
+        "unable_to_perform",
+        "pain_or_discomfort",
+        "other",
+    }
 )
 
 

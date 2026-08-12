@@ -350,3 +350,20 @@ timing.
 This boundary permits later workout history and analytics to reconstruct what the application knew
 and when, while avoiding false precision and keeping current domain state directly queryable and
 validated.
+
+---
+
+## DEC-021 — Defer independent discomfort reporting from the MVP
+
+**Status:** Accepted
+
+The MVP will not introduce a separate discomfort or pain report, structured body area, severity,
+sensation, or continuation outcome. That model adds health-adjacent complexity before the product
+has a demonstrated need to record discomfort when planned work continues.
+
+F15's structured skip feedback is extended by F15.1 with the stable `pain_or_discomfort` reason.
+The existing optional note can retain natural-language context. This records pain only when a set or
+exercise is skipped and does not derive medical meaning, signals, recommendations, or plan changes.
+
+F16 is intentionally omitted rather than treated as completed. It may be reconsidered when
+continued-work discomfort or structured discomfort history is needed for a concrete user flow.

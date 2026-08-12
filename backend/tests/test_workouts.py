@@ -421,7 +421,7 @@ def test_f13_migration_fresh_schema_and_safe_rerun(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f13_fresh.db').as_posix()}"
     _run_alembic(database_url, "upgrade", "head")
     _run_alembic(database_url, "upgrade", "head")
-    assert "f15_exceptions" in _run_alembic(database_url, "current").stdout
+    assert "f15_1_pain_reason" in _run_alembic(database_url, "current").stdout
 
     engine = create_engine(database_url)
     schema = inspect(engine)
@@ -1266,7 +1266,7 @@ def test_f14_2_migration_upgrade_and_legacy_timing(tmp_path: Path) -> None:
 def test_f14_2_migration_fresh_and_rerun(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f14_2_fresh.db').as_posix()}"
     _run_alembic(database_url, "upgrade", "head")
-    assert "f15_exceptions" in _run_alembic(database_url, "current").stdout
+    assert "f15_1_pain_reason" in _run_alembic(database_url, "current").stdout
     _run_alembic(database_url, "upgrade", "head")
 
     engine = create_engine(database_url)
@@ -1450,6 +1450,32 @@ def test_skip_set_other_requires_note(client: TestClient) -> None:
 
     r2 = _skip_set(client, token, workout["id"], 1, 1, reason_code="other", note="Reason details")
     assert r2.status_code == 200, r2.text
+
+
+def test_skip_exercise_with_pain_or_discomfort_reason(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+
+    response = _skip_exercise(
+        client,
+        token,
+        workout["id"],
+        1,
+        reason_code="pain_or_discomfort",
+        note="Left shoulder felt uncomfortable",
+    )
+
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    exception = updated["exercises"][0]["exception"]
+    assert exception["reason_code"] == "pain_or_discomfort"
+    assert exception["note"] == "Left shoulder felt uncomfortable"
+    assert updated["events"][-1]["exception"] == {
+        "scope": "exercise",
+        "reason_code": "pain_or_discomfort",
+        "note": "Left shoulder felt uncomfortable",
+    }
 
 
 def test_skip_set_advances_to_next_unresolved(client: TestClient) -> None:
@@ -1852,7 +1878,7 @@ def test_f15_migration_fresh_and_upgrade(tmp_path: Path) -> None:
     _run_alembic(database_url, "upgrade", "head")
     _run_alembic(database_url, "upgrade", "head")
 
-    assert "f15_exceptions" in _run_alembic(database_url, "current").stdout
+    assert "f15_1_pain_reason" in _run_alembic(database_url, "current").stdout
 
     engine = create_engine(database_url)
     schema = inspect(engine)
@@ -1920,3 +1946,64 @@ def test_f15_migration_fresh_and_upgrade(tmp_path: Path) -> None:
     finally:
         app.dependency_overrides.clear()
         upgrade_engine2.dispose()
+
+
+def test_f15_1_upgrade_preserves_exceptions_and_accepts_pain_reason(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'f15_1_upgrade.db').as_posix()}"
+    _run_alembic(database_url, "upgrade", "f15_exceptions")
+
+    engine = create_engine(database_url, connect_args={"check_same_thread": False})
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    def override_get_session() -> Generator[Session, None, None]:
+        session = session_factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        with TestClient(app) as migrated_client:
+            token, _ = _register(migrated_client, "f15-1-upgrade@example.com")
+            _, day_id = _ready_plan_multi_sets(migrated_client, token, set_count=2)
+            workout = _start(migrated_client, token, day_id).json()
+            _start_exercise(migrated_client, token, workout["id"], 1)
+            before = _skip_set(
+                migrated_client,
+                token,
+                workout["id"],
+                1,
+                1,
+                reason_code="too_fatigued",
+                note="Existing fact",
+            ).json()
+            before_event = before["events"][-1]
+
+        _run_alembic(database_url, "upgrade", "head")
+
+        with TestClient(app) as migrated_client:
+            migrated_client.cookies.set("access_token", token)
+            preserved = migrated_client.get(
+                f"/api/workouts/{workout['id']}", headers=_headers(token)
+            ).json()
+            assert preserved["events"][-1] == before_event
+            assert preserved["exercises"][0]["planned_sets"][0]["exception"]["note"] == (
+                "Existing fact"
+            )
+            pain = _skip_exercise(
+                migrated_client,
+                token,
+                workout["id"],
+                1,
+                reason_code="pain_or_discomfort",
+            )
+            assert pain.status_code == 200, pain.text
+            assert pain.json()["exercises"][0]["exception"]["reason_code"] == "pain_or_discomfort"
+
+        with engine.connect() as connection:
+            assert connection.execute(text("PRAGMA integrity_check")).scalar_one() == "ok"
+            assert connection.execute(text("PRAGMA foreign_key_check")).all() == []
+    finally:
+        app.dependency_overrides.clear()
+        engine.dispose()
