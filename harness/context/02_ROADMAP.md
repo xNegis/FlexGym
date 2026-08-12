@@ -93,18 +93,28 @@ The normative visual and interaction contract lives in `07_UI_DESIGN_SYSTEM.md`.
 
 Goal: make the application usable during real gym sessions.
 
-Planned areas:
+Current intended sequence:
 
-* Start workout
-* Live workout
-* Set tracking
-* Exercise navigation
-* Rest timer
-* Exercise feedback
-* Pain/discomfort reporting
-* Exercise skip feedback
-* Workout completion
-* Workout history
+* F13 — Start Workout
+* F14 — Live Workout Timeline and Set Tracking
+* F14.2 — Explicit Set Start and Accurate Set Timing
+* F15 — Workout Exceptions and Feedback
+* F16 — Discomfort and Pain Reporting
+* F17 — Workout Completion
+* F18 — Workout History
+
+F14 introduces the core one-tap execution timeline: review the started workout, start each exercise,
+accept planned set values as performed or adjust them, record each set while advancing, time planned
+rest between sets, observe transitions between exercises, and recover the timeline after
+interruption. F14.2 corrects the set lifecycle by requiring an explicit set start after rest and
+recording observed start-to-completion timing. F15 adds workout exceptions such as skipped sets or
+exercises and their reasons. F16 adds structured discomfort or pain reporting whether the user stops
+or continues. F17 closes the active workout and presents its immediate summary. F18 makes completed
+and cancelled workouts available through historical browsing.
+
+These boundaries are intentionally incremental. Later features build on persisted workout facts
+without collapsing planned targets, observed performance, skip feedback, discomfort, completion,
+or historical presentation into one undifferentiated feature.
 
 Completion of this phase should make the product independently useful as a workout tracker.
 

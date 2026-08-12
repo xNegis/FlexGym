@@ -21,6 +21,9 @@ Before proposing or writing a feature, read:
 6. `06_FEATURE_TEMPLATE.md`
 7. `07_UI_DESIGN_SYSTEM.md` when the feature creates or changes user-facing UI.
 
+Historical implementation model and cost metadata is tracked centrally in
+`08_COST_TRACKING.md`.
+
 Also read any existing features relevant to the feature currently being designed.
 
 UI-affecting features must reuse the visual tokens, primitives, responsive rules, and interaction

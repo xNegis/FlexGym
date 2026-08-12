@@ -360,3 +360,95 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.timerCircle,
+.timerCircleLarge {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  border: 3px solid var(--color-accent);
+  border-radius: 50%;
+  aspect-ratio: 1;
+}
+
+.timerCircle > svg {
+  flex-shrink: 0;
+  margin-right: var(--space-1);
+}
+
+.timerCircle {
+  width: 5rem;
+  height: 5rem;
+}
+
+.timerCircleLarge {
+  width: 6rem;
+  height: 6rem;
+}
+
+.timerOvertime {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.timerOvertime .timerText {
+  color: var(--color-warning);
+}
+
+.timerText,
+.timerTextLarge {
+  font-family: var(--font-family);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.timerText {
+  font-size: 1.125rem;
+}
+
+.timerTextLarge {
+  font-size: 1.5rem;
+}
+
+.actionButton {
+  min-height: var(--touch-target-large);
+  font-size: 1rem;
+}
+
+.setSummary {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.setSummaryAdjusted {
+  border-left: 3px solid var(--color-warning);
+}
+
+.setCheck {
+  flex-shrink: 0;
+  color: var(--color-success);
+}
+
+.setDot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+}
+
+.setLabel {
+  font: var(--text-body);
+  font-weight: 500;
+}
+
+.setValue {
+  font: var(--text-body);
+  font-weight: 600;
+}

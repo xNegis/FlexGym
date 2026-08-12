@@ -1,13 +1,13 @@
-"""Workout endpoints: start context, start, active, lookup, cancel."""
+"""Workout endpoints: start context, start, active, lookup, execution, cancel."""
 
 from __future__ import annotations
 
 import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, StrictInt, field_validator
+from pydantic import BaseModel, FiniteFloat, StrictInt, field_validator
 
 from app.auth.dependencies import get_current_user
 from app.db import get_session
@@ -44,8 +44,51 @@ class StartRequest(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+class AsPlannedPerformance(BaseModel):
+    entry_mode: Literal["as_planned"]
+
+    model_config = {"extra": "forbid"}
+
+
+class AdjustedPerformance(BaseModel):
+    entry_mode: Literal["adjusted"]
+    performed_value: FiniteFloat
+    performed_weight_kg: FiniteFloat | None
+    performed_rir: StrictInt | None
+
+    @field_validator("performed_value", "performed_weight_kg", mode="before")
+    @classmethod
+    def reject_boolean_numbers(cls, value: object) -> object:
+        if isinstance(value, bool):
+            raise ValueError("performed values must be numbers, not booleans")
+        return value
+
+    model_config = {"extra": "forbid"}
+
+
 def _parse_date(date_str: str) -> datetime.date:
     return datetime.date.fromisoformat(date_str)
+
+
+def _execution_error_to_http(error: str) -> tuple[int, str]:
+    mapping = {
+        "Workout not found": (404, "Workout not found"),
+        "Workout is not active": (409, "Workout is not active"),
+        "Workout exercise not found": (404, "Workout exercise not found"),
+        "Workout set not found": (404, "Workout set not found"),
+        "Exercise is already started": (409, "Exercise is already started"),
+        "Exercise cannot be started yet": (409, "Exercise cannot be started yet"),
+        "Exercise has not been started": (409, "Exercise has not been started"),
+        "Exercise has no incomplete sets": (409, "Exercise has no incomplete sets"),
+        "Workout set is not current": (409, "Workout set is not current"),
+        "Workout set is already incomplete": (409, "Workout set is already incomplete"),
+        "Workout set is already started": (409, "Workout set is already started"),
+        "Workout set is already complete": (409, "Workout set is already complete"),
+        "Workout set has not been started": (409, "Workout set has not been started"),
+    }
+    if error.startswith("Invalid performed"):
+        return (422, error)
+    return mapping.get(error, (500, "Unable to process request"))
 
 
 @router.get("/api/workouts/start-context")
@@ -188,5 +231,134 @@ def cancel_workout(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to cancel workout",
         )
+
+    return workout_service._build_workout_response(workout)
+
+
+# ────────────────── F14 execution endpoints ──────────────────
+
+
+@router.post("/api/workouts/{workout_id}/exercises/{exercise_position}/start")
+def start_exercise(
+    workout_id: int,
+    exercise_position: int,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if workout_id <= 0 or exercise_position <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "workout_id and exercise_position must be positive integers"}],
+        )
+
+    try:
+        workout = workout_service.start_exercise(session, user.id, workout_id, exercise_position)
+    except workout_service.ExecutionError as e:
+        code, detail = _execution_error_to_http(str(e))
+        raise HTTPException(status_code=code, detail=detail)
+
+    return workout_service._build_workout_response(workout)
+
+
+@router.post("/api/workouts/{workout_id}/exercises/{exercise_position}/sets/{set_position}/start")
+def start_set(
+    workout_id: int,
+    exercise_position: int,
+    set_position: int,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if workout_id <= 0 or exercise_position <= 0 or set_position <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "path parameters must be positive integers"}],
+        )
+
+    try:
+        workout = workout_service.start_set(
+            session, user.id, workout_id, exercise_position, set_position
+        )
+    except workout_service.ExecutionError as e:
+        code, detail = _execution_error_to_http(str(e))
+        raise HTTPException(status_code=code, detail=detail)
+
+    return workout_service._build_workout_response(workout)
+
+
+@router.put(
+    "/api/workouts/{workout_id}/exercises/{exercise_position}/sets/{set_position}/performance"
+)
+def record_set_performance(
+    workout_id: int,
+    exercise_position: int,
+    set_position: int,
+    body: AsPlannedPerformance | AdjustedPerformance,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if workout_id <= 0 or exercise_position <= 0 or set_position <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "path parameters must be positive integers"}],
+        )
+
+    entry_mode = body.entry_mode
+
+    if isinstance(body, AsPlannedPerformance):
+        pv = pw = pr = None
+    else:
+        pv = float(body.performed_value)
+        pw = float(body.performed_weight_kg) if body.performed_weight_kg is not None else None
+        pr = int(body.performed_rir) if body.performed_rir is not None else None
+
+    try:
+        if entry_mode == "as_planned" or entry_mode == "adjusted":
+            workout = workout_service.complete_set(
+                session,
+                user.id,
+                workout_id,
+                exercise_position,
+                set_position,
+                entry_mode=entry_mode,
+                performed_value=pv,
+                performed_weight_kg=pw,
+                performed_rir=pr,
+            )
+        else:
+            raise HTTPException(status_code=422, detail="Invalid entry_mode")
+    except workout_service.ExecutionError as e:
+        code, detail = _execution_error_to_http(str(e))
+        raise HTTPException(status_code=code, detail=detail)
+
+    return workout_service._build_workout_response(workout)
+
+
+@router.delete(
+    "/api/workouts/{workout_id}/exercises/{exercise_position}/sets/{set_position}/performance"
+)
+def mark_incomplete(
+    workout_id: int,
+    exercise_position: int,
+    set_position: int,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if workout_id <= 0 or exercise_position <= 0 or set_position <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "path parameters must be positive integers"}],
+        )
+
+    try:
+        workout = workout_service.mark_set_incomplete(
+            session,
+            user.id,
+            workout_id,
+            exercise_position,
+            set_position,
+        )
+    except workout_service.ExecutionError as e:
+        code, detail = _execution_error_to_http(str(e))
+        raise HTTPException(status_code=code, detail=detail)
 
     return workout_service._build_workout_response(workout)

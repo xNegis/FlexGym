@@ -335,6 +335,12 @@ class WorkoutSession(Base):
         cascade="all, delete-orphan",
         order_by="WorkoutExercise.position",
     )
+    events: Mapped[list["WorkoutEvent"]] = relationship(
+        "WorkoutEvent",
+        back_populates="workout",
+        cascade="all, delete-orphan",
+        order_by="WorkoutEvent.sequence",
+    )
 
     __table_args__ = (
         UniqueConstraint("id", "user_id", name="uq_workout_session_id_user_id"),
@@ -394,6 +400,7 @@ class WorkoutExercise(Base):
     target_type: Mapped[str] = mapped_column(String, nullable=False)
     rest_after_exercise_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    instructions: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     planned_sets: Mapped[list["WorkoutPlannedSet"]] = relationship(
         "WorkoutPlannedSet",
@@ -439,6 +446,13 @@ class WorkoutPlannedSet(Base):
     rest_after_set_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    performed_set: Mapped["PerformedSet | None"] = relationship(
+        "PerformedSet",
+        back_populates="workout_planned_set",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
     __table_args__ = (
         UniqueConstraint(
             "workout_exercise_id",
@@ -446,6 +460,77 @@ class WorkoutPlannedSet(Base):
             name="uq_workout_planned_set_exercise_position",
         ),
         CheckConstraint("position >= 1", name="ck_workout_planned_sets_position"),
+    )
+
+
+class PerformedSet(Base):
+    __tablename__ = "performed_sets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workout_planned_set_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("workout_planned_sets.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+    )
+    workout_planned_set: Mapped["WorkoutPlannedSet"] = relationship(
+        "WorkoutPlannedSet", back_populates="performed_set"
+    )
+    performed_value: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
+    performed_weight_kg: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
+    performed_rir: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    entry_mode: Mapped[str] = mapped_column(String, nullable=False)
+    completed_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "entry_mode IN ('as_planned', 'adjusted')",
+            name="ck_performed_sets_entry_mode",
+        ),
+    )
+
+
+class WorkoutEvent(Base):
+    __tablename__ = "workout_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workout_session_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workout_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    workout: Mapped["WorkoutSession"] = relationship("WorkoutSession")
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_type: Mapped[str] = mapped_column(String, nullable=False)
+    workout_exercise_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("workout_exercises.id", ondelete="SET NULL"), nullable=True
+    )
+    workout_planned_set_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("workout_planned_sets.id", ondelete="SET NULL"), nullable=True
+    )
+    occurred_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "workout_session_id", "sequence", name="uq_workout_events_session_sequence"
+        ),
+        CheckConstraint("sequence >= 1", name="ck_workout_events_sequence"),
+        CheckConstraint(
+            "event_type IN ("
+            "'workout_started','exercise_started','set_started',"
+            "'set_completed','set_updated','set_marked_incomplete',"
+            "'exercise_completed','workout_cancelled'"
+            ")",
+            name="ck_workout_events_event_type",
+        ),
     )
 
 

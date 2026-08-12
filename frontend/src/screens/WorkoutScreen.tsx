@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CalendarCheck } from "lucide-react";
-import { cancelWorkout, fetchWorkout, UnauthenticatedError, type WorkoutResult } from "../api";
+import { CalendarCheck, Info, Play } from "lucide-react";
+import {
+  cancelWorkout,
+  fetchWorkout,
+  startExercise,
+  UnauthenticatedError,
+  type WorkoutResult,
+} from "../api";
 import { useAuth } from "../context";
 import type { WorkoutSession } from "../types";
 import Page from "../layouts/Page";
@@ -33,6 +39,8 @@ export default function WorkoutScreen() {
   const [discarding, setDiscarding] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [discardError, setDiscardError] = useState<string | null>(null);
+  const [startingExercise, setStartingExercise] = useState(false);
+  const [executionError, setExecutionError] = useState<string | null>(null);
 
   const workoutId = Number(workoutIdParam);
   const isInvalidId = Number.isNaN(workoutId) || workoutId <= 0;
@@ -96,6 +104,39 @@ export default function WorkoutScreen() {
 
   const isInProgress = workout?.status === "in_progress";
   const isCancelled = workout?.status === "cancelled";
+  const noExerciseStarted =
+    workout?.all_sets_recorded === false &&
+    workout?.completed_set_count === 0 &&
+    workout?.current_exercise_position == null &&
+    workout?.transition_to_exercise_position == null;
+  const firstExercise = workout?.exercises[0];
+  const canResume = isInProgress && !noExerciseStarted;
+
+  const handleStartFirstExercise = async () => {
+    if (!workout || !firstExercise) return;
+    setStartingExercise(true);
+    setExecutionError(null);
+    try {
+      const result = await startExercise(workout.id, firstExercise.position);
+      if ("notFound" in result) {
+        setExecutionError("Workout is no longer available.");
+        return;
+      }
+      if ("detail" in result) {
+        setExecutionError(result.detail);
+        return;
+      }
+      navigate(`/workouts/${workout.id}/exercises/${firstExercise.position}`);
+    } catch (err) {
+      if (err instanceof UnauthenticatedError) {
+        logout();
+        return;
+      }
+      setExecutionError("Unable to start exercise. Please try again.");
+    } finally {
+      setStartingExercise(false);
+    }
+  };
 
   return (
     <>
@@ -138,11 +179,16 @@ export default function WorkoutScreen() {
             <Card>
               <div className={styles.stack3}>
                 <div className={styles.rowBetween}>
-                  {isInProgress ? (
-                    <Badge variant="accent">In progress</Badge>
-                  ) : (
-                    <Badge variant="warning">Cancelled</Badge>
-                  )}
+                  <div className={styles.row2}>
+                    {isInProgress ? (
+                      <Badge variant="accent">In progress</Badge>
+                    ) : (
+                      <Badge variant="warning">Cancelled</Badge>
+                    )}
+                    {isInProgress && workout.all_sets_recorded && (
+                      <Badge variant="success">All sets recorded</Badge>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <div className={styles.textCompactMuted}>{workout.routine_name}</div>
@@ -154,6 +200,11 @@ export default function WorkoutScreen() {
                     })}
                   </div>
                 </div>
+                {isInProgress && (
+                  <div className={styles.textCompactMuted}>
+                    {workout.completed_set_count} of {workout.total_set_count} sets completed
+                  </div>
+                )}
                 <div className={styles.textCompactMuted}>
                   {workout.selection_kind === "scheduled"
                     ? "Scheduled session"
@@ -163,6 +214,22 @@ export default function WorkoutScreen() {
                         ? `Chose ${workout.selected_training_day_name} instead of ${workout.scheduled_training_day_name}`
                         : "Alternate session"}
                 </div>
+                {executionError && <Alert variant="error">{executionError}</Alert>}
+                {isInProgress && noExerciseStarted && firstExercise && (
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    onClick={handleStartFirstExercise}
+                    disabled={startingExercise}
+                  >
+                    {startingExercise ? "Starting…" : "Start first exercise"}
+                  </Button>
+                )}
+                {canResume && !workout.all_sets_recorded && workout.resume_url && (
+                  <Button variant="primary" fullWidth onClick={() => navigate(workout.resume_url!)}>
+                    Resume workout
+                  </Button>
+                )}
               </div>
             </Card>
 
@@ -186,6 +253,33 @@ export default function WorkoutScreen() {
                                 ? "Duration"
                                 : "Distance"}
                           </div>
+                        </div>
+                        <div className={styles.row1}>
+                          {isInProgress && ex.completed_set_count > 0 && (
+                            <Badge variant="accent">
+                              {ex.completed_set_count}/{ex.total_set_count}
+                            </Badge>
+                          )}
+                          {ex.is_complete && <Badge variant="success">Done</Badge>}
+                          {ex.instructions && (
+                            <Info
+                              size={14}
+                              className={styles.textCaptionSubtle}
+                              aria-label="Instructions available"
+                            />
+                          )}
+                          {isInProgress && ex.started_at != null && (
+                            <Button
+                              variant="secondary"
+                              size="small"
+                              onClick={() =>
+                                navigate(`/workouts/${workout.id}/exercises/${ex.position}`)
+                              }
+                            >
+                              <Play size={14} aria-hidden="true" />
+                              <span>{ex.is_complete ? "View" : "Resume"}</span>
+                            </Button>
+                          )}
                         </div>
                       </div>
                       <div className={styles.stack2}>

@@ -323,3 +323,30 @@ automated browser coverage when the product flows are stable enough to justify i
 
 This decision supersedes DEC-018's requirement for ongoing focused browser-test coverage and extends
 DEC-008's original deferral through the remainder of the MVP.
+
+---
+
+## DEC-020 — Workout monitoring uses typed observed events and structured facts
+
+**Status:** Accepted
+
+Live workouts require a recoverable temporal record without forcing continuous phone interaction.
+FlexGym therefore records server-timestamped, append-only events for meaningful actions the
+application actually observes, such as workout start, exercise start, set confirmation, correction,
+exercise completion, and cancellation.
+
+The timeline complements rather than replaces structured domain state. Performed values remain
+structured performed-set facts, planned targets remain immutable snapshot facts, and progress,
+timer thresholds, transition duration, and other timing values are derived from those facts and
+event timestamps. Events use explicit supported types and relational references rather than an
+arbitrary JSON event store.
+
+Timer ticks and the instant a client-rendered countdown reaches zero are not persisted as observed
+events. They are deterministic projections of a server timestamp and snapshotted planned duration.
+The system must distinguish exact observed intervals from estimates: one confirmation per set can
+measure time between interactions but cannot measure exact set duration or individual repetition
+timing.
+
+This boundary permits later workout history and analytics to reconstruct what the application knew
+and when, while avoiding false precision and keeping current domain state directly queryable and
+validated.

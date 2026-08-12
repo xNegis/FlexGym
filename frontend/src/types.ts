@@ -143,6 +143,7 @@ interface ActiveWorkoutSummary {
   started_at: string;
   status: string;
   selection_kind: string;
+  resume_url: string;
 }
 
 type StartContextState = "active_workout" | "no_active_routine" | "rest_day" | "scheduled_session";
@@ -181,6 +182,25 @@ type StartContext =
   | StartContextRestDay
   | StartContextScheduledSession;
 
+interface PerformedSet {
+  performed_value: number;
+  performed_weight_kg: number | null;
+  performed_rir: number | null;
+  entry_mode: "as_planned" | "adjusted";
+  set_started_at: string | null;
+  completed_at: string;
+  observed_duration_seconds: number | null;
+  updated_at: string;
+}
+
+interface WorkoutEvent {
+  sequence: number;
+  event_type: string;
+  exercise_position: number | null;
+  set_position: number | null;
+  occurred_at: string;
+}
+
 interface WorkoutPlannedSetSnapshot {
   position: number;
   target_value: number;
@@ -189,6 +209,7 @@ interface WorkoutPlannedSetSnapshot {
   tempo: ConfiguredSetTempo | null;
   rest_after_set_seconds: number | null;
   notes: string | null;
+  performance: PerformedSet | null;
 }
 
 interface WorkoutExerciseSnapshot {
@@ -200,6 +221,12 @@ interface WorkoutExerciseSnapshot {
   rest_after_exercise_seconds: number | null;
   notes: string | null;
   planned_sets: WorkoutPlannedSetSnapshot[];
+  instructions: string | null;
+  started_at: string | null;
+  latest_completed_at: string | null;
+  completed_set_count: number;
+  total_set_count: number;
+  is_complete: boolean;
 }
 
 interface WorkoutSession {
@@ -218,6 +245,17 @@ interface WorkoutSession {
   started_at: string;
   cancelled_at: string | null;
   exercises: WorkoutExerciseSnapshot[];
+  server_now: string;
+  completed_set_count: number;
+  total_set_count: number;
+  all_sets_recorded: boolean;
+  current_exercise_position: number | null;
+  current_set_position: number | null;
+  current_set_phase: string | null;
+  current_set_started_at: string | null;
+  transition_to_exercise_position: number | null;
+  resume_url: string | null;
+  events: WorkoutEvent[];
 }
 
 interface ActiveWorkoutConflict {
@@ -236,6 +274,7 @@ export {
   type ExerciseDetail,
   type ExerciseSummary,
   type FitnessProfile,
+  type PerformedSet,
   type Routine,
   type ScheduleRestSlot,
   type ScheduleSlot,
@@ -249,6 +288,7 @@ export {
   type StartContextState,
   type TrainingDay,
   type User,
+  type WorkoutEvent,
   type WorkoutExerciseSnapshot,
   type WorkoutPlannedSetSnapshot,
   type WorkoutSession,

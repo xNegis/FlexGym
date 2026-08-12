@@ -5,7 +5,7 @@
 ## Current Phase
 
 Phase 0 — Foundation and Phase 1 — Training Planning are completed successfully. Phase 2 — Workout
-Tracking is in progress with F13 — Start Workout completed.
+Tracking is in progress with F14 and its F14.2 corrective follow-up completed.
 
 ## Current Status
 
@@ -40,6 +40,14 @@ plan, snapshots the selected prescription, and supports persistent resume and co
 Backend, migration, and static frontend validation pass, and the product owner completed the final
 manual UI verification.
 
+F14 — Live Workout Timeline and Set Tracking and F14.2 — Explicit Set Start and Accurate Set Timing
+are implemented and validated. The live flow snapshots prescriptions, records performed sets and an
+append-only event timeline, separates rest from explicit set start, derives observed set and rest
+durations from server timestamps, preserves adjustments and corrections, times exercise transitions,
+and recovers after interruption. The product owner completed a real-workout validation and confirmed
+the final interaction flow and persisted monitoring timeline. Workout-level completion remains
+deliberately assigned to F17.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -54,6 +62,8 @@ manual UI verification.
 * F11 — Active Routine
 * F12 — Mobile-first UI System and Phase 1 UX Refresh
 * F13 — Start Workout
+* F14 — Live Workout Timeline and Set Tracking
+* F14.2 — Explicit Set Start and Accurate Set Timing
 
 ## Skipped Features
 
@@ -61,8 +71,9 @@ manual UI verification.
 
 ## Next Feature
 
-Select and specify the next Phase 2 feature from the roadmap's Live workout and Set tracking areas.
-Its exact boundary should be discussed before assigning a feature number or writing its specification.
+F15 — Workout Exceptions and Feedback. It adds skipped sets or exercises and structured reasons on
+top of the completed F14/F14.2 execution timeline. Discomfort, workout completion, and history
+remain sequenced as F16 through F18.
 
 ## Existing Feature Specifications
 
@@ -79,6 +90,8 @@ Its exact boundary should be discussed before assigning a feature number or writ
 * `harness/features/11_active_routine.md`
 * `harness/features/12_mobile_ui_system.md` (completed)
 * `harness/features/13_start_workout.md` (completed)
+* `harness/features/14_live_workout_timeline_and_set_tracking.md` (completed)
+* `harness/features/14_2_explicit_set_start_timing.md` (completed corrective follow-up)
 
 ## Current Technology
 
@@ -101,6 +114,11 @@ completion gate for current MVP features under DEC-019
 Code Quality:
 Backend: Ruff (lint + format), mypy (type checking)
 Frontend: Prettier (format), ESLint (lint), tsc (type checking)
+
+## Cost Tracking
+
+Per-feature AI implementation costs and models are recorded in
+`harness/context/08_COST_TRACKING.md`.
 
 ## Important Current Constraints
 

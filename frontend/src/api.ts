@@ -1408,7 +1408,9 @@ function isActiveWorkoutSummary(value: unknown): value is ActiveWorkoutSummary {
     typeof v.status === "string" &&
     v.status.length > 0 &&
     typeof v.selection_kind === "string" &&
-    v.selection_kind.length > 0
+    v.selection_kind.length > 0 &&
+    typeof v.resume_url === "string" &&
+    v.resume_url.startsWith(`/workouts/${v.id}`)
   );
 }
 
@@ -1553,6 +1555,7 @@ function isWorkoutPlannedSetSnapshot(
       : targetType === "duration_seconds"
         ? Number.isInteger(v.target_value) && v.target_value >= 1
         : true;
+  const perfOk = v.performance === null || isPerformedSet(v.performance);
   return (
     typeof v.position === "number" &&
     Number.isInteger(v.position) &&
@@ -1565,7 +1568,31 @@ function isWorkoutPlannedSetSnapshot(
     (v.rest_after_set_seconds === null ||
       (typeof v.rest_after_set_seconds === "number" &&
         Number.isInteger(v.rest_after_set_seconds))) &&
-    (v.notes === null || typeof v.notes === "string")
+    (v.notes === null || typeof v.notes === "string") &&
+    perfOk
+  );
+}
+
+function isPerformedSet(value: unknown): value is WorkoutPlannedSetSnapshot["performance"] {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.performed_value === "number" &&
+    Number.isFinite(v.performed_value) &&
+    (v.performed_weight_kg === null ||
+      (typeof v.performed_weight_kg === "number" && Number.isFinite(v.performed_weight_kg))) &&
+    (v.performed_rir === null ||
+      (typeof v.performed_rir === "number" && Number.isInteger(v.performed_rir))) &&
+    (v.entry_mode === "as_planned" || v.entry_mode === "adjusted") &&
+    (v.set_started_at === null || typeof v.set_started_at === "string") &&
+    typeof v.completed_at === "string" &&
+    v.completed_at.length > 0 &&
+    (v.observed_duration_seconds === null ||
+      (typeof v.observed_duration_seconds === "number" &&
+        Number.isInteger(v.observed_duration_seconds) &&
+        v.observed_duration_seconds >= 0)) &&
+    typeof v.updated_at === "string" &&
+    v.updated_at.length > 0
   );
 }
 
@@ -1589,6 +1616,17 @@ function isWorkoutExerciseSnapshot(value: unknown): value is WorkoutExerciseSnap
       (typeof v.rest_after_exercise_seconds === "number" &&
         Number.isInteger(v.rest_after_exercise_seconds))) &&
     (v.notes === null || typeof v.notes === "string") &&
+    (v.instructions === null || typeof v.instructions === "string") &&
+    (v.started_at === null || typeof v.started_at === "string") &&
+    (v.latest_completed_at === null || typeof v.latest_completed_at === "string") &&
+    typeof v.completed_set_count === "number" &&
+    Number.isInteger(v.completed_set_count) &&
+    v.completed_set_count >= 0 &&
+    typeof v.total_set_count === "number" &&
+    Number.isInteger(v.total_set_count) &&
+    v.total_set_count >= 1 &&
+    v.completed_set_count <= v.total_set_count &&
+    typeof v.is_complete === "boolean" &&
     Array.isArray(v.planned_sets) &&
     v.planned_sets.length >= 1 &&
     v.planned_sets.every(
@@ -1602,6 +1640,37 @@ function isWorkoutExerciseSnapshot(value: unknown): value is WorkoutExerciseSnap
 function isWorkoutSession(value: unknown): value is WorkoutSession {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
+  const eventsOk =
+    Array.isArray(v.events) &&
+    v.events.length >= 1 &&
+    v.events.every((event: unknown, index: number) => {
+      if (typeof event !== "object" || event === null) return false;
+      const e = event as Record<string, unknown>;
+      return (
+        e.sequence === index + 1 &&
+        typeof e.event_type === "string" &&
+        [
+          "workout_started",
+          "exercise_started",
+          "set_started",
+          "set_completed",
+          "set_updated",
+          "set_marked_incomplete",
+          "exercise_completed",
+          "workout_cancelled",
+        ].includes(e.event_type) &&
+        (e.exercise_position === null ||
+          (typeof e.exercise_position === "number" &&
+            Number.isInteger(e.exercise_position) &&
+            e.exercise_position >= 1)) &&
+        (e.set_position === null ||
+          (typeof e.set_position === "number" &&
+            Number.isInteger(e.set_position) &&
+            e.set_position >= 1)) &&
+        typeof e.occurred_at === "string" &&
+        e.occurred_at.length > 0
+      );
+    });
   return (
     typeof v.id === "number" &&
     Number.isInteger(v.id) &&
@@ -1630,6 +1699,35 @@ function isWorkoutSession(value: unknown): value is WorkoutSession {
     typeof v.started_at === "string" &&
     v.started_at.length > 0 &&
     (v.cancelled_at === null || typeof v.cancelled_at === "string") &&
+    typeof v.server_now === "string" &&
+    v.server_now.length > 0 &&
+    typeof v.completed_set_count === "number" &&
+    Number.isInteger(v.completed_set_count) &&
+    v.completed_set_count >= 0 &&
+    typeof v.total_set_count === "number" &&
+    Number.isInteger(v.total_set_count) &&
+    v.total_set_count >= 1 &&
+    v.completed_set_count <= v.total_set_count &&
+    typeof v.all_sets_recorded === "boolean" &&
+    (v.current_exercise_position === null ||
+      (typeof v.current_exercise_position === "number" &&
+        Number.isInteger(v.current_exercise_position) &&
+        v.current_exercise_position >= 1)) &&
+    (v.current_set_position === null ||
+      (typeof v.current_set_position === "number" &&
+        Number.isInteger(v.current_set_position) &&
+        v.current_set_position >= 1)) &&
+    (v.current_set_phase === null ||
+      (typeof v.current_set_phase === "string" &&
+        ["awaiting_set_start", "set_in_progress"].includes(v.current_set_phase))) &&
+    (v.current_set_started_at === null || typeof v.current_set_started_at === "string") &&
+    (v.transition_to_exercise_position === null ||
+      (typeof v.transition_to_exercise_position === "number" &&
+        Number.isInteger(v.transition_to_exercise_position) &&
+        v.transition_to_exercise_position >= 1)) &&
+    typeof v.resume_url === "string" &&
+    v.resume_url.startsWith(`/workouts/${v.id}`) &&
+    eventsOk &&
     Array.isArray(v.exercises) &&
     v.exercises.length >= 1 &&
     v.exercises.every(
@@ -1763,5 +1861,130 @@ export async function cancelWorkout(workoutId: number): Promise<CancelWorkoutRes
   if (!isWorkoutSession(result)) {
     throw new Error("Invalid workout response");
   }
+  return result;
+}
+
+export type StartExerciseResult = WorkoutSession | { notFound: true } | { detail: string };
+
+export async function startExercise(
+  workoutId: number,
+  exercisePosition: number,
+): Promise<StartExerciseResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/start`,
+    { method: "POST", credentials: "include" },
+  );
+  if (response.status === 401) throw new UnauthenticatedError();
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) return { notFound: true };
+    return { detail: safeErrorDetail(result, response.status, "Unable to start exercise") };
+  }
+  if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
+  return result;
+}
+
+export async function startSet(
+  workoutId: number,
+  exercisePosition: number,
+  setPosition: number,
+): Promise<SetPerformanceResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/sets/${setPosition}/start`,
+    { method: "POST", credentials: "include" },
+  );
+  if (response.status === 401) throw new UnauthenticatedError();
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) return { notFound: true };
+    return { detail: safeErrorDetail(result, response.status, "Unable to start set") };
+  }
+  if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
+  return result;
+}
+
+export type SetPerformanceResult = WorkoutSession | { notFound: true } | { detail: string };
+export type SetPerformanceBody =
+  | { entry_mode: "as_planned" }
+  | {
+      entry_mode: "adjusted";
+      performed_value: number;
+      performed_weight_kg: number | null;
+      performed_rir: number | null;
+    };
+
+export async function recordSetPerformance(
+  workoutId: number,
+  exercisePosition: number,
+  setPosition: number,
+  body: SetPerformanceBody,
+): Promise<SetPerformanceResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/sets/${setPosition}/performance`,
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (response.status === 401) throw new UnauthenticatedError();
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) return { notFound: true };
+    return { detail: safeErrorDetail(result, response.status, "Unable to save set") };
+  }
+  if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
+  return result;
+}
+
+export async function updateSetPerformance(
+  workoutId: number,
+  exercisePosition: number,
+  setPosition: number,
+  performedValue: number,
+  performedWeightKg: number | null,
+  performedRir: number | null,
+): Promise<SetPerformanceResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/sets/${setPosition}/performance`,
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        entry_mode: "adjusted",
+        performed_value: performedValue,
+        performed_weight_kg: performedWeightKg,
+        performed_rir: performedRir,
+      }),
+    },
+  );
+  if (response.status === 401) throw new UnauthenticatedError();
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) return { notFound: true };
+    return { detail: safeErrorDetail(result, response.status, "Unable to update set") };
+  }
+  if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
+  return result;
+}
+
+export async function markSetIncomplete(
+  workoutId: number,
+  exercisePosition: number,
+  setPosition: number,
+): Promise<SetPerformanceResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/sets/${setPosition}/performance`,
+    { method: "DELETE", credentials: "include" },
+  );
+  if (response.status === 401) throw new UnauthenticatedError();
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) return { notFound: true };
+    return { detail: safeErrorDetail(result, response.status, "Unable to mark incomplete") };
+  }
+  if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
   return result;
 }

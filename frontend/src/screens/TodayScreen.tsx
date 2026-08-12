@@ -155,7 +155,7 @@ export default function TodayScreen() {
                 <Button
                   variant="primary"
                   fullWidth
-                  onClick={() => navigate(`/workouts/${resumeWorkout.id}`)}
+                  onClick={() => navigate(resumeWorkout.resume_url)}
                 >
                   <Play size={18} aria-hidden="true" /> Resume workout
                 </Button>
