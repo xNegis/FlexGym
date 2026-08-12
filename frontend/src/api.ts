@@ -1,5 +1,7 @@
 import type {
   ActiveRoutine,
+  ActiveWorkoutConflict,
+  ActiveWorkoutSummary,
   ConfiguredExercise,
   ConfiguredSet,
   ConfiguredSetTempo,
@@ -9,7 +11,13 @@ import type {
   Routine,
   ScheduleSlot,
   ScheduleSlotType,
+  SessionPreview,
+  StartContext,
+  StartContextState,
   TrainingDay,
+  WorkoutExerciseSnapshot,
+  WorkoutPlannedSetSnapshot,
+  WorkoutSession,
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -1380,4 +1388,380 @@ export async function deactivateRoutine(): Promise<{ detail: string | null }> {
     return { detail: null };
   }
   return { detail: "Unable to deactivate routine" };
+}
+
+function isActiveWorkoutSummary(value: unknown): value is ActiveWorkoutSummary {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "number" &&
+    Number.isInteger(v.id) &&
+    v.id > 0 &&
+    typeof v.routine_name === "string" &&
+    v.routine_name.length > 0 &&
+    typeof v.selected_training_day_name === "string" &&
+    v.selected_training_day_name.length > 0 &&
+    typeof v.local_date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(v.local_date) &&
+    typeof v.started_at === "string" &&
+    v.started_at.length > 0 &&
+    typeof v.status === "string" &&
+    v.status.length > 0 &&
+    typeof v.selection_kind === "string" &&
+    v.selection_kind.length > 0
+  );
+}
+
+const VALID_START_CONTEXT_STATES: Set<StartContextState> = new Set([
+  "active_workout",
+  "no_active_routine",
+  "rest_day",
+  "scheduled_session",
+]);
+
+function isSessionPreviewExercise(
+  value: unknown,
+): value is { position: number; name: string; set_count: number } {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.position === "number" &&
+    Number.isInteger(v.position) &&
+    v.position >= 1 &&
+    typeof v.name === "string" &&
+    v.name.trim().length > 0 &&
+    typeof v.set_count === "number" &&
+    Number.isInteger(v.set_count) &&
+    v.set_count >= 0
+  );
+}
+
+function isSessionPreview(value: unknown): value is SessionPreview {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "number" &&
+    Number.isInteger(v.id) &&
+    v.id > 0 &&
+    typeof v.name === "string" &&
+    v.name.trim().length > 0 &&
+    typeof v.week_position === "number" &&
+    Number.isInteger(v.week_position) &&
+    v.week_position >= 1 &&
+    v.week_position <= 7 &&
+    typeof v.exercise_count === "number" &&
+    Number.isInteger(v.exercise_count) &&
+    v.exercise_count >= 0 &&
+    typeof v.set_count === "number" &&
+    Number.isInteger(v.set_count) &&
+    v.set_count >= 0 &&
+    typeof v.can_start === "boolean" &&
+    Array.isArray(v.exercises) &&
+    v.exercises.every(isSessionPreviewExercise)
+  );
+}
+
+function isSessionPreviewArray(value: unknown): value is SessionPreview[] {
+  if (!Array.isArray(value)) return false;
+  return value.every(isSessionPreview);
+}
+
+function isStartContext(value: unknown): value is StartContext {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.state !== "string" || !VALID_START_CONTEXT_STATES.has(v.state as StartContextState))
+    return false;
+
+  if (v.state === "active_workout") {
+    return isActiveWorkoutSummary(v.workout);
+  }
+  if (v.state === "no_active_routine") {
+    return true;
+  }
+  if (v.state === "rest_day" || v.state === "scheduled_session") {
+    if (
+      typeof v.routine !== "object" ||
+      v.routine === null ||
+      !("routine_id" in v.routine) ||
+      !("routine_name" in v.routine)
+    )
+      return false;
+    if (!isSessionPreviewArray(v.session_previews)) return false;
+    if (v.state === "scheduled_session") {
+      return isSessionPreview(v.session);
+    }
+    return (
+      typeof v.week_position === "number" &&
+      Number.isInteger(v.week_position) &&
+      v.week_position >= 1 &&
+      v.week_position <= 7 &&
+      typeof v.weekday === "string" &&
+      v.weekday.length > 0
+    );
+  }
+  return false;
+}
+
+export type StartContextResult = StartContext | { detail: string };
+
+export async function fetchStartContext(localDate: string): Promise<StartContextResult> {
+  const url = `${API_BASE_URL}/api/workouts/start-context?local_date=${encodeURIComponent(localDate)}`;
+  const response = await fetch(url, { credentials: "include" });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (
+      response.status === 422 &&
+      typeof result === "object" &&
+      result !== null &&
+      "detail" in result
+    ) {
+      const detail = (result as Record<string, unknown>).detail;
+      if (Array.isArray(detail)) {
+        const messages = detail
+          .filter(
+            (item): item is { msg: string } =>
+              typeof item === "object" &&
+              item !== null &&
+              "msg" in item &&
+              typeof item.msg === "string",
+          )
+          .map((item) => item.msg);
+        return { detail: messages.length > 0 ? messages.join("; ") : "Invalid date" };
+      }
+    }
+    return { detail: "Unable to load today's context" };
+  }
+  if (!isStartContext(result)) {
+    throw new Error("Invalid start context response");
+  }
+  return result;
+}
+
+function isWorkoutPlannedSetSnapshot(
+  value: unknown,
+  targetType: string,
+): value is WorkoutPlannedSetSnapshot {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.target_value !== "number" || !Number.isFinite(v.target_value)) return false;
+  const targetIsValid =
+    targetType === "repetitions"
+      ? Number.isInteger(v.target_value) && v.target_value >= 1
+      : targetType === "duration_seconds"
+        ? Number.isInteger(v.target_value) && v.target_value >= 1
+        : true;
+  return (
+    typeof v.position === "number" &&
+    Number.isInteger(v.position) &&
+    v.position >= 1 &&
+    targetIsValid &&
+    (v.target_weight_kg === null || typeof v.target_weight_kg === "number") &&
+    (v.target_rir === null ||
+      (typeof v.target_rir === "number" && Number.isInteger(v.target_rir))) &&
+    (v.tempo === null || isConfiguredSetTempo(v.tempo)) &&
+    (v.rest_after_set_seconds === null ||
+      (typeof v.rest_after_set_seconds === "number" &&
+        Number.isInteger(v.rest_after_set_seconds))) &&
+    (v.notes === null || typeof v.notes === "string")
+  );
+}
+
+function isWorkoutExerciseSnapshot(value: unknown): value is WorkoutExerciseSnapshot {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const targetType = typeof v.target_type === "string" ? v.target_type : "";
+  return (
+    typeof v.position === "number" &&
+    Number.isInteger(v.position) &&
+    v.position >= 1 &&
+    (v.source_exercise_id === null ||
+      (typeof v.source_exercise_id === "number" && Number.isInteger(v.source_exercise_id))) &&
+    typeof v.exercise_slug === "string" &&
+    v.exercise_slug.length > 0 &&
+    typeof v.exercise_name === "string" &&
+    v.exercise_name.length > 0 &&
+    typeof v.target_type === "string" &&
+    ["repetitions", "duration_seconds", "distance_meters"].includes(v.target_type) &&
+    (v.rest_after_exercise_seconds === null ||
+      (typeof v.rest_after_exercise_seconds === "number" &&
+        Number.isInteger(v.rest_after_exercise_seconds))) &&
+    (v.notes === null || typeof v.notes === "string") &&
+    Array.isArray(v.planned_sets) &&
+    v.planned_sets.length >= 1 &&
+    v.planned_sets.every(
+      (s: unknown, index: number) =>
+        isWorkoutPlannedSetSnapshot(s, targetType) &&
+        (s as WorkoutPlannedSetSnapshot).position === index + 1,
+    )
+  );
+}
+
+function isWorkoutSession(value: unknown): value is WorkoutSession {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "number" &&
+    Number.isInteger(v.id) &&
+    v.id > 0 &&
+    typeof v.routine_name === "string" &&
+    v.routine_name.length > 0 &&
+    typeof v.local_date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(v.local_date) &&
+    typeof v.scheduled_week_position === "number" &&
+    Number.isInteger(v.scheduled_week_position) &&
+    v.scheduled_week_position >= 1 &&
+    v.scheduled_week_position <= 7 &&
+    typeof v.scheduled_slot_was_rest === "boolean" &&
+    (v.scheduled_training_day_id === null || typeof v.scheduled_training_day_id === "number") &&
+    (v.scheduled_training_day_name === null || typeof v.scheduled_training_day_name === "string") &&
+    typeof v.selected_training_day_id === "number" &&
+    Number.isInteger(v.selected_training_day_id) &&
+    v.selected_training_day_id > 0 &&
+    typeof v.selected_training_day_name === "string" &&
+    v.selected_training_day_name.length > 0 &&
+    typeof v.selected_week_position === "number" &&
+    typeof v.selection_kind === "string" &&
+    ["scheduled", "alternate"].includes(v.selection_kind) &&
+    typeof v.status === "string" &&
+    ["in_progress", "cancelled"].includes(v.status) &&
+    typeof v.started_at === "string" &&
+    v.started_at.length > 0 &&
+    (v.cancelled_at === null || typeof v.cancelled_at === "string") &&
+    Array.isArray(v.exercises) &&
+    v.exercises.length >= 1 &&
+    v.exercises.every(
+      (e: unknown, index: number) =>
+        isWorkoutExerciseSnapshot(e) && (e as WorkoutExerciseSnapshot).position === index + 1,
+    )
+  );
+}
+
+export type CreateWorkoutResult =
+  WorkoutSession | { detail: string; active_workout?: ActiveWorkoutSummary };
+
+function isActiveWorkoutConflict(value: unknown): value is ActiveWorkoutConflict {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.detail === "string" &&
+    (v.active_workout === null || isActiveWorkoutSummary(v.active_workout))
+  );
+}
+
+function safeErrorDetail(result: unknown, _status: number, fallback: string): string {
+  if (typeof result === "object" && result !== null && "detail" in result) {
+    const detail = (result as Record<string, unknown>).detail;
+    if (typeof detail === "string" && detail.trim().length > 0) {
+      return detail;
+    }
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .filter(
+          (item): item is { msg: string } =>
+            typeof item === "object" &&
+            item !== null &&
+            "msg" in item &&
+            typeof item.msg === "string",
+        )
+        .map((item) => item.msg);
+      return messages.length > 0 ? messages.join("; ") : fallback;
+    }
+  }
+  return fallback;
+}
+
+export async function createWorkout(
+  trainingDayId: number,
+  localDate: string,
+): Promise<CreateWorkoutResult> {
+  const response = await fetch(`${API_BASE_URL}/api/workouts`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ training_day_id: trainingDayId, local_date: localDate }),
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 409 && isActiveWorkoutConflict(result)) {
+      return {
+        detail: result.detail,
+        active_workout: result.active_workout ?? undefined,
+      };
+    }
+    return { detail: safeErrorDetail(result, response.status, "Unable to start workout") };
+  }
+  if (!isWorkoutSession(result)) {
+    throw new Error("Invalid workout response");
+  }
+  return result;
+}
+
+export async function fetchActiveWorkout(): Promise<WorkoutSession | null> {
+  const response = await fetch(`${API_BASE_URL}/api/workouts/active`, {
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load active workout");
+  }
+  const data: unknown = await response.json();
+  if (data === null) {
+    return null;
+  }
+  if (!isWorkoutSession(data)) {
+    throw new Error("Invalid workout response");
+  }
+  return data;
+}
+
+export type WorkoutResult = WorkoutSession | { notFound: true };
+export type CancelWorkoutResult = WorkoutSession | { notFound: true } | { detail: string };
+
+export async function fetchWorkout(workoutId: number): Promise<WorkoutResult> {
+  const response = await fetch(`${API_BASE_URL}/api/workouts/${workoutId}`, {
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 404) {
+    return { notFound: true };
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load workout");
+  }
+  const data: unknown = await response.json();
+  if (!isWorkoutSession(data)) {
+    throw new Error("Invalid workout response");
+  }
+  return data;
+}
+
+export async function cancelWorkout(workoutId: number): Promise<CancelWorkoutResult> {
+  const response = await fetch(`${API_BASE_URL}/api/workouts/${workoutId}/cancel`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (response.status === 404) {
+    return { notFound: true };
+  }
+  if (!response.ok) {
+    return { detail: safeErrorDetail(result, response.status, "Unable to discard workout") };
+  }
+  if (!isWorkoutSession(result)) {
+    throw new Error("Invalid workout response");
+  }
+  return result;
 }

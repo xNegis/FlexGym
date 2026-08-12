@@ -301,3 +301,25 @@ old/new visual system is not an acceptable completion state.
 F12 also ends DEC-008's blanket frontend browser-test deferral for stable cross-feature shell,
 navigation, responsive, and dialog behaviour. Coverage remains deliberately focused; business-rule
 variants continue to belong primarily in backend tests.
+
+---
+
+## DEC-019 — Defer Playwright coverage during the MVP
+
+**Status:** Accepted
+
+Automated browser and end-to-end coverage is not a completion requirement for F13 or subsequent MVP
+features. New Playwright tests must not be added as part of normal feature delivery during this
+stage.
+
+Frontend behaviour is still validated proportionally through static checks, focused parser or unit
+tests when a suitable existing runner is available, and manual execution of the required responsive,
+keyboard, focus, navigation, loading, empty, error, pending, unavailable, and confirmation states.
+Backend tests remain required for domain, API, ownership, persistence, and migration behaviour.
+
+The existing Playwright infrastructure and F12 coverage may remain in the repository, but maintaining
+or executing it is not an MVP feature-completion gate. A later explicit decision may reinstate
+automated browser coverage when the product flows are stable enough to justify its delivery cost.
+
+This decision supersedes DEC-018's requirement for ongoing focused browser-test coverage and extends
+DEC-008's original deferral through the remainder of the MVP.

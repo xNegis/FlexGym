@@ -17,7 +17,7 @@ from app.db import get_session
 from app.main import app
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-F11_REVISION = "f11a1b2c3d4e"
+F11_REVISION = "5f6392b90798"
 PREVIOUS_REVISION = "c31f5a8d2e04"
 
 

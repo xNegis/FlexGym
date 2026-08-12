@@ -20,7 +20,7 @@ from app.main import app
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 F10_INITIAL_REVISION = "aab110d57981"
-F10_REVISION = "f11a1b2c3d4e"
+F10_REVISION = "5f6392b90798"
 PREVIOUS_REVISION = "273789964714"
 
 WEEKDAY_NAMES = [

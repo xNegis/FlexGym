@@ -5,7 +5,7 @@
 ## Current Phase
 
 Phase 0 — Foundation and Phase 1 — Training Planning are completed successfully. Phase 2 — Workout
-Tracking is next.
+Tracking is in progress with F13 — Start Workout completed.
 
 ## Current Status
 
@@ -34,6 +34,12 @@ canonical routes, authentication and profile guards, a mobile-first app shell wi
 and the Quiet Strength visual direction. All F02–F11 flows have been migrated and validated with
 authenticated Playwright coverage at 360, 390, and 430 px.
 
+F13 — Start Workout is implemented and validated. Today resolves the active routine's local-day session, previews
+its exercises and planned set counts, permits an alternate executable session without changing the
+plan, snapshots the selected prescription, and supports persistent resume and confirmed discard.
+Backend, migration, and static frontend validation pass, and the product owner completed the final
+manual UI verification.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -47,6 +53,7 @@ authenticated Playwright coverage at 360, 390, and 430 px.
 * F10 — Routine Schedule
 * F11 — Active Routine
 * F12 — Mobile-first UI System and Phase 1 UX Refresh
+* F13 — Start Workout
 
 ## Skipped Features
 
@@ -54,8 +61,8 @@ authenticated Playwright coverage at 360, 390, and 430 px.
 
 ## Next Feature
 
-Phase 2 — Workout Tracking is next. Start Workout is the next appropriate feature and remains to be
-specified.
+Select and specify the next Phase 2 feature from the roadmap's Live workout and Set tracking areas.
+Its exact boundary should be discussed before assigning a feature number or writing its specification.
 
 ## Existing Feature Specifications
 
@@ -71,6 +78,7 @@ specified.
 * `harness/features/10_routine_schedule.md`
 * `harness/features/11_active_routine.md`
 * `harness/features/12_mobile_ui_system.md` (completed)
+* `harness/features/13_start_workout.md` (completed)
 
 ## Current Technology
 
@@ -87,7 +95,8 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (177 backend tests) / focused authenticated Playwright coverage introduced by F12
+pytest (187 backend tests) / existing F12 Playwright infrastructure retained but deferred as a
+completion gate for current MVP features under DEC-019
 
 Code Quality:
 Backend: Ruff (lint + format), mypy (type checking)

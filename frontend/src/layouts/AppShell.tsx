@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, Dumbbell, LayoutList, User } from "lucide-react";
+import { ChevronLeft, CalendarCheck, Dumbbell, LayoutList, User } from "lucide-react";
 import IconButton from "../ui/IconButton";
 import styles from "./AppShell.module.css";
 
@@ -11,6 +11,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { label: "Today", path: "/today", icon: <CalendarCheck className={styles.navIcon} /> },
   { label: "Plan", path: "/plan", icon: <LayoutList className={styles.navIcon} /> },
   { label: "Exercises", path: "/exercises", icon: <Dumbbell className={styles.navIcon} /> },
   { label: "Profile", path: "/profile", icon: <User className={styles.navIcon} /> },
@@ -46,6 +47,8 @@ export default function AppShell() {
   const navigate = useNavigate();
 
   const isActive = (path: string) => {
+    if (path === "/today")
+      return location.pathname === "/today" || location.pathname.startsWith("/workouts");
     if (path === "/plan") return location.pathname.startsWith("/plan");
     if (path === "/exercises") return location.pathname.startsWith("/exercises");
     if (path === "/profile") return location.pathname.startsWith("/profile");

@@ -12,6 +12,7 @@ from app.api.health import router as health_router
 from app.api.routines import router as routines_router
 from app.api.schedule import router as schedule_router
 from app.api.training_days import router as training_days_router
+from app.api.workouts import router as workouts_router
 from app.config import get_config
 
 logging.basicConfig(level=logging.INFO)
@@ -37,3 +38,4 @@ app.include_router(routines_router, prefix="/api")
 app.include_router(training_days_router, prefix="/api")
 app.include_router(exercise_config_router, prefix="/api")
 app.include_router(schedule_router, prefix="/api")
+app.include_router(workouts_router)

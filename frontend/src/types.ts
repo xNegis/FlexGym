@@ -119,8 +119,116 @@ interface ConfiguredExercise {
   updated_at: string;
 }
 
+interface SessionPreviewExercise {
+  position: number;
+  name: string;
+  set_count: number;
+}
+
+interface SessionPreview {
+  id: number;
+  name: string;
+  week_position: number;
+  exercise_count: number;
+  set_count: number;
+  can_start: boolean;
+  exercises: SessionPreviewExercise[];
+}
+
+interface ActiveWorkoutSummary {
+  id: number;
+  routine_name: string;
+  selected_training_day_name: string;
+  local_date: string;
+  started_at: string;
+  status: string;
+  selection_kind: string;
+}
+
+type StartContextState = "active_workout" | "no_active_routine" | "rest_day" | "scheduled_session";
+
+interface StartContextBase {
+  state: StartContextState;
+}
+
+interface StartContextActiveWorkout extends StartContextBase {
+  state: "active_workout";
+  workout: ActiveWorkoutSummary;
+}
+
+interface StartContextNoActiveRoutine extends StartContextBase {
+  state: "no_active_routine";
+}
+
+interface StartContextRestDay extends StartContextBase {
+  state: "rest_day";
+  routine: { routine_id: number; routine_name: string };
+  week_position: number;
+  weekday: string;
+  session_previews: SessionPreview[];
+}
+
+interface StartContextScheduledSession extends StartContextBase {
+  state: "scheduled_session";
+  routine: { routine_id: number; routine_name: string };
+  session: SessionPreview;
+  session_previews: SessionPreview[];
+}
+
+type StartContext =
+  | StartContextActiveWorkout
+  | StartContextNoActiveRoutine
+  | StartContextRestDay
+  | StartContextScheduledSession;
+
+interface WorkoutPlannedSetSnapshot {
+  position: number;
+  target_value: number;
+  target_weight_kg: number | null;
+  target_rir: number | null;
+  tempo: ConfiguredSetTempo | null;
+  rest_after_set_seconds: number | null;
+  notes: string | null;
+}
+
+interface WorkoutExerciseSnapshot {
+  position: number;
+  source_exercise_id: number | null;
+  exercise_slug: string;
+  exercise_name: string;
+  target_type: string;
+  rest_after_exercise_seconds: number | null;
+  notes: string | null;
+  planned_sets: WorkoutPlannedSetSnapshot[];
+}
+
+interface WorkoutSession {
+  id: number;
+  routine_name: string;
+  local_date: string;
+  scheduled_week_position: number;
+  scheduled_slot_was_rest: boolean;
+  scheduled_training_day_id: number | null;
+  scheduled_training_day_name: string | null;
+  selected_training_day_id: number;
+  selected_training_day_name: string;
+  selected_week_position: number;
+  selection_kind: string;
+  status: string;
+  started_at: string;
+  cancelled_at: string | null;
+  exercises: WorkoutExerciseSnapshot[];
+}
+
+interface ActiveWorkoutConflict {
+  detail: string;
+  active_workout: ActiveWorkoutSummary | null;
+}
+
 export {
   type ActiveRoutine,
+  type ActiveWorkoutConflict,
+  type ActiveWorkoutSummary,
   type AuthScreen,
   type ConfiguredExercise,
   type ConfiguredSet,
@@ -135,6 +243,13 @@ export {
   type ScheduleSlotType,
   type ScheduleTrainingSlot,
   type Section,
+  type SessionPreview,
+  type SessionPreviewExercise,
+  type StartContext,
+  type StartContextState,
   type TrainingDay,
   type User,
+  type WorkoutExerciseSnapshot,
+  type WorkoutPlannedSetSnapshot,
+  type WorkoutSession,
 };

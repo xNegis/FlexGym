@@ -128,6 +128,12 @@ status, validation field, enum, or boundary. If frontend or end-to-end tests are
 deferred, state which error scenarios must instead be verified through focused manual execution or
 code inspection; do not mark them validated solely because backend tests and TypeScript checks pass.
 
+During the current MVP, DEC-019 defers Playwright and other automated browser/end-to-end coverage.
+Feature specifications must not require new Playwright tests. They must instead define focused
+manual UI validation for the relevant responsive, keyboard, focus, navigation, request, empty,
+pending, unavailable, error, and confirmation states. Existing browser-test infrastructure is not
+a feature-completion gate.
+
 ## Out of Scope
 
 Explicitly state functionality that might appear related but belongs to another feature or roadmap phase.

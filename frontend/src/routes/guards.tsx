@@ -57,7 +57,7 @@ export function RedirectIfAuthenticated({ children }: RequireAuthProps) {
   }
 
   if (status === "authenticated") {
-    return <Navigate to="/plan" replace />;
+    return <Navigate to="/today" replace />;
   }
 
   if (status === "onboarding") {
@@ -87,7 +87,7 @@ export function RedirectToOnboarding({ children }: RequireAuthProps) {
   }
 
   if (status === "authenticated") {
-    return <Navigate to="/plan" replace />;
+    return <Navigate to="/today" replace />;
   }
 
   return <>{children}</>;
