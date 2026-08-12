@@ -88,6 +88,7 @@ def _execution_error_to_http(error: str) -> tuple[int, str]:
     mapping = {
         "Workout not found": (404, "Workout not found"),
         "Workout is not active": (409, "Workout is not active"),
+        "Workout has unresolved sets": (409, "Workout has unresolved sets"),
         "Workout exercise not found": (404, "Workout exercise not found"),
         "Workout set not found": (404, "Workout set not found"),
         "Exercise is already started": (409, "Exercise is already started"),
@@ -256,6 +257,30 @@ def cancel_workout(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to cancel workout",
         )
+
+    return workout_service._build_workout_response(workout)
+
+
+# ────────────────── F17 completion endpoint ──────────────────
+
+
+@router.post("/api/workouts/{workout_id}/complete")
+def complete_workout(
+    workout_id: int,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if workout_id <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "workout_id must be a positive integer"}],
+        )
+
+    try:
+        workout = workout_service.complete_workout(session, user.id, workout_id)
+    except workout_service.ExecutionError as e:
+        code, detail = _execution_error_to_http(str(e))
+        raise HTTPException(status_code=code, detail=detail)
 
     return workout_service._build_workout_response(workout)
 

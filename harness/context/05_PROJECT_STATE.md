@@ -5,7 +5,7 @@
 ## Current Phase
 
 Phase 0 — Foundation and Phase 1 — Training Planning are completed successfully. Phase 2 — Workout
-Tracking is in progress with F15 and F15.1 completed.
+Tracking is in progress with F13 through F15.1 and F17 completed.
 
 ## Current Status
 
@@ -59,6 +59,14 @@ F15.1 — Pain or Discomfort Skip Reason is implemented and validated. Set and e
 the stable `pain_or_discomfort` reason with optional notes. The migration preserves existing
 exception/event history, and the configured local database is at repository head.
 
+F17 — Workout Completion is implemented and validated. An owned, currently active workout with
+every planned set performed or explicitly skipped can be deliberately finished through a confirmed
+dialog, atomically persisting `completed` status, a server-owned `completed_at`, a contiguous
+`workout_completed` event, and release of the matching active association. The canonical workout URL
+immediately renders a read-only summary with wall-clock duration, performed/skipped/total counts,
+and compact ordered exercise results, while Today returns to normal start behaviour. Completed
+workouts reject all live mutations and the configured local database is at repository head.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -77,6 +85,7 @@ exception/event history, and the configured local database is at repository head
 * F14.2 — Explicit Set Start and Accurate Set Timing
 * F15 — Workout Exceptions and Feedback
 * F15.1 — Pain or Discomfort Skip Reason
+* F17 — Workout Completion
 
 ## Skipped Features
 
@@ -85,7 +94,7 @@ exception/event history, and the configured local database is at repository head
 
 ## Next Feature
 
-F17 — Workout Completion.
+F18 — Workout History.
 
 ## Existing Feature Specifications
 
@@ -107,6 +116,7 @@ F17 — Workout Completion.
 * `harness/features/15_workout_exceptions_and_feedback.md` (completed)
 * `harness/features/15_1_pain_or_discomfort_skip_reason.md` (completed corrective follow-up)
 * `harness/features/16_discomfort_and_pain_reporting.md` (intentionally omitted from current MVP)
+* `harness/features/17_workout_completion.md` (completed)
 
 ## Current Technology
 
@@ -123,7 +133,7 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (240 backend tests) / existing F12 Playwright infrastructure retained but deferred as a
+pytest (251 backend tests) / existing F12 Playwright infrastructure retained but deferred as a
 completion gate for current MVP features under DEC-019
 
 Code Quality:

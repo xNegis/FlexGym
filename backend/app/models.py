@@ -321,6 +321,7 @@ class WorkoutSession(Base):
         DateTime, nullable=False, default=datetime.datetime.utcnow
     )
     cancelled_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
 
     active_workout: Mapped["ActiveWorkout | None"] = relationship(
         "ActiveWorkout",
@@ -350,7 +351,7 @@ class WorkoutSession(Base):
     __table_args__ = (
         UniqueConstraint("id", "user_id", name="uq_workout_session_id_user_id"),
         CheckConstraint(
-            "status IN ('in_progress', 'cancelled')",
+            "status IN ('in_progress', 'cancelled', 'completed')",
             name="ck_workout_sessions_status",
         ),
         CheckConstraint(
@@ -370,8 +371,9 @@ class WorkoutSession(Base):
             name="ck_workout_sessions_scheduled_slot_was_rest",
         ),
         CheckConstraint(
-            "(status = 'in_progress' AND cancelled_at IS NULL) OR "
-            "(status = 'cancelled' AND cancelled_at IS NOT NULL)",
+            "(status = 'in_progress' AND cancelled_at IS NULL AND completed_at IS NULL) OR "
+            "(status = 'cancelled' AND cancelled_at IS NOT NULL AND completed_at IS NULL) OR "
+            "(status = 'completed' AND completed_at IS NOT NULL AND cancelled_at IS NULL)",
             name="ck_workout_sessions_status_timestamp",
         ),
         CheckConstraint(
@@ -588,7 +590,7 @@ class WorkoutEvent(Base):
             "event_type IN ("
             "'workout_started','exercise_started','set_started',"
             "'set_completed','set_updated','set_marked_incomplete',"
-            "'exercise_completed','workout_cancelled',"
+            "'exercise_completed','workout_cancelled','workout_completed',"
             "'set_skipped','set_skip_reverted',"
             "'exercise_skipped','exercise_skip_reverted'"
             ")",

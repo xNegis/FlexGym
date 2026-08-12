@@ -421,7 +421,7 @@ def test_f13_migration_fresh_schema_and_safe_rerun(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f13_fresh.db').as_posix()}"
     _run_alembic(database_url, "upgrade", "head")
     _run_alembic(database_url, "upgrade", "head")
-    assert "f15_1_pain_reason" in _run_alembic(database_url, "current").stdout
+    assert "f17_completion" in _run_alembic(database_url, "current").stdout
 
     engine = create_engine(database_url)
     schema = inspect(engine)
@@ -1266,7 +1266,7 @@ def test_f14_2_migration_upgrade_and_legacy_timing(tmp_path: Path) -> None:
 def test_f14_2_migration_fresh_and_rerun(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f14_2_fresh.db').as_posix()}"
     _run_alembic(database_url, "upgrade", "head")
-    assert "f15_1_pain_reason" in _run_alembic(database_url, "current").stdout
+    assert "f17_completion" in _run_alembic(database_url, "current").stdout
     _run_alembic(database_url, "upgrade", "head")
 
     engine = create_engine(database_url)
@@ -1878,7 +1878,7 @@ def test_f15_migration_fresh_and_upgrade(tmp_path: Path) -> None:
     _run_alembic(database_url, "upgrade", "head")
     _run_alembic(database_url, "upgrade", "head")
 
-    assert "f15_1_pain_reason" in _run_alembic(database_url, "current").stdout
+    assert "f17_completion" in _run_alembic(database_url, "current").stdout
 
     engine = create_engine(database_url)
     schema = inspect(engine)
@@ -1953,7 +1953,87 @@ def test_f15_1_upgrade_preserves_exceptions_and_accepts_pain_reason(tmp_path: Pa
     _run_alembic(database_url, "upgrade", "f15_exceptions")
 
     engine = create_engine(database_url, connect_args={"check_same_thread": False})
-    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO users (id, email, password_hash, created_at) VALUES "
+                "(9001, 'legacy-exception@example.com', 'hash', CURRENT_TIMESTAMP)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO workout_sessions "
+                "(id, user_id, source_routine_id, source_training_day_id, routine_name, "
+                "local_date, scheduled_week_position, scheduled_slot_was_rest, "
+                "scheduled_training_day_id, scheduled_training_day_name, "
+                "selected_training_day_id, selected_training_day_name, selected_week_position, "
+                "selection_kind, status, started_at, cancelled_at) VALUES "
+                "(9001, 9001, NULL, NULL, 'Legacy Plan', '2026-08-10', 1, 0, 1, 'Push', "
+                "1, 'Push', 1, 'scheduled', 'in_progress', '2026-08-10 09:00:00', NULL)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO workout_exercises "
+                "(id, workout_session_id, position, source_exercise_id, exercise_slug, "
+                "exercise_name, target_type, rest_after_exercise_seconds, notes, instructions) "
+                "VALUES (9001, 9001, 1, NULL, 'legacy-ex', 'Legacy Exercise', 'repetitions', "
+                "NULL, NULL, NULL)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO workout_planned_sets "
+                "(id, workout_exercise_id, position, target_value, target_weight_kg, target_rir, "
+                "eccentric_seconds, stretched_pause_seconds, concentric_seconds, "
+                "peak_contraction_seconds, rest_after_set_seconds, notes) VALUES "
+                "(9001, 9001, 1, 10, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO workout_exceptions "
+                "(id, workout_session_id, workout_exercise_id, workout_planned_set_id, scope, "
+                "reason_code, note, occurred_at) VALUES "
+                "(9001, 9001, 9001, 9001, 'set', 'too_fatigued', 'Existing fact', "
+                "'2026-08-10 09:05:00')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO workout_events "
+                "(id, workout_session_id, sequence, event_type, workout_exercise_id, "
+                "workout_planned_set_id, workout_exception_id, occurred_at) VALUES "
+                "(9001, 9001, 1, 'workout_started', NULL, NULL, NULL, '2026-08-10 09:00:00')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO workout_events "
+                "(id, workout_session_id, sequence, event_type, workout_exercise_id, "
+                "workout_planned_set_id, workout_exception_id, occurred_at) VALUES "
+                "(9002, 9001, 2, 'set_skipped', 9001, 9001, 9001, '2026-08-10 09:05:00')"
+            )
+        )
+    engine.dispose()
+
+    _run_alembic(database_url, "upgrade", "head")
+
+    engine2 = create_engine(database_url, connect_args={"check_same_thread": False})
+    with engine2.connect() as connection:
+        note = connection.execute(
+            text("SELECT note FROM workout_exceptions WHERE id = 9001")
+        ).scalar_one()
+        assert note == "Existing fact"
+        event_type, exception_id = connection.execute(
+            text("SELECT event_type, workout_exception_id FROM workout_events WHERE id = 9002")
+        ).one()
+        assert event_type == "set_skipped"
+        assert exception_id == 9001
+        assert connection.execute(text("PRAGMA integrity_check")).scalar_one() == "ok"
+        assert connection.execute(text("PRAGMA foreign_key_check")).all() == []
+
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine2)
 
     def override_get_session() -> Generator[Session, None, None]:
         session = session_factory()
@@ -1969,28 +2049,6 @@ def test_f15_1_upgrade_preserves_exceptions_and_accepts_pain_reason(tmp_path: Pa
             _, day_id = _ready_plan_multi_sets(migrated_client, token, set_count=2)
             workout = _start(migrated_client, token, day_id).json()
             _start_exercise(migrated_client, token, workout["id"], 1)
-            before = _skip_set(
-                migrated_client,
-                token,
-                workout["id"],
-                1,
-                1,
-                reason_code="too_fatigued",
-                note="Existing fact",
-            ).json()
-            before_event = before["events"][-1]
-
-        _run_alembic(database_url, "upgrade", "head")
-
-        with TestClient(app) as migrated_client:
-            migrated_client.cookies.set("access_token", token)
-            preserved = migrated_client.get(
-                f"/api/workouts/{workout['id']}", headers=_headers(token)
-            ).json()
-            assert preserved["events"][-1] == before_event
-            assert preserved["exercises"][0]["planned_sets"][0]["exception"]["note"] == (
-                "Existing fact"
-            )
             pain = _skip_exercise(
                 migrated_client,
                 token,
@@ -2000,10 +2058,342 @@ def test_f15_1_upgrade_preserves_exceptions_and_accepts_pain_reason(tmp_path: Pa
             )
             assert pain.status_code == 200, pain.text
             assert pain.json()["exercises"][0]["exception"]["reason_code"] == "pain_or_discomfort"
-
-        with engine.connect() as connection:
-            assert connection.execute(text("PRAGMA integrity_check")).scalar_one() == "ok"
-            assert connection.execute(text("PRAGMA foreign_key_check")).all() == []
     finally:
         app.dependency_overrides.clear()
-        engine.dispose()
+        engine2.dispose()
+
+
+# ────────────────── F17 completion helpers ──────────────────
+
+
+def _complete_workout(client: TestClient, token: str, workout_id: int) -> Any:
+    return client.post(f"/api/workouts/{workout_id}/complete", headers=_headers(token))
+
+
+# ────────────────── F17 completion tests ──────────────────
+
+
+def test_complete_all_performed_workout(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan(client, token)
+    workout = _start(client, token, day_id).json()
+    workout_id = workout["id"]
+
+    _start_exercise(client, token, workout_id, 1)
+    _complete(client, token, workout_id, 1, 1)
+
+    response = _complete_workout(client, token, workout_id)
+    assert response.status_code == 200, response.text
+    completed = response.json()
+
+    assert completed["status"] == "completed"
+    assert completed["completed_at"] is not None
+    assert completed["cancelled_at"] is None
+    assert completed["duration_seconds"] is not None
+    assert completed["duration_seconds"] >= 0
+    assert isinstance(completed["duration_seconds"], int)
+
+    assert completed["resume_url"] is None
+    assert completed["current_exercise_position"] is None
+    assert completed["current_set_position"] is None
+    assert completed["current_set_phase"] is None
+    assert completed["current_set_started_at"] is None
+    assert completed["transition_to_exercise_position"] is None
+
+    assert completed["completed_set_count"] == 1
+    assert completed["skipped_set_count"] == 0
+    assert completed["all_sets_resolved"] is True
+    assert completed["all_sets_recorded"] is True
+
+    events = completed["events"]
+    assert events[-1]["event_type"] == "workout_completed"
+    assert events[-1]["occurred_at"] == completed["completed_at"]
+    assert events[-1]["exercise_position"] is None
+    assert events[-1]["set_position"] is None
+    assert events[-1]["exception"] is None
+
+    assert client.get("/api/workouts/active", headers=_headers(token)).json() is None
+
+
+def test_complete_mixed_performed_and_skipped(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    workout_id = workout["id"]
+
+    _start_exercise(client, token, workout_id, 1)
+    _complete(client, token, workout_id, 1, 1)
+    _skip_set(client, token, workout_id, 1, 2)
+
+    response = _complete_workout(client, token, workout_id)
+    assert response.status_code == 200, response.text
+    completed = response.json()
+
+    assert completed["status"] == "completed"
+    assert completed["completed_set_count"] == 1
+    assert completed["skipped_set_count"] == 1
+    assert completed["total_set_count"] == 2
+    assert completed["all_sets_resolved"] is True
+    assert completed["all_sets_recorded"] is False
+
+    exercise = completed["exercises"][0]
+    assert exercise["execution_status"] == "partial"
+    assert exercise["planned_sets"][0]["performance"] is not None
+    assert exercise["planned_sets"][1]["exception"] is not None
+
+
+def test_complete_all_skipped_workout(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    workout_id = workout["id"]
+
+    _start_exercise(client, token, workout_id, 1)
+    _skip_set(client, token, workout_id, 1, 1)
+    _skip_set(client, token, workout_id, 1, 2)
+
+    response = _complete_workout(client, token, workout_id)
+    assert response.status_code == 200, response.text
+    completed = response.json()
+
+    assert completed["status"] == "completed"
+    assert completed["completed_set_count"] == 0
+    assert completed["skipped_set_count"] == 2
+    assert completed["all_sets_resolved"] is True
+    assert completed["all_sets_recorded"] is False
+    assert completed["exercises"][0]["execution_status"] == "skipped"
+
+
+def test_complete_unresolved_workout_rejected_atomically(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan(client, token)
+    workout = _start(client, token, day_id).json()
+    workout_id = workout["id"]
+
+    response = _complete_workout(client, token, workout_id)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Workout has unresolved sets"
+
+    preserved = client.get(f"/api/workouts/{workout_id}", headers=_headers(token)).json()
+    assert preserved["status"] == "in_progress"
+    assert preserved["completed_at"] is None
+    assert preserved["duration_seconds"] is None
+    assert client.get("/api/workouts/active", headers=_headers(token)).json()["id"] == workout_id
+    assert all(e["event_type"] != "workout_completed" for e in preserved["events"])
+
+
+def test_complete_rejects_cancelled_and_repeated(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan(client, token)
+    workout = _start(client, token, day_id).json()
+    workout_id = workout["id"]
+
+    _start_exercise(client, token, workout_id, 1)
+    _complete(client, token, workout_id, 1, 1)
+    assert _complete_workout(client, token, workout_id).status_code == 200
+
+    repeated = _complete_workout(client, token, workout_id)
+    assert repeated.status_code == 409
+    assert repeated.json()["detail"] == "Workout is not active"
+
+    cancelled = _start(client, token, day_id).json()
+    assert cancelled["selection_kind"] == "scheduled"
+    client.post(f"/api/workouts/{cancelled['id']}/cancel", headers=_headers(token))
+    assert _complete_workout(client, token, cancelled["id"]).status_code == 409
+
+
+def test_completed_workout_rejects_all_live_mutations(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_exercises(client, token)
+    workout = _start(client, token, day_id).json()
+    workout_id = workout["id"]
+
+    _start_exercise(client, token, workout_id, 1)
+    _complete(client, token, workout_id, 1, 1)
+    _start_exercise(client, token, workout_id, 2)
+    _complete(client, token, workout_id, 2, 1)
+    assert _complete_workout(client, token, workout_id).status_code == 200
+
+    start_resp = _start_exercise(client, token, workout_id, 2)
+    assert start_resp.status_code == 409
+    assert start_resp.json()["detail"] == "Workout is not active"
+
+    assert _start_set(client, token, workout_id, 1, 1).status_code == 409
+    assert _complete(client, token, workout_id, 1, 1).status_code == 409
+    assert _skip_set(client, token, workout_id, 1, 1).status_code == 409
+    assert _skip_exercise(client, token, workout_id, 1).status_code == 409
+    assert _undo_set_skip(client, token, workout_id, 1, 1).status_code == 409
+    assert (
+        client.post(f"/api/workouts/{workout_id}/cancel", headers=_headers(token)).status_code
+        == 409
+    )
+
+    completed = client.get(f"/api/workouts/{workout_id}", headers=_headers(token)).json()
+    assert completed["status"] == "completed"
+    assert completed["exercises"][0]["planned_sets"][0]["performance"] is not None
+
+
+def test_completion_releases_active_and_allows_new_start(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan(client, token)
+    workout = _start(client, token, day_id).json()
+    workout_id = workout["id"]
+
+    _start_exercise(client, token, workout_id, 1)
+    _complete(client, token, workout_id, 1, 1)
+    assert _complete_workout(client, token, workout_id).status_code == 200
+
+    context = client.get(
+        "/api/workouts/start-context?local_date=2026-08-10", headers=_headers(token)
+    ).json()
+    assert context["state"] == "scheduled_session"
+
+    second = _start(client, token, day_id)
+    assert second.status_code == 201, second.text
+    assert second.json()["id"] != workout_id
+
+
+def test_complete_ownership_authentication_and_path(client: TestClient) -> None:
+    owner, _ = _register(client, "complete-owner@example.com")
+    other, _ = _register(client, "complete-other@example.com")
+    _, day_id = _ready_plan(client, owner)
+    workout = _start(client, owner, day_id).json()
+    workout_id = workout["id"]
+    _start_exercise(client, owner, workout_id, 1)
+    _complete(client, owner, workout_id, 1, 1)
+
+    assert _complete_workout(client, other, workout_id).status_code == 404
+
+    assert client.post("/api/workouts/0/complete", headers=_headers(owner)).status_code == 422
+    assert client.post("/api/workouts/9999/complete", headers=_headers(owner)).status_code == 404
+
+    client.cookies.clear()
+    assert client.post("/api/workouts/1/complete").status_code == 401
+
+
+# ────────────────── F17 migration validation ──────────────────
+
+
+def test_f17_migration_fresh_and_upgrade(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'f17_fresh.db').as_posix()}"
+    _run_alembic(database_url, "upgrade", "head")
+    assert "f17_completion" in _run_alembic(database_url, "current").stdout
+    _run_alembic(database_url, "upgrade", "head")
+
+    engine = create_engine(database_url)
+    schema = inspect(engine)
+    workout_columns = {c["name"] for c in schema.get_columns("workout_sessions")}
+    assert "completed_at" in workout_columns
+    workout_checks = {c["name"] for c in schema.get_check_constraints("workout_sessions")}
+    assert "ck_workout_sessions_status" in workout_checks
+    assert "ck_workout_sessions_status_timestamp" in workout_checks
+    event_checks = {c["name"] for c in schema.get_check_constraints("workout_events")}
+    assert "ck_workout_events_event_type" in event_checks
+    with engine.connect() as connection:
+        assert connection.execute(text("PRAGMA integrity_check")).scalar_one() == "ok"
+        assert connection.execute(text("PRAGMA foreign_key_check")).all() == []
+    engine.dispose()
+
+    upgrade_db = f"sqlite:///{(tmp_path / 'f17_upgrade.db').as_posix()}"
+    _run_alembic(upgrade_db, "upgrade", "f15_1_pain_reason")
+
+    upgrade_engine = create_engine(upgrade_db, connect_args={"check_same_thread": False})
+    with upgrade_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO users (id, email, password_hash, created_at) VALUES "
+                "(9001, 'legacy-complete@example.com', 'hash', CURRENT_TIMESTAMP)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO workout_sessions "
+                "(id, user_id, source_routine_id, source_training_day_id, routine_name, "
+                "local_date, scheduled_week_position, scheduled_slot_was_rest, "
+                "scheduled_training_day_id, scheduled_training_day_name, "
+                "selected_training_day_id, selected_training_day_name, selected_week_position, "
+                "selection_kind, status, started_at, cancelled_at) VALUES "
+                "(9001, 9001, NULL, NULL, 'Legacy Plan', '2026-08-10', 1, 0, 1, 'Push', "
+                "1, 'Push', 1, 'scheduled', 'in_progress', '2026-08-10 09:00:00', NULL)"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO workout_sessions "
+                "(id, user_id, source_routine_id, source_training_day_id, routine_name, "
+                "local_date, scheduled_week_position, scheduled_slot_was_rest, "
+                "scheduled_training_day_id, scheduled_training_day_name, "
+                "selected_training_day_id, selected_training_day_name, selected_week_position, "
+                "selection_kind, status, started_at, cancelled_at) VALUES "
+                "(9002, 9001, NULL, NULL, 'Legacy Plan', '2026-08-11', 2, 1, NULL, NULL, "
+                "1, 'Push', 1, 'alternate', 'cancelled', '2026-08-11 09:00:00', "
+                "'2026-08-11 09:20:00')"
+            )
+        )
+        conn.execute(
+            text("INSERT INTO active_workouts (user_id, workout_session_id) VALUES (9001, 9001)")
+        )
+        conn.execute(
+            text(
+                "INSERT INTO workout_events "
+                "(id, workout_session_id, sequence, event_type, workout_exercise_id, "
+                "workout_planned_set_id, workout_exception_id, occurred_at) VALUES "
+                "(9001, 9001, 1, 'workout_started', NULL, NULL, NULL, '2026-08-10 09:00:00')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO workout_events "
+                "(id, workout_session_id, sequence, event_type, workout_exercise_id, "
+                "workout_planned_set_id, workout_exception_id, occurred_at) VALUES "
+                "(9002, 9002, 1, 'workout_started', NULL, NULL, NULL, '2026-08-11 09:00:00')"
+            )
+        )
+    upgrade_engine.dispose()
+
+    _run_alembic(upgrade_db, "upgrade", "head")
+
+    upgrade_engine2 = create_engine(upgrade_db, connect_args={"check_same_thread": False})
+    with upgrade_engine2.connect() as conn:
+        rows = conn.execute(
+            text("SELECT id, status, cancelled_at, completed_at FROM workout_sessions ORDER BY id")
+        ).fetchall()
+        assert len(rows) == 2
+        by_id = {row[0]: row for row in rows}
+        assert by_id[9001][1] == "in_progress"
+        assert by_id[9001][2] is None
+        assert by_id[9001][3] is None
+        assert by_id[9002][1] == "cancelled"
+        assert by_id[9002][2] is not None
+        assert by_id[9002][3] is None
+        active = conn.execute(
+            text("SELECT workout_session_id FROM active_workouts WHERE user_id = 9001")
+        ).scalar_one()
+        assert active == 9001
+        event_count = conn.execute(text("SELECT COUNT(*) FROM workout_events")).scalar_one()
+        assert event_count == 2
+
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=upgrade_engine2)
+
+    def override_get_session() -> Generator[Session, None, None]:
+        s = session_factory()
+        try:
+            yield s
+        finally:
+            s.close()
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        with TestClient(app) as migrated_client:
+            token, _ = _register(migrated_client, "migration-f17@example.com")
+            _, day_id = _ready_plan(migrated_client, token, "Migrated Completion Plan")
+            workout_id = _start(migrated_client, token, day_id).json()["id"]
+            _start_exercise(migrated_client, token, workout_id, 1)
+            _complete(migrated_client, token, workout_id, 1, 1)
+            completed = _complete_workout(migrated_client, token, workout_id)
+            assert completed.status_code == 200, completed.text
+            assert completed.json()["status"] == "completed"
+            assert completed.json()["duration_seconds"] is not None
+    finally:
+        app.dependency_overrides.clear()
+        upgrade_engine2.dispose()

@@ -1723,6 +1723,7 @@ function isWorkoutSession(value: unknown): value is WorkoutSession {
           "set_marked_incomplete",
           "exercise_completed",
           "workout_cancelled",
+          "workout_completed",
           "set_skipped",
           "set_skip_reverted",
           "exercise_skipped",
@@ -1765,10 +1766,15 @@ function isWorkoutSession(value: unknown): value is WorkoutSession {
     typeof v.selection_kind === "string" &&
     ["scheduled", "alternate"].includes(v.selection_kind) &&
     typeof v.status === "string" &&
-    ["in_progress", "cancelled"].includes(v.status) &&
+    ["in_progress", "cancelled", "completed"].includes(v.status) &&
     typeof v.started_at === "string" &&
     v.started_at.length > 0 &&
     (v.cancelled_at === null || typeof v.cancelled_at === "string") &&
+    (v.completed_at === null || typeof v.completed_at === "string") &&
+    (v.duration_seconds === null ||
+      (typeof v.duration_seconds === "number" &&
+        Number.isInteger(v.duration_seconds) &&
+        v.duration_seconds >= 0)) &&
     typeof v.server_now === "string" &&
     v.server_now.length > 0 &&
     typeof v.completed_set_count === "number" &&
@@ -1799,8 +1805,8 @@ function isWorkoutSession(value: unknown): value is WorkoutSession {
       (typeof v.transition_to_exercise_position === "number" &&
         Number.isInteger(v.transition_to_exercise_position) &&
         v.transition_to_exercise_position >= 1)) &&
-    typeof v.resume_url === "string" &&
-    v.resume_url.startsWith(`/workouts/${v.id}`) &&
+    (v.resume_url === null ||
+      (typeof v.resume_url === "string" && v.resume_url.startsWith(`/workouts/${v.id}`))) &&
     eventsOk &&
     Array.isArray(v.exercises) &&
     v.exercises.length >= 1 &&
@@ -1931,6 +1937,29 @@ export async function cancelWorkout(workoutId: number): Promise<CancelWorkoutRes
   }
   if (!response.ok) {
     return { detail: safeErrorDetail(result, response.status, "Unable to discard workout") };
+  }
+  if (!isWorkoutSession(result)) {
+    throw new Error("Invalid workout response");
+  }
+  return result;
+}
+
+export type CompleteWorkoutResult = WorkoutSession | { notFound: true } | { detail: string };
+
+export async function completeWorkout(workoutId: number): Promise<CompleteWorkoutResult> {
+  const response = await fetch(`${API_BASE_URL}/api/workouts/${workoutId}/complete`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (response.status === 404) {
+    return { notFound: true };
+  }
+  if (!response.ok) {
+    return { detail: safeErrorDetail(result, response.status, "Unable to finish workout") };
   }
   if (!isWorkoutSession(result)) {
     throw new Error("Invalid workout response");

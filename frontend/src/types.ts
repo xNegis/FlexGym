@@ -263,6 +263,8 @@ interface WorkoutSession {
   status: string;
   started_at: string;
   cancelled_at: string | null;
+  completed_at: string | null;
+  duration_seconds: number | null;
   exercises: WorkoutExerciseSnapshot[];
   server_now: string;
   completed_set_count: number;

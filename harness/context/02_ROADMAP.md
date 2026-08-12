@@ -103,6 +103,7 @@ Current intended sequence:
 * F16 — Discomfort and Pain Reporting (intentionally omitted from the current MVP)
 * F17 — Workout Completion
 * F18 — Workout History
+* F19 — Dockerise App. Prepare environment variables
 
 F14 introduces the core one-tap execution timeline: review the started workout, start each exercise,
 accept planned set values as performed or adjust them, record each set while advancing, time planned

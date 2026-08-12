@@ -1007,6 +1007,11 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
     server_now = datetime.datetime.utcnow()
     events = list(workout.events) if workout.events else []
     active_exceptions = _get_active_exceptions(workout)
+    is_completed = workout.status == "completed"
+
+    duration_seconds: int | None = None
+    if workout.completed_at is not None and workout.started_at is not None:
+        duration_seconds = max(0, int((workout.completed_at - workout.started_at).total_seconds()))
 
     exercises: list[dict[str, object]] = []
     for we in workout.exercises:
@@ -1160,18 +1165,24 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
         "status": workout.status,
         "started_at": workout.started_at.isoformat(),
         "cancelled_at": workout.cancelled_at.isoformat() if workout.cancelled_at else None,
+        "completed_at": workout.completed_at.isoformat() if workout.completed_at else None,
+        "duration_seconds": duration_seconds,
         "server_now": server_now.isoformat(),
         "completed_set_count": progress["completed_set_count"],
         "skipped_set_count": progress["skipped_set_count"],
         "total_set_count": progress["total_set_count"],
         "all_sets_recorded": progress["all_sets_recorded"],
         "all_sets_resolved": progress["all_sets_resolved"],
-        "current_exercise_position": progress["current_exercise_position"],
-        "current_set_position": progress["current_set_position"],
-        "current_set_phase": progress["current_set_phase"],
-        "current_set_started_at": progress["current_set_started_at"],
-        "transition_to_exercise_position": progress["transition_to_exercise_position"],
-        "resume_url": resume_url,
+        "current_exercise_position": (
+            None if is_completed else progress["current_exercise_position"]
+        ),
+        "current_set_position": None if is_completed else progress["current_set_position"],
+        "current_set_phase": None if is_completed else progress["current_set_phase"],
+        "current_set_started_at": None if is_completed else progress["current_set_started_at"],
+        "transition_to_exercise_position": (
+            None if is_completed else progress["transition_to_exercise_position"]
+        ),
+        "resume_url": None if is_completed else resume_url,
         "exercises": exercises,
         "events": timeline,
     }
@@ -1194,6 +1205,32 @@ def cancel_workout(session: Session, user_id: int, workout_id: int) -> WorkoutSe
 
     seq = _get_next_event_sequence(session, workout_id)
     _append_event(session, workout_id, seq, "workout_cancelled", now)
+
+    active = session.query(ActiveWorkout).filter(ActiveWorkout.user_id == user_id).first()
+    if active is not None and active.workout_session_id == workout_id:
+        session.delete(active)
+
+    session.commit()
+    session.refresh(workout)
+    return _load_workout_full(session, workout_id)
+
+
+# ────────────────── completion ──────────────────
+
+
+def complete_workout(session: Session, user_id: int, workout_id: int) -> WorkoutSession:
+    workout = _get_active_workout_for_execution(session, user_id, workout_id)
+
+    progress = _derive_progress(workout)
+    if not progress["all_sets_resolved"]:
+        raise ExecutionError("Workout has unresolved sets")
+
+    now = datetime.datetime.utcnow()
+    workout.status = "completed"
+    workout.completed_at = now
+
+    seq = _get_next_event_sequence(session, workout_id)
+    _append_event(session, workout_id, seq, "workout_completed", now)
 
     active = session.query(ActiveWorkout).filter(ActiveWorkout.user_id == user_id).first()
     if active is not None and active.workout_session_id == workout_id:
