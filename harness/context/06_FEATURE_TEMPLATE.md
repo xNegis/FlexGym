@@ -124,12 +124,12 @@ Describe important behavioural tests expected from the implementation.
 Do not require tests merely for achieving arbitrary coverage percentages.
 
 Keep coverage proportional. Prefer one representative failure-path test over a test for every
-status, validation field, enum, or boundary. If frontend or end-to-end tests are intentionally
+status, validation field, enum, or boundary. If frontend or browser-level tests are intentionally
 deferred, state which error scenarios must instead be verified through focused manual execution or
 code inspection; do not mark them validated solely because backend tests and TypeScript checks pass.
 
-During the current MVP, DEC-019 defers Playwright and other automated browser/end-to-end coverage.
-Feature specifications must not require new Playwright tests. They must instead define focused
+During the current MVP, DEC-019 defers automated browser and other automated browser/browser-level coverage.
+Feature specifications must not require new automated browser tests. They must instead define focused
 manual UI validation for the relevant responsive, keyboard, focus, navigation, request, empty,
 pending, unavailable, error, and confirmation states. Existing browser-test infrastructure is not
 a feature-completion gate.

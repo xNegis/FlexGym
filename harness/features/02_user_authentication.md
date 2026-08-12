@@ -177,7 +177,7 @@ cookie attribute. Tests use isolated persistence and do not depend on execution 
 * Refresh tokens, rotation, persisted sessions, revocation, and device/session management.
 * Rate limiting, lockout, bot protection, security auditing, additional CSRF mechanisms, and
   comprehensive production hardening.
-* End-to-end and browser automation tests; these are deferred until the product flows are more
+* Browser-level and browser automation tests; these are deferred until the product flows are more
   stable.
 
 ## Dependencies

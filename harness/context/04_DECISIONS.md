@@ -89,15 +89,15 @@ hardening.
 
 ---
 
-## DEC-008 — Defer end-to-end testing during the early proof of concept
+## DEC-008 — Defer browser-level testing during the early proof of concept
 
 **Status:** Accepted
 
 New features will initially require only a small set of basic backend tests for their essential
-behaviour. Exhaustive variant testing and Playwright end-to-end coverage are deferred until the
+behaviour. Exhaustive variant testing and automated browser browser-level coverage are deferred until the
 main product flows are more stable.
 
-Existing testing infrastructure may remain available, but end-to-end execution is not part of
+Existing testing infrastructure may remain available, but browser-level execution is not part of
 the current feature validation contract.
 
 ---
@@ -304,12 +304,12 @@ variants continue to belong primarily in backend tests.
 
 ---
 
-## DEC-019 — Defer Playwright coverage during the MVP
+## DEC-019 — Defer automated browser coverage during the MVP
 
 **Status:** Accepted
 
-Automated browser and end-to-end coverage is not a completion requirement for F13 or subsequent MVP
-features. New Playwright tests must not be added as part of normal feature delivery during this
+Automated browser and browser-level coverage is not a completion requirement for F13 or subsequent MVP
+features. New automated browser tests must not be added as part of normal feature delivery during this
 stage.
 
 Frontend behaviour is still validated proportionally through static checks, focused parser or unit
@@ -317,7 +317,7 @@ tests when a suitable existing runner is available, and manual execution of the 
 keyboard, focus, navigation, loading, empty, error, pending, unavailable, and confirmation states.
 Backend tests remain required for domain, API, ownership, persistence, and migration behaviour.
 
-The existing Playwright infrastructure and F12 coverage may remain in the repository, but maintaining
+The existing automated browser infrastructure and F12 coverage may remain in the repository, but maintaining
 or executing it is not an MVP feature-completion gate. A later explicit decision may reinstate
 automated browser coverage when the product flows are stable enough to justify its delivery cost.
 

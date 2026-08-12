@@ -343,7 +343,7 @@ Add backend tests covering:
 
 Do not add a test for every field, enum value, validation boundary, timestamp detail, or UI state.
 
-No frontend unit, component, integration, browser, Playwright, or end-to-end tests are required for
+No frontend unit, component, integration, browser, automated browser, or browser-level tests are required for
 F04. Because those tests are deferred, focused manual execution or code inspection must verify:
 
 * Summary labels and optional-value rendering.
@@ -371,7 +371,7 @@ required.
 * Exercise catalogs, routines, workout generation, or training schedules.
 * Deterministic signals, adaptations, AI interpretation, or recommendations.
 * Final application navigation, dashboard design, and full design-system work.
-* Frontend automated or end-to-end testing.
+* Frontend automated or browser-level testing.
 
 ## Dependencies
 

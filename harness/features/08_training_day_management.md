@@ -486,7 +486,7 @@ Add backend tests covering:
 
 Do not add one automated test per name boundary, malformed payload variant, list size, or UI state.
 
-No frontend unit, component, browser, Playwright, or end-to-end tests are required for F08. Because
+No frontend unit, component, browser, automated browser, or browser-level tests are required for F08. Because
 they remain deferred, focused manual execution or code inspection must verify:
 
 * Routine detail loading, empty, populated, and list-failure states.
@@ -516,7 +516,7 @@ required.
 * Routine archiving, recovery, versioning, or change history.
 * Custom exercises or changes to the curated exercise catalog.
 * Workout execution, tracking, feedback, history, analytics, adaptations, or AI reasoning.
-* Frontend automated or end-to-end testing.
+* Frontend automated or browser-level testing.
 
 ## Dependencies
 

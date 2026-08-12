@@ -585,7 +585,7 @@ Focused manual UI validation covers:
   200% zoom, safe areas, reduced motion, and on-screen keyboard access.
 * No overflow at 360, 390, and 430 px plus representative tablet and wide desktop inspection.
 
-In accordance with DEC-019, F15 adds no Playwright or other automated end-to-end tests.
+In accordance with DEC-019, F15 adds no automated browser or other automated browser-level tests.
 
 ## Out of Scope
 

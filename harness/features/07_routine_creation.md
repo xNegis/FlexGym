@@ -427,7 +427,7 @@ Add backend tests covering:
 Do not add one automated test per goal value, validation boundary, malformed payload variant, or UI
 state.
 
-No frontend unit, component, browser, Playwright, or end-to-end tests are required for F07. Because
+No frontend unit, component, browser, automated browser, or browser-level tests are required for F07. Because
 they are deferred, focused manual execution or code inspection must verify:
 
 * Navigation among Profile, Exercises, and Routines.
@@ -457,7 +457,7 @@ required.
 * Automatic routine generation, deterministic adaptations, suggestions, or AI reasoning.
 * Custom exercises or changes to the curated exercise catalog.
 * Workout execution, tracking, feedback, or history.
-* Frontend automated or end-to-end testing.
+* Frontend automated or browser-level testing.
 
 ## Dependencies
 

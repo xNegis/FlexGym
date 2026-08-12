@@ -635,7 +635,7 @@ F12 is the point at which the previous blanket deferral of frontend browser cove
 stable cross-feature shell behaviour. Keep coverage focused rather than attempting exhaustive UI
 testing.
 
-Add Playwright coverage for:
+Add automated browser coverage for:
 
 ### Public and guard flow
 

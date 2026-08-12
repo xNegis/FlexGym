@@ -1,8 +1,9 @@
-"""Workout endpoints: start context, start, active, lookup, execution, cancel."""
+"""Workout endpoints: start context, start, active, lookup, execution, cancel, history."""
 
 from __future__ import annotations
 
 import datetime
+import re
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -17,6 +18,7 @@ from app.services import workout_service
 router = APIRouter(tags=["workouts"])
 
 DATE_RE = r"^\d{4}-\d{2}-\d{2}$"
+LIMIT_RE = re.compile(r"^[1-9][0-9]*$")
 
 
 class StartRequest(BaseModel):
@@ -203,6 +205,68 @@ def get_active_workout(
     if workout is None:
         return None
     return workout_service._build_workout_response(workout)
+
+
+@router.get("/api/workouts/history")
+def get_workout_history(
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    params = request.query_params
+    allowed = {"status", "cursor", "limit"}
+    if not set(params.keys()).issubset(allowed):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "Unknown query parameter"}],
+        )
+    for key in ("status", "cursor", "limit"):
+        if len(params.getlist(key)) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=[{"msg": f"{key} must be provided at most once"}],
+            )
+
+    status_filter = params.get("status")
+    if status_filter is not None and (
+        status_filter == "" or status_filter not in ("completed", "cancelled")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "status must be 'completed' or 'cancelled'"}],
+        )
+
+    cursor = params.get("cursor")
+    if cursor is not None and cursor == "":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "cursor must be a non-empty string"}],
+        )
+
+    limit_raw = params.get("limit", "20")
+    if not LIMIT_RE.fullmatch(limit_raw):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "limit must be an integer from 1 through 50"}],
+        )
+    limit = int(limit_raw)
+    if limit < 1 or limit > 50:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "limit must be an integer from 1 through 50"}],
+        )
+
+    try:
+        result = workout_service.list_workout_history(
+            session, user.id, status_filter, cursor, limit
+        )
+    except workout_service.HistoryError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "Invalid cursor"}],
+        )
+
+    return result
 
 
 @router.get("/api/workouts/{workout_id}")

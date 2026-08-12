@@ -428,7 +428,7 @@ Backend tests cover:
 
 Do not add one test per weekday, swap pair, parser failure, or UI state.
 
-Frontend automated and end-to-end tests remain deferred. Manual execution or code inspection must
+Frontend automated and browser-level tests remain deferred. Manual execution or code inspection must
 verify loading/all-rest/populated/failure states, automatic placement, move, swap, failed move,
 rename and exercise placement preservation, deletion copy, removal of old reorder controls and API,
 safe response parsing, duplicate-submission prevention, keyboard use, and mobile layout.
@@ -447,7 +447,7 @@ Existing tests must be updated for the intentional ordering change and otherwise
 * Workout execution, today's-workout selection, facts, timers, feedback, history, analytics,
   adaptation, suggestions, or AI.
 * Changes to exercise/set ordering, custom exercises, or the global catalog.
-* Frontend automated or end-to-end testing.
+* Frontend automated or browser-level testing.
 
 ## Dependencies
 

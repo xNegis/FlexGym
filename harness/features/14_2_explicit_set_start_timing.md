@@ -580,7 +580,7 @@ adjustment behaviour, and normalized errors. Do not add a new test runner solely
 
 Focused manual UI validation covers the complete first-set, rest, next-set start, active set,
 transition, correction, refresh, failure, accessibility, and responsive flows described above. In
-accordance with DEC-019, do not add Playwright or automated E2E coverage.
+accordance with DEC-019, do not add automated browser or automated browser integration coverage.
 
 ## Out of Scope
 

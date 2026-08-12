@@ -286,6 +286,29 @@ interface ActiveWorkoutConflict {
   active_workout: ActiveWorkoutSummary | null;
 }
 
+type WorkoutHistoryStatus = "completed" | "cancelled";
+
+interface WorkoutHistoryItem {
+  id: number;
+  routine_name: string;
+  selected_training_day_name: string;
+  local_date: string;
+  status: WorkoutHistoryStatus;
+  selection_kind: "scheduled" | "alternate";
+  started_at: string;
+  terminal_at: string;
+  duration_seconds: number;
+  completed_set_count: number;
+  skipped_set_count: number;
+  unresolved_set_count: number;
+  total_set_count: number;
+}
+
+interface WorkoutHistoryPage {
+  items: WorkoutHistoryItem[];
+  next_cursor: string | null;
+}
+
 export {
   type ActiveRoutine,
   type ActiveWorkoutConflict,
@@ -315,6 +338,9 @@ export {
   type WorkoutEventException,
   type WorkoutExceptionProjection,
   type WorkoutExerciseSnapshot,
+  type WorkoutHistoryItem,
+  type WorkoutHistoryPage,
+  type WorkoutHistoryStatus,
   type WorkoutPlannedSetSnapshot,
   type WorkoutSession,
 };

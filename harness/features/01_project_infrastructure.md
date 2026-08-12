@@ -18,7 +18,7 @@ The accepted architecture defines:
 * SQLite and SQLAlchemy for initial persistence.
 * A REST boundary between frontend and backend.
 * Separation between HTTP endpoints, application logic, and persistence.
-* pytest for backend tests and Playwright where frontend or end-to-end validation is appropriate.
+* pytest for backend tests and automated browser where frontend or browser-level validation is appropriate.
 
 The initial product is personal-first, but this feature must not introduce global application state or persistence shortcuts that would make future user ownership unnecessarily difficult.
 
@@ -137,7 +137,7 @@ Validation commands must fail with a non-zero exit code when a check fails and m
 
 Backend tests must use an isolated temporary database and must not read or mutate the developer's local database.
 
-Playwright must provide an end-to-end smoke test that starts from the browser and verifies the healthy application state through the real API and test database.
+automated browser must provide an browser-level smoke test that starts from the browser and verifies the healthy application state through the real API and test database.
 
 Test execution must be deterministic and must clean up its temporary runtime data.
 
@@ -206,8 +206,8 @@ The interface is an infrastructure verification shell, not the final dashboard o
 * [x] The frontend works at a mobile viewport without horizontal overflow.
 * [x] CORS accepts the configured development frontend origin and does not use a wildcard.
 * [x] Backend tests run against isolated temporary persistence.
-* [x] The Playwright smoke test verifies the browser-to-API-to-database path.
-* [x] Formatting, linting, type checking, backend tests, and end-to-end tests pass using documented commands.
+* [x] The automated browser smoke test verifies the browser-to-API-to-database path.
+* [x] Formatting, linting, type checking, backend tests, and browser-level tests pass using documented commands.
 * [x] Generated databases, caches, build output, local environment files, and test artifacts are ignored by version control.
 * [x] No authentication, fitness profile, exercise, routine, or workout functionality is introduced.
 
@@ -220,7 +220,7 @@ Backend tests must cover:
 * Exact public response shape for both outcomes.
 * CORS behaviour for an allowed origin and an unconfigured origin.
 
-Playwright must cover:
+automated browser must cover:
 
 * Loading the application at a mobile viewport.
 * Reaching the ready state through the real backend and test database.

@@ -312,7 +312,7 @@ HTTP status, timestamp, serialization detail, database constraint, or UI state. 
 parameterized test matrices merely to exercise all validation combinations. Validation rules still
 need to be implemented, but one representative invalid request is sufficient for F03 automation.
 
-No frontend unit, component, integration, browser, Playwright, or end-to-end tests are required for
+No frontend unit, component, integration, browser, automated browser, or browser-level tests are required for
 F03. Existing tests must continue to pass, and frontend quality checks must still validate
 TypeScript, lint, and formatting.
 
@@ -331,7 +331,7 @@ TypeScript, lint, and formatting.
 * Exercise catalogs, routines, workout generation, or training schedules.
 * Deterministic signals, adaptations, AI interpretation, or recommendations.
 * Final application navigation, dashboard design, and full design-system work.
-* End-to-end or Playwright coverage.
+* Browser-level or automated browser coverage.
 
 ## Dependencies
 

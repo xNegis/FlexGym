@@ -17,7 +17,6 @@ backend/local.settings.json
 frontend/node_modules/
 frontend/dist/
 frontend/.env
-frontend/test-results/
 
 # IDE
 .vscode/

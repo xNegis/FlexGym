@@ -17,6 +17,7 @@ import RoutineEditScreen from "../screens/RoutineEditScreen";
 import TrainingDayExercisesScreen from "../screens/TrainingDayExercisesScreen";
 import PlanRedirect from "../screens/PlanRedirect";
 import TodayScreen from "../screens/TodayScreen";
+import HistoryScreen from "../screens/HistoryScreen";
 import WorkoutScreen from "../screens/WorkoutScreen";
 import WorkoutExecutionScreen from "../screens/WorkoutExecutionScreen";
 
@@ -70,6 +71,7 @@ export default function AppRouter() {
             }
           >
             <Route path="/today" element={<TodayScreen />} />
+            <Route path="/history" element={<HistoryScreen />} />
             <Route path="/workouts/:workoutId" element={<WorkoutScreen />} />
             <Route
               path="/workouts/:workoutId/exercises/:exercisePosition"

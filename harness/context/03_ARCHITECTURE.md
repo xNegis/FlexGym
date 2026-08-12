@@ -40,9 +40,9 @@ Backend:
 
 * pytest
 
-Frontend / E2E:
+Frontend / browser integration:
 
-* Playwright where appropriate.
+* automated browser where appropriate.
 
 ## Logical Architecture
 

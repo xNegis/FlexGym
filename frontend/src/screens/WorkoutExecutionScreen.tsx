@@ -18,7 +18,7 @@ import {
   type SkipResult,
   type WorkoutResult,
 } from "../api";
-import { useAuth } from "../context";
+import { useAuth, useWorkoutNav } from "../context";
 import type {
   PerformedSet,
   WorkoutExerciseSnapshot,
@@ -126,6 +126,7 @@ export default function WorkoutExecutionScreen() {
   }>();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { setWorkoutNavStatus } = useWorkoutNav();
 
   const [workout, setWorkout] = useState<WorkoutSession | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -199,6 +200,17 @@ export default function WorkoutExecutionScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (workout?.status === "in_progress") {
+      setWorkoutNavStatus("in_progress");
+    } else if (workout?.status === "completed" || workout?.status === "cancelled") {
+      setWorkoutNavStatus("terminal");
+    } else {
+      setWorkoutNavStatus(null);
+    }
+    return () => setWorkoutNavStatus(null);
+  }, [workout, setWorkoutNavStatus]);
 
   useEffect(() => {
     if (!workout) return;

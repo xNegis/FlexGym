@@ -655,7 +655,7 @@ Focused manual UI validation exercises:
   and usable touch-target sizes.
 
 Do not add one test per weekday, exercise count, nullable snapshot combination, or malformed payload
-variant. In accordance with DEC-019, F13 adds no Playwright or other automated browser/end-to-end
+variant. In accordance with DEC-019, F13 adds no automated browser or other automated browser/browser-level
 tests, and existing browser-test execution is not a completion gate.
 
 ## Out of Scope

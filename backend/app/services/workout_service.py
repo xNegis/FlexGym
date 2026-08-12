@@ -1,14 +1,21 @@
-"""Workout domain operations: start context, start, execution, cancel."""
+"""Workout domain operations: start context, start, execution, cancel, history."""
 
 from __future__ import annotations
 
+import base64
 import datetime
+import hashlib
+import hmac
+import json
+import re
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import and_, case, exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.config import get_config
 from app.models import (
     ActiveRoutine,
     ActiveWorkout,
@@ -40,6 +47,10 @@ class StartError(Exception):
 
 
 class ExecutionError(Exception):
+    pass
+
+
+class HistoryError(Exception):
     pass
 
 
@@ -1007,11 +1018,12 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
     server_now = datetime.datetime.utcnow()
     events = list(workout.events) if workout.events else []
     active_exceptions = _get_active_exceptions(workout)
-    is_completed = workout.status == "completed"
+    is_terminal = workout.status in ("completed", "cancelled")
 
+    terminal_at = workout.completed_at if workout.status == "completed" else workout.cancelled_at
     duration_seconds: int | None = None
-    if workout.completed_at is not None and workout.started_at is not None:
-        duration_seconds = max(0, int((workout.completed_at - workout.started_at).total_seconds()))
+    if terminal_at is not None and workout.started_at is not None:
+        duration_seconds = max(0, int((terminal_at - workout.started_at).total_seconds()))
 
     exercises: list[dict[str, object]] = []
     for we in workout.exercises:
@@ -1174,15 +1186,15 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
         "all_sets_recorded": progress["all_sets_recorded"],
         "all_sets_resolved": progress["all_sets_resolved"],
         "current_exercise_position": (
-            None if is_completed else progress["current_exercise_position"]
+            None if is_terminal else progress["current_exercise_position"]
         ),
-        "current_set_position": None if is_completed else progress["current_set_position"],
-        "current_set_phase": None if is_completed else progress["current_set_phase"],
-        "current_set_started_at": None if is_completed else progress["current_set_started_at"],
+        "current_set_position": None if is_terminal else progress["current_set_position"],
+        "current_set_phase": None if is_terminal else progress["current_set_phase"],
+        "current_set_started_at": None if is_terminal else progress["current_set_started_at"],
         "transition_to_exercise_position": (
-            None if is_completed else progress["transition_to_exercise_position"]
+            None if is_terminal else progress["transition_to_exercise_position"]
         ),
-        "resume_url": None if is_completed else resume_url,
+        "resume_url": None if is_terminal else resume_url,
         "exercises": exercises,
         "events": timeline,
     }
@@ -1574,3 +1586,230 @@ def _validate_performed_rir(value: int | None) -> None:
     if value is not None:
         if not isinstance(value, (int, float)) or value != int(value) or value < 0 or value > 10:
             raise ExecutionError("Invalid performed RIR")
+
+
+# ────────────────── history (F18) ──────────────────
+
+_HISTORY_CURSOR_VERSION = 1
+_HISTORY_CURSOR_MAX_LENGTH = 512
+_HISTORY_CURSOR_RE = re.compile(r"^[A-Za-z0-9_-]+={0,2}$")
+
+TERMINAL_STATUSES = ("completed", "cancelled")
+
+
+def _encode_history_cursor(
+    user_id: int, status: str | None, terminal_at: datetime.datetime, workout_id: int
+) -> str:
+    payload = {
+        "v": _HISTORY_CURSOR_VERSION,
+        "u": user_id,
+        "s": status,
+        "t": terminal_at.isoformat(),
+        "i": workout_id,
+    }
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    signature = hmac.new(
+        get_config().jwt_secret.encode("utf-8"), raw, hashlib.sha256
+    ).digest()
+    return base64.urlsafe_b64encode(raw + signature).decode("ascii").rstrip("=")
+
+
+def _decode_history_cursor(
+    token: str, user_id: int, status: str | None
+) -> tuple[datetime.datetime, int]:
+    if not token or len(token) > _HISTORY_CURSOR_MAX_LENGTH:
+        raise HistoryError("Invalid cursor")
+    if not _HISTORY_CURSOR_RE.fullmatch(token):
+        raise HistoryError("Invalid cursor")
+    padded = token + "=" * (-len(token) % 4)
+    try:
+        signed = base64.urlsafe_b64decode(padded.encode("ascii"))
+    except (ValueError, UnicodeDecodeError):
+        raise HistoryError("Invalid cursor") from None
+    if len(signed) <= hashlib.sha256().digest_size:
+        raise HistoryError("Invalid cursor")
+    raw = signed[: -hashlib.sha256().digest_size]
+    signature = signed[-hashlib.sha256().digest_size :]
+    expected_signature = hmac.new(
+        get_config().jwt_secret.encode("utf-8"), raw, hashlib.sha256
+    ).digest()
+    if not hmac.compare_digest(signature, expected_signature):
+        raise HistoryError("Invalid cursor")
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        raise HistoryError("Invalid cursor") from None
+    if not isinstance(payload, dict) or set(payload.keys()) != {"v", "u", "s", "t", "i"}:
+        raise HistoryError("Invalid cursor")
+    if payload.get("v") != _HISTORY_CURSOR_VERSION:
+        raise HistoryError("Invalid cursor")
+    if payload.get("s") != status:
+        raise HistoryError("Invalid cursor")
+    cursor_user_id = payload.get("u")
+    if (
+        isinstance(cursor_user_id, bool)
+        or not isinstance(cursor_user_id, int)
+        or cursor_user_id != user_id
+    ):
+        raise HistoryError("Invalid cursor")
+    workout_id = payload.get("i")
+    if isinstance(workout_id, bool) or not isinstance(workout_id, int) or workout_id <= 0:
+        raise HistoryError("Invalid cursor")
+    terminal_token = payload.get("t")
+    if not isinstance(terminal_token, str) or not terminal_token:
+        raise HistoryError("Invalid cursor")
+    try:
+        terminal_at = datetime.datetime.fromisoformat(terminal_token)
+    except ValueError:
+        raise HistoryError("Invalid cursor") from None
+    return terminal_at, workout_id
+
+
+def _history_terminal(workout: WorkoutSession) -> datetime.datetime | None:
+    return workout.completed_at if workout.status == "completed" else workout.cancelled_at
+
+
+def _active_exception_ids(session: Session, workout_ids: list[int]) -> list[int]:
+    skip_types = ("set_skipped", "exercise_skipped")
+    revert_types = ("set_skip_reverted", "exercise_skip_reverted")
+    rows = (
+        session.query(WorkoutEvent.workout_exception_id)
+        .filter(
+            WorkoutEvent.workout_session_id.in_(workout_ids),
+            WorkoutEvent.workout_exception_id.isnot(None),
+        )
+        .group_by(WorkoutEvent.workout_exception_id)
+        .having(
+            func.max(case((WorkoutEvent.event_type.in_(skip_types), 1), else_=0)) == 1,
+            func.max(case((WorkoutEvent.event_type.in_(revert_types), 1), else_=0)) == 0,
+        )
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
+def _history_counts(session: Session, workout_ids: list[int]) -> dict[int, dict[str, int]]:
+    result: dict[int, dict[str, int]] = {
+        wid: {"total": 0, "performed": 0, "skipped": 0} for wid in workout_ids
+    }
+    if not workout_ids:
+        return result
+
+    total_performed = (
+        session.query(
+            WorkoutExercise.workout_session_id.label("wid"),
+            func.count(WorkoutPlannedSet.id).label("total"),
+            func.count(PerformedSet.id).label("performed"),
+        )
+        .join(WorkoutPlannedSet, WorkoutPlannedSet.workout_exercise_id == WorkoutExercise.id)
+        .outerjoin(PerformedSet, PerformedSet.workout_planned_set_id == WorkoutPlannedSet.id)
+        .filter(WorkoutExercise.workout_session_id.in_(workout_ids))
+        .group_by(WorkoutExercise.workout_session_id)
+        .all()
+    )
+    for wid, total, performed in total_performed:
+        result[wid]["total"] = total
+        result[wid]["performed"] = performed
+
+    active_ids = _active_exception_ids(session, workout_ids)
+    if active_ids:
+        set_exists = exists(
+            select(WorkoutException.id).where(
+                WorkoutException.scope == "set",
+                WorkoutException.workout_planned_set_id == WorkoutPlannedSet.id,
+                WorkoutException.id.in_(active_ids),
+            )
+        )
+        exercise_exists = exists(
+            select(WorkoutException.id).where(
+                WorkoutException.scope == "exercise",
+                WorkoutException.workout_exercise_id == WorkoutExercise.id,
+                WorkoutException.id.in_(active_ids),
+            )
+        )
+        skipped_rows = (
+            session.query(
+                WorkoutExercise.workout_session_id.label("wid"),
+                func.count(func.distinct(WorkoutPlannedSet.id)).label("skipped"),
+            )
+            .join(WorkoutPlannedSet, WorkoutPlannedSet.workout_exercise_id == WorkoutExercise.id)
+            .filter(
+                WorkoutExercise.workout_session_id.in_(workout_ids),
+                or_(set_exists, exercise_exists),
+            )
+            .group_by(WorkoutExercise.workout_session_id)
+            .all()
+        )
+        for wid, skipped in skipped_rows:
+            result[wid]["skipped"] = skipped
+
+    return result
+
+
+def _build_history_item(workout: WorkoutSession, counts: dict[str, int]) -> dict[str, object]:
+    terminal_at = _history_terminal(workout)
+    duration_seconds = 0
+    if terminal_at is not None and workout.started_at is not None:
+        duration_seconds = max(0, int((terminal_at - workout.started_at).total_seconds()))
+
+    total = counts.get("total", 0)
+    performed = counts.get("performed", 0)
+    skipped = counts.get("skipped", 0)
+    unresolved = max(0, total - performed - skipped)
+
+    return {
+        "id": workout.id,
+        "routine_name": workout.routine_name,
+        "selected_training_day_name": workout.selected_training_day_name,
+        "local_date": workout.local_date.isoformat(),
+        "status": workout.status,
+        "selection_kind": workout.selection_kind,
+        "started_at": workout.started_at.isoformat(),
+        "terminal_at": terminal_at.isoformat() if terminal_at is not None else None,
+        "duration_seconds": duration_seconds,
+        "completed_set_count": performed,
+        "skipped_set_count": skipped,
+        "unresolved_set_count": unresolved,
+        "total_set_count": total,
+    }
+
+
+def list_workout_history(
+    session: Session,
+    user_id: int,
+    status_filter: str | None,
+    cursor: str | None,
+    limit: int,
+) -> dict[str, object]:
+    terminal = func.coalesce(WorkoutSession.completed_at, WorkoutSession.cancelled_at)
+    query = session.query(WorkoutSession).filter(WorkoutSession.user_id == user_id)
+    if status_filter is not None:
+        query = query.filter(WorkoutSession.status == status_filter)
+    else:
+        query = query.filter(WorkoutSession.status.in_(TERMINAL_STATUSES))
+
+    if cursor is not None:
+        cursor_terminal, cursor_id = _decode_history_cursor(cursor, user_id, status_filter)
+        query = query.filter(
+            or_(
+                terminal < cursor_terminal,
+                and_(terminal == cursor_terminal, WorkoutSession.id < cursor_id),
+            )
+        )
+
+    rows = query.order_by(terminal.desc(), WorkoutSession.id.desc()).limit(limit + 1).all()
+
+    has_more = len(rows) > limit
+    page_rows = rows[:limit]
+
+    counts = _history_counts(session, [row.id for row in page_rows])
+    items = [_build_history_item(workout, counts.get(workout.id, {})) for workout in page_rows]
+
+    next_cursor: str | None = None
+    if has_more:
+        last = page_rows[-1]
+        last_terminal = _history_terminal(last)
+        if last_terminal is not None:
+            next_cursor = _encode_history_cursor(user_id, status_filter, last_terminal, last.id)
+
+    return {"items": items, "next_cursor": next_cursor}

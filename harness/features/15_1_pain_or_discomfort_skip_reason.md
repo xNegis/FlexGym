@@ -102,7 +102,7 @@ its timeline projection. Existing grouped F15 tests continue covering both scope
 reversal, validation, ownership, progress, and failures. Migration checks cover fresh creation,
 upgrade preservation, the new check constraint, foreign keys, and a real authenticated flow.
 Frontend format, lint, and type checks validate the selector and strict parser change. Per DEC-019,
-no Playwright test is added.
+no automated browser test is added.
 
 ## Out of Scope
 

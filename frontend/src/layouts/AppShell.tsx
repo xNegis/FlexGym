@@ -1,7 +1,8 @@
 import { type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, CalendarCheck, Dumbbell, LayoutList, User } from "lucide-react";
+import { CalendarCheck, ChevronLeft, Dumbbell, History, LayoutList, User } from "lucide-react";
 import IconButton from "../ui/IconButton";
+import { useWorkoutNav, WorkoutNavProvider } from "../context";
 import styles from "./AppShell.module.css";
 
 interface NavItem {
@@ -12,6 +13,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Today", path: "/today", icon: <CalendarCheck className={styles.navIcon} /> },
+  { label: "History", path: "/history", icon: <History className={styles.navIcon} /> },
   { label: "Plan", path: "/plan", icon: <LayoutList className={styles.navIcon} /> },
   { label: "Exercises", path: "/exercises", icon: <Dumbbell className={styles.navIcon} /> },
   { label: "Profile", path: "/profile", icon: <User className={styles.navIcon} /> },
@@ -43,12 +45,31 @@ export function AppHeader({ title, showBack = false, onBack }: HeaderProps) {
 }
 
 export default function AppShell() {
+  return (
+    <WorkoutNavProvider>
+      <AppShellContent />
+    </WorkoutNavProvider>
+  );
+}
+
+function AppShellContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { workoutNavStatus } = useWorkoutNav();
+
+  const isWorkoutRoute = location.pathname.startsWith("/workouts");
 
   const isActive = (path: string) => {
-    if (path === "/today")
-      return location.pathname === "/today" || location.pathname.startsWith("/workouts");
+    if (path === "/today") {
+      return (
+        location.pathname === "/today" || (isWorkoutRoute && workoutNavStatus === "in_progress")
+      );
+    }
+    if (path === "/history") {
+      return (
+        location.pathname === "/history" || (isWorkoutRoute && workoutNavStatus === "terminal")
+      );
+    }
     if (path === "/plan") return location.pathname.startsWith("/plan");
     if (path === "/exercises") return location.pathname.startsWith("/exercises");
     if (path === "/profile") return location.pathname.startsWith("/profile");

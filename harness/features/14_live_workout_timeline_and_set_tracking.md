@@ -752,7 +752,7 @@ Focused manual UI validation exercises:
 * Focus, touch targets, non-color timer state, restrained announcements, 200% zoom, safe areas,
   reduced motion, and on-screen keyboard access.
 
-In accordance with DEC-019, F14 adds no Playwright or other automated end-to-end tests.
+In accordance with DEC-019, F14 adds no automated browser or other automated browser-level tests.
 
 ## Out of Scope
 

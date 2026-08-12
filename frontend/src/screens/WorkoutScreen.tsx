@@ -9,7 +9,7 @@ import {
   UnauthenticatedError,
   type WorkoutResult,
 } from "../api";
-import { useAuth } from "../context";
+import { useAuth, useWorkoutNav } from "../context";
 import type { WorkoutExerciseSnapshot, WorkoutPlannedSetSnapshot, WorkoutSession } from "../types";
 import Page from "../layouts/Page";
 import { AppHeader } from "../layouts/AppShell";
@@ -80,6 +80,7 @@ export default function WorkoutScreen() {
   const { workoutId: workoutIdParam } = useParams<{ workoutId: string }>();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { setWorkoutNavStatus } = useWorkoutNav();
 
   const [workout, setWorkout] = useState<WorkoutSession | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -149,6 +150,17 @@ export default function WorkoutScreen() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (workout?.status === "in_progress") {
+      setWorkoutNavStatus("in_progress");
+    } else if (workout?.status === "completed" || workout?.status === "cancelled") {
+      setWorkoutNavStatus("terminal");
+    } else {
+      setWorkoutNavStatus(null);
+    }
+    return () => setWorkoutNavStatus(null);
+  }, [workout, setWorkoutNavStatus]);
+
   const handleDiscard = async () => {
     if (!workout) return;
     setDiscarding(true);
@@ -213,6 +225,7 @@ export default function WorkoutScreen() {
   const isInProgress = workout?.status === "in_progress";
   const isCancelled = workout?.status === "cancelled";
   const isCompleted = workout?.status === "completed";
+  const isTerminal = isCompleted || isCancelled;
   const noExerciseStarted =
     workout?.all_sets_resolved === false &&
     workout?.completed_set_count === 0 &&
@@ -221,6 +234,9 @@ export default function WorkoutScreen() {
     workout?.transition_to_exercise_position == null;
   const firstExercise = workout?.exercises[0];
   const canResume = isInProgress && !noExerciseStarted;
+  const unresolvedSetCount = workout
+    ? Math.max(0, workout.total_set_count - workout.completed_set_count - workout.skipped_set_count)
+    : 0;
 
   const handleStartFirstExercise = async () => {
     if (!workout || !firstExercise) return;
@@ -253,7 +269,7 @@ export default function WorkoutScreen() {
       <AppHeader
         title={workout ? workout.selected_training_day_name : "Workout"}
         showBack
-        onBack={() => navigate("/today")}
+        onBack={() => navigate(isTerminal ? "/history" : "/today")}
       />
       <Page width="reading">
         {error && (
@@ -328,9 +344,9 @@ export default function WorkoutScreen() {
                   variant="primary"
                   fullWidth
                   className={styles.actionButton}
-                  onClick={() => navigate("/today")}
+                  onClick={() => navigate("/history")}
                 >
-                  Back to Today
+                  Back to History
                 </Button>
               </div>
             </Card>
@@ -401,24 +417,138 @@ export default function WorkoutScreen() {
           </div>
         )}
 
-        {!loading && !notFound && workout && !isCompleted && (
+        {!loading && !notFound && workout && isCancelled && (
           <div className={styles.stack5}>
             <Card>
               <div className={styles.stack3}>
-                <div className={styles.rowBetween}>
-                  <div className={styles.row2}>
-                    {isInProgress ? (
-                      <Badge variant="accent">In progress</Badge>
-                    ) : (
-                      <Badge variant="warning">Cancelled</Badge>
-                    )}
-                    {isInProgress && workout.all_sets_recorded && (
-                      <Badge variant="success">All sets recorded</Badge>
-                    )}
-                    {isInProgress && workout.all_sets_resolved && !workout.all_sets_recorded && (
-                      <Badge variant="accent">All sets resolved</Badge>
-                    )}
+                <div className={styles.row2}>
+                  <Badge variant="warning">Cancelled</Badge>
+                </div>
+                <div>
+                  <div className={styles.textCompactMuted}>{workout.routine_name}</div>
+                  <div className={styles.cardTitle}>{workout.selected_training_day_name}</div>
+                  <div className={styles.textCompactMuted}>{workout.local_date}</div>
+                </div>
+                <div className={styles.stack2}>
+                  <div className={styles.rowBetween}>
+                    <span className={styles.textCompactMuted}>Started</span>
+                    <span>{formatTime(workout.started_at)}</span>
                   </div>
+                  {workout.cancelled_at && (
+                    <div className={styles.rowBetween}>
+                      <span className={styles.textCompactMuted}>Cancelled</span>
+                      <span>{formatTime(workout.cancelled_at)}</span>
+                    </div>
+                  )}
+                  <div className={styles.rowBetween}>
+                    <span className={styles.textCompactMuted}>Workout duration</span>
+                    <span>
+                      {workout.duration_seconds != null
+                        ? formatDuration(workout.duration_seconds)
+                        : ""}
+                    </span>
+                  </div>
+                  <div className={styles.rowBetween}>
+                    <span className={styles.textCompactMuted}>Sets</span>
+                    <span>
+                      {workout.completed_set_count} performed · {workout.skipped_set_count} skipped
+                      {unresolvedSetCount > 0 && ` · ${unresolvedSetCount} not done`} ·{" "}
+                      {workout.total_set_count} total
+                    </span>
+                  </div>
+                  <div className={styles.textCompactMuted}>{selectionContext(workout)}</div>
+                </div>
+                <Button
+                  variant="primary"
+                  fullWidth
+                  className={styles.actionButton}
+                  onClick={() => navigate("/history")}
+                >
+                  Back to History
+                </Button>
+              </div>
+            </Card>
+
+            <Section title="Exercises">
+              <div className={styles.stack3}>
+                {workout.exercises.map((ex) => (
+                  <Card key={ex.position}>
+                    <div className={styles.stack3}>
+                      <div className={styles.rowBetween}>
+                        <div>
+                          <div className={styles.row2}>
+                            <span className={styles.textCaptionSubtle}>{ex.position}.</span>
+                            <span className={styles.cardTitle}>{ex.exercise_name}</span>
+                          </div>
+                          <div className={styles.textCompactMuted}>
+                            {ex.total_set_count} {ex.total_set_count === 1 ? "set" : "sets"} ·{" "}
+                            {ex.target_type === "repetitions"
+                              ? "Repetitions"
+                              : ex.target_type === "duration_seconds"
+                                ? "Duration"
+                                : "Distance"}
+                          </div>
+                        </div>
+                        {ex.execution_status === "completed" && (
+                          <Badge variant="success">Done</Badge>
+                        )}
+                        {ex.execution_status === "partial" && (
+                          <Badge variant="accent">Partial</Badge>
+                        )}
+                        {ex.execution_status === "skipped" && (
+                          <Badge variant="warning">Skipped</Badge>
+                        )}
+                        {ex.execution_status === "in_progress" && (
+                          <Badge variant="accent">In progress</Badge>
+                        )}
+                        {ex.execution_status === "pending" && (
+                          <Badge variant="default">Not started</Badge>
+                        )}
+                      </div>
+                      <div className={styles.stack2}>
+                        {ex.planned_sets.map((ps) => (
+                          <div
+                            key={ps.position}
+                            className={`${styles.rowBetween} ${styles.rowWrap2}`}
+                          >
+                            <span className={styles.textCompactMuted}>Set {ps.position}</span>
+                            {ps.exception ? (
+                              <div className={styles.row1}>
+                                <SkipForward size={12} className={styles.textCaptionMuted} />
+                                <span className={styles.textCaptionMuted}>
+                                  Skipped
+                                  {ps.exception.scope === "exercise" ? " (exercise)" : ""}
+                                </span>
+                              </div>
+                            ) : ps.performance ? (
+                              <span className={styles.textCompactMuted}>
+                                <Check size={12} className={styles.setCheck} aria-hidden="true" />
+                                {setResultSummary(ex, ps)}
+                              </span>
+                            ) : (
+                              <span className={styles.textCaptionMuted}>Not done</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </Section>
+          </div>
+        )}
+
+        {!loading && !notFound && workout && isInProgress && (
+          <div className={styles.stack5}>
+            <Card>
+              <div className={styles.stack3}>
+                <div className={styles.row2}>
+                  <Badge variant="accent">In progress</Badge>
+                  {workout.all_sets_recorded && <Badge variant="success">All sets recorded</Badge>}
+                  {workout.all_sets_resolved && !workout.all_sets_recorded && (
+                    <Badge variant="accent">All sets resolved</Badge>
+                  )}
                 </div>
                 <div>
                   <div className={styles.textCompactMuted}>{workout.routine_name}</div>
@@ -426,16 +556,14 @@ export default function WorkoutScreen() {
                     {workout.local_date} — {formatTime(workout.started_at)}
                   </div>
                 </div>
-                {isInProgress && (
-                  <div className={styles.textCompactMuted}>
-                    {workout.completed_set_count} completed
-                    {workout.skipped_set_count > 0 &&
-                      ` · ${workout.skipped_set_count} skipped`} of {workout.total_set_count} sets
-                  </div>
-                )}
+                <div className={styles.textCompactMuted}>
+                  {workout.completed_set_count} completed
+                  {workout.skipped_set_count > 0 &&
+                    ` · ${workout.skipped_set_count} skipped`} of {workout.total_set_count} sets
+                </div>
                 <div className={styles.textCompactMuted}>{selectionContext(workout)}</div>
                 {executionError && <Alert variant="error">{executionError}</Alert>}
-                {isInProgress && noExerciseStarted && firstExercise && (
+                {noExerciseStarted && firstExercise && (
                   <Button
                     variant="primary"
                     fullWidth
@@ -450,7 +578,7 @@ export default function WorkoutScreen() {
                     Resume workout
                   </Button>
                 )}
-                {isInProgress && workout.all_sets_resolved && (
+                {workout.all_sets_resolved && (
                   <Button
                     variant="primary"
                     fullWidth
@@ -488,12 +616,11 @@ export default function WorkoutScreen() {
                           </div>
                         </div>
                         <div className={styles.row1}>
-                          {isInProgress &&
-                            (ex.completed_set_count > 0 || ex.skipped_set_count > 0) && (
-                              <Badge variant="accent">
-                                {ex.completed_set_count}/{ex.total_set_count}
-                              </Badge>
-                            )}
+                          {(ex.completed_set_count > 0 || ex.skipped_set_count > 0) && (
+                            <Badge variant="accent">
+                              {ex.completed_set_count}/{ex.total_set_count}
+                            </Badge>
+                          )}
                           {ex.is_complete && ex.execution_status === "completed" && (
                             <Badge variant="success">Done</Badge>
                           )}
@@ -510,7 +637,7 @@ export default function WorkoutScreen() {
                               aria-label="Instructions available"
                             />
                           )}
-                          {isInProgress && ex.started_at != null && (
+                          {ex.started_at != null && (
                             <Button
                               variant="secondary"
                               size="small"
@@ -553,24 +680,16 @@ export default function WorkoutScreen() {
               </div>
             </Section>
 
-            {isInProgress && (
-              <Button
-                variant="ghost"
-                fullWidth
-                onClick={() => {
-                  setDiscardError(null);
-                  setDiscardOpen(true);
-                }}
-              >
-                Discard workout
-              </Button>
-            )}
-
-            {isCancelled && (
-              <Button variant="primary" fullWidth onClick={() => navigate("/today")}>
-                Back to Today
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              fullWidth
+              onClick={() => {
+                setDiscardError(null);
+                setDiscardOpen(true);
+              }}
+            >
+              Discard workout
+            </Button>
           </div>
         )}
       </Page>

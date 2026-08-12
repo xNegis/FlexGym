@@ -454,7 +454,7 @@ Backend tests cover:
 
 Do not add one test per malformed payload variant, routine count, edit type, or UI state.
 
-Frontend automated and end-to-end tests remain deferred. Manual execution or focused code inspection
+Frontend automated and browser-level tests remain deferred. Manual execution or focused code inspection
 must verify:
 
 * No-active, first activation, active badge, detail actions, and deactivation.
@@ -482,7 +482,7 @@ continue to pass.
 * Notifications, reminders, dashboard, or dedicated home screen.
 * Changes to catalog, routine metadata vocabulary, schedule movement, exercise configuration, or set
   semantics.
-* Frontend automated or end-to-end testing.
+* Frontend automated or browser-level testing.
 
 ## Dependencies
 

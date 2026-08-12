@@ -18,6 +18,8 @@ import type {
   WorkoutEventException,
   WorkoutExceptionProjection,
   WorkoutExerciseSnapshot,
+  WorkoutHistoryItem,
+  WorkoutHistoryPage,
   WorkoutPlannedSetSnapshot,
   WorkoutSession,
 } from "./types";
@@ -2183,4 +2185,100 @@ export async function undoSkipExercise(
   }
   if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
   return result;
+}
+
+export interface WorkoutHistoryParams {
+  status?: "completed" | "cancelled";
+  cursor?: string;
+}
+
+function isWorkoutHistoryItem(value: unknown): value is WorkoutHistoryItem {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.completed_set_count !== "number" ||
+    !Number.isInteger(v.completed_set_count) ||
+    v.completed_set_count < 0 ||
+    typeof v.skipped_set_count !== "number" ||
+    !Number.isInteger(v.skipped_set_count) ||
+    v.skipped_set_count < 0 ||
+    typeof v.unresolved_set_count !== "number" ||
+    !Number.isInteger(v.unresolved_set_count) ||
+    v.unresolved_set_count < 0 ||
+    typeof v.total_set_count !== "number" ||
+    !Number.isInteger(v.total_set_count) ||
+    v.total_set_count < 0
+  ) {
+    return false;
+  }
+  if (v.completed_set_count + v.skipped_set_count + v.unresolved_set_count !== v.total_set_count) {
+    return false;
+  }
+  return (
+    typeof v.id === "number" &&
+    Number.isInteger(v.id) &&
+    v.id > 0 &&
+    typeof v.routine_name === "string" &&
+    v.routine_name.trim().length > 0 &&
+    typeof v.selected_training_day_name === "string" &&
+    v.selected_training_day_name.trim().length > 0 &&
+    typeof v.local_date === "string" &&
+    isValidCalendarDate(v.local_date) &&
+    (v.status === "completed" || v.status === "cancelled") &&
+    (v.selection_kind === "scheduled" || v.selection_kind === "alternate") &&
+    typeof v.started_at === "string" &&
+    isValidTimestamp(v.started_at) &&
+    typeof v.terminal_at === "string" &&
+    isValidTimestamp(v.terminal_at) &&
+    typeof v.duration_seconds === "number" &&
+    Number.isInteger(v.duration_seconds) &&
+    v.duration_seconds >= 0
+  );
+}
+
+function isValidCalendarDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  );
+}
+
+function isValidTimestamp(value: string): boolean {
+  return value.trim().length > 0 && Number.isFinite(Date.parse(value));
+}
+
+function isWorkoutHistoryPage(value: unknown): value is WorkoutHistoryPage {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    Array.isArray(v.items) &&
+    v.items.every(isWorkoutHistoryItem) &&
+    (v.next_cursor === null || (typeof v.next_cursor === "string" && v.next_cursor.length > 0))
+  );
+}
+
+export async function fetchWorkoutHistory(
+  params: WorkoutHistoryParams = {},
+): Promise<WorkoutHistoryPage> {
+  const url = new URL(`${API_BASE_URL}/api/workouts/history`);
+  if (params.status) url.searchParams.set("status", params.status);
+  if (params.cursor) url.searchParams.set("cursor", params.cursor);
+
+  const response = await fetch(url.toString(), { credentials: "include" });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load workout history");
+  }
+  const data: unknown = await response.json();
+  if (!isWorkoutHistoryPage(data)) {
+    throw new Error("Invalid workout history response");
+  }
+  return data;
 }

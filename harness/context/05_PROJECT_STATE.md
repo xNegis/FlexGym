@@ -5,7 +5,7 @@
 ## Current Phase
 
 Phase 0 — Foundation and Phase 1 — Training Planning are completed successfully. Phase 2 — Workout
-Tracking is in progress with F13 through F15.1 and F17 completed.
+Tracking is in progress with F13 through F15.1, F17, and F18 completed.
 
 ## Current Status
 
@@ -32,7 +32,7 @@ F12 — Mobile-first UI System and Phase 1 UX Refresh is implemented. The fronte
 design-token system (CSS custom properties), a reusable UI primitive layer, React Router with
 canonical routes, authentication and profile guards, a mobile-first app shell with bottom navigation,
 and the Quiet Strength visual direction. All F02–F11 flows have been migrated and validated with
-authenticated Playwright coverage at 360, 390, and 430 px.
+authenticated automated browser coverage at 360, 390, and 430 px.
 
 F13 — Start Workout is implemented and validated. Today resolves the active routine's local-day session, previews
 its exercises and planned set counts, permits an alternate executable session without changing the
@@ -67,6 +67,13 @@ immediately renders a read-only summary with wall-clock duration, performed/skip
 and compact ordered exercise results, while Today returns to normal start behaviour. Completed
 workouts reject all live mutations and the configured local database is at repository head.
 
+F18 — Workout History is implemented and awaiting final manual UI validation. Authenticated users browse their completed and
+cancelled workouts newest-first at the `/history` destination through an opaque cursor-paginated
+compact projection, with URL-backed `All`/`Completed`/`Cancelled` filtering, incremental `Load more`,
+and distinct empty/error states. Cancelled workouts receive a read-only terminal summary with elapsed
+duration and explicitly distinguishable unresolved sets, and terminal detail associates with History
+in main navigation. F18 adds no migration; the configured local database remains at repository head.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -94,7 +101,7 @@ workouts reject all live mutations and the configured local database is at repos
 
 ## Next Feature
 
-F18 — Workout History.
+Complete F18 manual responsive and accessibility validation before selecting the next roadmap item.
 
 ## Existing Feature Specifications
 
@@ -133,7 +140,7 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (251 backend tests) / existing F12 Playwright infrastructure retained but deferred as a
+pytest (271 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
 completion gate for current MVP features under DEC-019
 
 Code Quality:

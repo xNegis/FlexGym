@@ -718,7 +718,7 @@ Add backend tests covering:
 Do not add one backend test for every numeric boundary, nullable field combination, target type,
 catalog exercise, or malformed payload variant.
 
-No frontend unit, component, browser, Playwright, or end-to-end tests are required for F09. Because
+No frontend unit, component, browser, automated browser, or browser-level tests are required for F09. Because
 they remain deferred, focused manual execution or code inspection must verify:
 
 * Empty, populated, loading, list-failure, picker, no-results, and catalog-failure states.
@@ -754,7 +754,7 @@ required.
 * Routine or training-day duplication, templates, imports, exports, sharing, or collaboration.
 * Custom exercises or mutation of the curated exercise catalog.
 * Analytics, adaptation signals, suggestions, or AI reasoning.
-* Frontend automated or end-to-end testing.
+* Frontend automated or browser-level testing.
 
 ## Dependencies
 

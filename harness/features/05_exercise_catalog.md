@@ -642,7 +642,7 @@ Do not add one automated test per seeded exercise, enum value, or filter combina
 completeness should be checked by a deterministic seed count, uniqueness constraints, validation,
 and selected representative records.
 
-No frontend unit, component, browser, Playwright, or end-to-end tests are required for F05. Because
+No frontend unit, component, browser, automated browser, or browser-level tests are required for F05. Because
 they are deferred, focused manual execution or code inspection must verify:
 
 * Authenticated navigation between Profile and Exercises.
@@ -669,7 +669,7 @@ required.
   scheduling.
 * Workout execution, history, feedback, discomfort, signals, adaptations, or AI reasoning.
 * Final dashboard, final application navigation, and a comprehensive design system.
-* Frontend automated or end-to-end testing.
+* Frontend automated or browser-level testing.
 
 ## Dependencies
 

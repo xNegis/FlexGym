@@ -319,7 +319,7 @@ corrections; success, refresh, direct access, Back, and Today; pending/conflict/
 inaccessible/unavailable/cancelled states; dialog focus and announcements; keyboard/touch, color
 independence, 200% zoom, safe areas/reduced motion; and overflow checks at required widths.
 
-Per DEC-019, F17 adds no Playwright or automated end-to-end tests.
+Per DEC-019, F17 adds no automated browser or automated browser-level tests.
 
 ## Out of Scope
 
