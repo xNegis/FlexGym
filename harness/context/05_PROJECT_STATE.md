@@ -5,7 +5,7 @@
 ## Current Phase
 
 Phase 0 — Foundation and Phase 1 — Training Planning are completed successfully. Phase 2 — Workout
-Tracking is in progress with F14 and its F14.2 corrective follow-up completed.
+Tracking is in progress with F15 completed.
 
 ## Current Status
 
@@ -48,6 +48,13 @@ and recovers after interruption. The product owner completed a real-workout vali
 the final interaction flow and persisted monitoring timeline. Workout-level completion remains
 deliberately assigned to F17.
 
+F15 — Workout Exceptions and Feedback is implemented and validated. Active workouts support
+optional structured set/exercise skips and append-only reversals while preserving performed facts,
+explicit set lifecycle timing, derived progress, transitions, and interruption recovery. Backend,
+migration, frontend static validation, and an intensive product-owner manual session pass. The
+persisted session audit confirmed a contiguous chronological timeline, readable skip/reversal
+history, consistent effective projections, valid foreign keys, and no performed/skipped overlap.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -64,6 +71,7 @@ deliberately assigned to F17.
 * F13 — Start Workout
 * F14 — Live Workout Timeline and Set Tracking
 * F14.2 — Explicit Set Start and Accurate Set Timing
+* F15 — Workout Exceptions and Feedback
 
 ## Skipped Features
 
@@ -71,9 +79,9 @@ deliberately assigned to F17.
 
 ## Next Feature
 
-F15 — Workout Exceptions and Feedback. It adds skipped sets or exercises and structured reasons on
-top of the completed F14/F14.2 execution timeline. Discomfort, workout completion, and history
-remain sequenced as F16 through F18.
+F16 — Discomfort and Pain Reporting. It adds structured discomfort/pain facts independently of
+whether the user continues, skips, or stops. Workout completion and history remain sequenced as F17
+and F18.
 
 ## Existing Feature Specifications
 
@@ -92,6 +100,7 @@ remain sequenced as F16 through F18.
 * `harness/features/13_start_workout.md` (completed)
 * `harness/features/14_live_workout_timeline_and_set_tracking.md` (completed)
 * `harness/features/14_2_explicit_set_start_timing.md` (completed corrective follow-up)
+* `harness/features/15_workout_exceptions_and_feedback.md` (completed)
 
 ## Current Technology
 
@@ -108,7 +117,7 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (187 backend tests) / existing F12 Playwright infrastructure retained but deferred as a
+pytest (240 backend tests) / existing F12 Playwright infrastructure retained but deferred as a
 completion gate for current MVP features under DEC-019
 
 Code Quality:

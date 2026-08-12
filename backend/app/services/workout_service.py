@@ -18,6 +18,7 @@ from app.models import (
     RoutineScheduleAssignment,
     TrainingDay,
     WorkoutEvent,
+    WorkoutException,
     WorkoutExercise,
     WorkoutPlannedSet,
     WorkoutSession,
@@ -379,6 +380,7 @@ def _load_workout_full(session: Session, workout_id: int) -> WorkoutSession:
             .selectinload(WorkoutExercise.planned_sets)
             .selectinload(WorkoutPlannedSet.performed_set),
             selectinload(WorkoutSession.events),
+            selectinload(WorkoutSession.exceptions),
         )
         .filter(WorkoutSession.id == workout_id)
         .one()
@@ -394,6 +396,7 @@ def get_active_workout(session: Session, user_id: int) -> WorkoutSession | None:
             .selectinload(WorkoutExercise.planned_sets)
             .selectinload(WorkoutPlannedSet.performed_set),
             selectinload(ActiveWorkout.workout).selectinload(WorkoutSession.events),
+            selectinload(ActiveWorkout.workout).selectinload(WorkoutSession.exceptions),
         )
         .filter(ActiveWorkout.user_id == user_id)
         .first()
@@ -409,6 +412,7 @@ def get_workout(session: Session, user_id: int, workout_id: int) -> WorkoutSessi
             .selectinload(WorkoutExercise.planned_sets)
             .selectinload(WorkoutPlannedSet.performed_set),
             selectinload(WorkoutSession.events),
+            selectinload(WorkoutSession.exceptions),
         )
         .filter(
             WorkoutSession.id == workout_id,
@@ -439,6 +443,7 @@ def _append_event(
     occurred_at: datetime.datetime,
     workout_exercise_id: int | None = None,
     workout_planned_set_id: int | None = None,
+    workout_exception_id: int | None = None,
 ) -> WorkoutEvent:
     event = WorkoutEvent(
         workout_session_id=workout_id,
@@ -446,39 +451,349 @@ def _append_event(
         event_type=event_type,
         workout_exercise_id=workout_exercise_id,
         workout_planned_set_id=workout_planned_set_id,
+        workout_exception_id=workout_exception_id,
         occurred_at=occurred_at,
     )
     session.add(event)
     return event
 
 
-# ────────────────── progress derivation ──────────────────
+# ────────────────── exception helpers ──────────────────
+
+SUPPORTED_REASON_CODES = frozenset(
+    {"not_enough_time", "too_fatigued", "equipment_unavailable", "unable_to_perform", "other"}
+)
+
+
+def _is_set_performed(ps: WorkoutPlannedSet) -> bool:
+    return ps.performed_set is not None
+
+
+def _is_set_skipped(ps: WorkoutPlannedSet, exceptions: list[WorkoutException]) -> bool:
+    for exc in exceptions:
+        if exc.scope == "set" and exc.workout_planned_set_id == ps.id:
+            return True
+        if exc.scope == "exercise" and exc.workout_exercise_id == ps.workout_exercise_id:
+            return True
+    return False
+
+
+def _is_set_resolved(ps: WorkoutPlannedSet, exceptions: list[WorkoutException]) -> bool:
+    return _is_set_performed(ps) or _is_set_skipped(ps, exceptions)
+
+
+def _get_active_exceptions(workout: WorkoutSession) -> list[WorkoutException]:
+    """Return active exceptions (those not yet reversed)."""
+    events = list(workout.events)
+    exception_events: dict[int, list[WorkoutEvent]] = {}
+    for e in events:
+        if e.workout_exception_id is None:
+            continue
+        exception_events.setdefault(e.workout_exception_id, []).append(e)
+
+    active_exceptions: list[WorkoutException] = []
+    for exc_row in workout.exceptions:
+        exc_events = exception_events.get(exc_row.id, [])
+        has_skip = any(ev.event_type in ("set_skipped", "exercise_skipped") for ev in exc_events)
+        has_revert = any(
+            ev.event_type in ("set_skip_reverted", "exercise_skip_reverted") for ev in exc_events
+        )
+        if has_skip and not has_revert:
+            active_exceptions.append(exc_row)
+
+    return active_exceptions
+
+
+def _get_exception_for_set(
+    ps: WorkoutPlannedSet,
+    active_exceptions: list[WorkoutException],
+) -> WorkoutException | None:
+    for exc in active_exceptions:
+        if exc.scope == "set" and exc.workout_planned_set_id == ps.id:
+            return exc
+        if exc.scope == "exercise" and exc.workout_exercise_id == ps.workout_exercise_id:
+            return exc
+    return None
+
+
+def _normalize_note(note: str | None, reason_code: str | None) -> str | None:
+    if note is not None:
+        trimmed = note.strip()
+        if not trimmed:
+            return None
+        if len(trimmed) > 500:
+            raise ExecutionError("Note exceeds 500 characters")
+        return trimmed
+    return None
+
+
+def _validate_exception_reason(reason_code: str | None, note: str | None) -> None:
+    if reason_code is not None and reason_code not in SUPPORTED_REASON_CODES:
+        raise ExecutionError("Unsupported reason code")
+    if reason_code == "other":
+        if note is None or not note.strip():
+            raise ExecutionError("A note is required when reason is 'other'")
+
+
+# ────────────────── set skip ──────────────────
+
+
+def skip_set(
+    session: Session,
+    user_id: int,
+    workout_id: int,
+    exercise_position: int,
+    set_position: int,
+    reason_code: str | None = None,
+    note: str | None = None,
+) -> WorkoutSession:
+    workout = _get_active_workout_for_execution(session, user_id, workout_id)
+
+    we = _get_exercise_by_position(workout, exercise_position)
+    if we is None:
+        raise ExecutionError("Workout set not found")
+
+    ps = _get_planned_set_by_position(we, set_position)
+    if ps is None:
+        raise ExecutionError("Workout set not found")
+
+    _validate_exception_reason(reason_code, note)
+    note = _normalize_note(note, reason_code)
+
+    active_exceptions = _get_active_exceptions(workout)
+
+    if not _exercise_is_started(we, workout.events):
+        raise ExecutionError("Exercise has not been started")
+
+    if ps.performed_set is not None:
+        raise ExecutionError("Workout set is already complete")
+
+    if _is_set_skipped(ps, active_exceptions):
+        raise ExecutionError("Workout set is already skipped")
+
+    earliest = _earliest_unresolved_planned_set(we, active_exceptions)
+    if earliest is None or ps.id != earliest.id:
+        raise ExecutionError("Workout set is not current")
+
+    now = datetime.datetime.utcnow()
+
+    exc = WorkoutException(
+        workout_session_id=workout.id,
+        workout_exercise_id=we.id,
+        workout_planned_set_id=ps.id,
+        scope="set",
+        reason_code=reason_code,
+        note=note,
+        occurred_at=now,
+    )
+    session.add(exc)
+    session.flush()
+
+    seq = _get_next_event_sequence(session, workout_id)
+    _append_event(
+        session,
+        workout_id,
+        seq,
+        "set_skipped",
+        now,
+        workout_exercise_id=we.id,
+        workout_planned_set_id=ps.id,
+        workout_exception_id=exc.id,
+    )
+
+    session.commit()
+    return _load_workout_full(session, workout_id)
+
+
+# ────────────────── set skip reversal ──────────────────
+
+
+def revert_skip_set(
+    session: Session,
+    user_id: int,
+    workout_id: int,
+    exercise_position: int,
+    set_position: int,
+) -> WorkoutSession:
+    workout = _get_active_workout_for_execution(session, user_id, workout_id)
+
+    we = _get_exercise_by_position(workout, exercise_position)
+    if we is None:
+        raise ExecutionError("Workout set not found")
+
+    ps = _get_planned_set_by_position(we, set_position)
+    if ps is None:
+        raise ExecutionError("Workout set not found")
+
+    active_exceptions = _get_active_exceptions(workout)
+
+    set_exc = None
+    for exc in active_exceptions:
+        if exc.scope == "set" and exc.workout_planned_set_id == ps.id:
+            set_exc = exc
+            break
+
+    if set_exc is None:
+        raise ExecutionError("Workout set is not skipped")
+
+    now = datetime.datetime.utcnow()
+    seq = _get_next_event_sequence(session, workout_id)
+    _append_event(
+        session,
+        workout_id,
+        seq,
+        "set_skip_reverted",
+        now,
+        workout_exercise_id=we.id,
+        workout_planned_set_id=ps.id,
+        workout_exception_id=set_exc.id,
+    )
+
+    session.commit()
+    return _load_workout_full(session, workout_id)
+
+
+# ────────────────── exercise skip ──────────────────
+
+
+def skip_exercise(
+    session: Session,
+    user_id: int,
+    workout_id: int,
+    exercise_position: int,
+    reason_code: str | None = None,
+    note: str | None = None,
+) -> WorkoutSession:
+    workout = _get_active_workout_for_execution(session, user_id, workout_id)
+
+    we = _get_exercise_by_position(workout, exercise_position)
+    if we is None:
+        raise ExecutionError("Workout exercise not found")
+
+    _validate_exception_reason(reason_code, note)
+    note = _normalize_note(note, reason_code)
+
+    active_exceptions = _get_active_exceptions(workout)
+
+    for prev_we in workout.exercises:
+        if prev_we.position < exercise_position:
+            if not _exercise_is_fully_resolved(prev_we, active_exceptions):
+                raise ExecutionError("Exercise cannot be skipped yet")
+
+    for exc in active_exceptions:
+        if exc.scope == "exercise" and exc.workout_exercise_id == we.id:
+            raise ExecutionError("Exercise is already skipped")
+
+    if _exercise_is_fully_resolved(we, active_exceptions):
+        raise ExecutionError("Exercise is already resolved")
+
+    now = datetime.datetime.utcnow()
+
+    exc = WorkoutException(
+        workout_session_id=workout.id,
+        workout_exercise_id=we.id,
+        workout_planned_set_id=None,
+        scope="exercise",
+        reason_code=reason_code,
+        note=note,
+        occurred_at=now,
+    )
+    session.add(exc)
+    session.flush()
+
+    seq = _get_next_event_sequence(session, workout_id)
+    _append_event(
+        session,
+        workout_id,
+        seq,
+        "exercise_skipped",
+        now,
+        workout_exercise_id=we.id,
+        workout_planned_set_id=None,
+        workout_exception_id=exc.id,
+    )
+
+    session.commit()
+    return _load_workout_full(session, workout_id)
+
+
+# ────────────────── exercise skip reversal ──────────────────
+
+
+def revert_skip_exercise(
+    session: Session,
+    user_id: int,
+    workout_id: int,
+    exercise_position: int,
+) -> WorkoutSession:
+    workout = _get_active_workout_for_execution(session, user_id, workout_id)
+
+    we = _get_exercise_by_position(workout, exercise_position)
+    if we is None:
+        raise ExecutionError("Workout exercise not found")
+
+    active_exceptions = _get_active_exceptions(workout)
+
+    exercise_exc = None
+    for exc in active_exceptions:
+        if exc.scope == "exercise" and exc.workout_exercise_id == we.id:
+            exercise_exc = exc
+            break
+
+    if exercise_exc is None:
+        raise ExecutionError("Exercise is not skipped")
+
+    now = datetime.datetime.utcnow()
+    seq = _get_next_event_sequence(session, workout_id)
+    _append_event(
+        session,
+        workout_id,
+        seq,
+        "exercise_skip_reverted",
+        now,
+        workout_exercise_id=we.id,
+        workout_planned_set_id=None,
+        workout_exception_id=exercise_exc.id,
+    )
+
+    session.commit()
+    return _load_workout_full(session, workout_id)
 
 
 def _derive_progress(workout: WorkoutSession) -> dict[str, Any]:
+    active_exceptions = _get_active_exceptions(workout)
+
     total_sets = 0
     completed_sets = 0
+    skipped_sets = 0
     all_recorded = True
+    all_resolved = True
     current_exercise_pos: int | None = None
     current_set_pos: int | None = None
     current_set_phase: str | None = None
     current_set_started_at: str | None = None
     transition_to_pos: int | None = None
     found_current = False
-    last_complete_exercise_pos: int | None = None
+    last_resolved_exercise_pos: int | None = None
 
     for we in workout.exercises:
+        exercise_all_resolved = True
         exercise_completed = 0
-        all_sets_recorded = True
+        exercise_skipped_count = 0
 
         for ps in we.planned_sets:
             total_sets += 1
-            if ps.performed_set is not None:
+            if _is_set_performed(ps):
                 completed_sets += 1
                 exercise_completed += 1
-            else:
-                all_sets_recorded = False
+            elif _is_set_skipped(ps, active_exceptions):
+                skipped_sets += 1
+                exercise_skipped_count += 1
                 all_recorded = False
+            else:
+                exercise_all_resolved = False
+                all_recorded = False
+                all_resolved = False
                 if not found_current:
                     exercise_started = _exercise_is_started(we, workout.events)
                     if exercise_started:
@@ -491,25 +806,24 @@ def _derive_progress(workout: WorkoutSession) -> dict[str, Any]:
                             )
                         found_current = True
 
-        if all_sets_recorded and exercise_completed > 0:
-            last_complete_exercise_pos = we.position
+        if exercise_all_resolved and (exercise_completed > 0 or exercise_skipped_count > 0):
+            last_resolved_exercise_pos = we.position
 
-    if not found_current and last_complete_exercise_pos is not None and not all_recorded:
+    if not found_current and last_resolved_exercise_pos is not None and not all_resolved:
         next_exercise = None
         for we in workout.exercises:
-            if we.position > last_complete_exercise_pos:
+            if we.position > last_resolved_exercise_pos:
                 next_exercise = we
                 break
         if next_exercise is not None:
             transition_to_pos = next_exercise.position
 
-    total_count = total_sets
-    completed_count = completed_sets
-
     return {
-        "total_set_count": total_count,
-        "completed_set_count": completed_count,
+        "total_set_count": total_sets,
+        "completed_set_count": completed_sets,
+        "skipped_set_count": skipped_sets,
         "all_sets_recorded": all_recorded,
+        "all_sets_resolved": all_resolved,
         "current_exercise_position": current_exercise_pos,
         "current_set_position": current_set_pos,
         "current_set_phase": current_set_phase,
@@ -518,18 +832,32 @@ def _derive_progress(workout: WorkoutSession) -> dict[str, Any]:
     }
 
 
-def _derive_set_phase(
-    ps: WorkoutPlannedSet, events: list[WorkoutEvent]
-) -> str:
-    set_events = [e for e in events if e.workout_planned_set_id == ps.id]
+def _set_lifecycle_events(ps: WorkoutPlannedSet, events: list[WorkoutEvent]) -> list[WorkoutEvent]:
+    return [
+        event
+        for event in events
+        if event.workout_planned_set_id == ps.id
+        or (
+            event.event_type == "exercise_skipped"
+            and event.workout_exercise_id == ps.workout_exercise_id
+        )
+    ]
+
+
+def _derive_set_phase(ps: WorkoutPlannedSet, events: list[WorkoutEvent]) -> str:
+    set_events = _set_lifecycle_events(ps, events)
 
     latest_start: WorkoutEvent | None = None
     latest_close: WorkoutEvent | None = None
 
+    close_types = frozenset(
+        {"set_completed", "set_marked_incomplete", "set_skipped", "exercise_skipped"}
+    )
+
     for e in set_events:
         if e.event_type == "set_started":
             latest_start = e
-        elif e.event_type in ("set_completed", "set_marked_incomplete"):
+        elif e.event_type in close_types:
             latest_close = e
 
     if latest_start is None:
@@ -547,17 +875,19 @@ def _derive_set_phase(
 def _find_effective_set_started_at(
     ps: WorkoutPlannedSet, events: list[WorkoutEvent], completed_at: datetime.datetime | None = None
 ) -> str | None:
-    set_events = sorted(
-        [e for e in events if e.workout_planned_set_id == ps.id],
-        key=lambda e: e.occurred_at,
-    )
+    set_events = sorted(_set_lifecycle_events(ps, events), key=lambda e: e.sequence)
 
     if completed_at is None:
         latest_start: WorkoutEvent | None = None
         for e in set_events:
             if e.event_type == "set_started":
                 latest_start = e
-            elif e.event_type in ("set_completed", "set_marked_incomplete"):
+            elif e.event_type in (
+                "set_completed",
+                "set_marked_incomplete",
+                "set_skipped",
+                "exercise_skipped",
+            ):
                 latest_start = None
         if latest_start is not None:
             return latest_start.occurred_at.isoformat()
@@ -569,7 +899,7 @@ def _find_effective_set_started_at(
             break
         if e.event_type == "set_started":
             best_start = e
-        elif e.event_type == "set_marked_incomplete":
+        elif e.event_type in ("set_marked_incomplete", "set_skipped", "exercise_skipped"):
             best_start = None
 
     if best_start is not None:
@@ -584,7 +914,7 @@ def _exercise_is_started(we: WorkoutExercise, events: list[WorkoutEvent]) -> boo
 
 
 def _derive_resume(progress: dict[str, Any], workout_id: int) -> str | None:
-    if progress["all_sets_recorded"]:
+    if progress["all_sets_resolved"]:
         return f"/workouts/{workout_id}"
     if progress["transition_to_exercise_position"] is not None:
         previous_position = progress["transition_to_exercise_position"] - 1
@@ -598,7 +928,9 @@ def _derive_resume(progress: dict[str, Any], workout_id: int) -> str | None:
 
 
 def _build_planned_set_response(
-    ps: WorkoutPlannedSet, events: list[WorkoutEvent]
+    ps: WorkoutPlannedSet,
+    events: list[WorkoutEvent],
+    active_exceptions: list[WorkoutException],
 ) -> dict[str, object]:
     tempo: dict[str, object] | None = None
     if (
@@ -623,7 +955,8 @@ def _build_planned_set_response(
         latest_start = _find_effective_set_started_at(ps, events, perf.completed_at)
         if latest_start is not None:
             set_started_at = latest_start
-            duration = (perf.completed_at - datetime.datetime.fromisoformat(latest_start)).total_seconds()
+            start_dt = datetime.datetime.fromisoformat(latest_start)
+            duration = (perf.completed_at - start_dt).total_seconds()
             observed_duration_seconds = max(0, int(duration))
 
         performance = {
@@ -639,6 +972,16 @@ def _build_planned_set_response(
             "updated_at": perf.updated_at.isoformat(),
         }
 
+    exception: dict[str, object] | None = None
+    exc = _get_exception_for_set(ps, active_exceptions)
+    if exc is not None:
+        exception = {
+            "scope": exc.scope,
+            "reason_code": exc.reason_code,
+            "note": exc.note,
+            "occurred_at": exc.occurred_at.isoformat(),
+        }
+
     return {
         "position": ps.position,
         "target_value": float(ps.target_value),
@@ -648,6 +991,7 @@ def _build_planned_set_response(
         "rest_after_set_seconds": ps.rest_after_set_seconds,
         "notes": ps.notes,
         "performance": performance,
+        "exception": exception,
     }
 
 
@@ -655,11 +999,19 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
     progress = _derive_progress(workout)
     server_now = datetime.datetime.utcnow()
     events = list(workout.events) if workout.events else []
+    active_exceptions = _get_active_exceptions(workout)
 
     exercises: list[dict[str, object]] = []
     for we in workout.exercises:
-        planned_sets = [_build_planned_set_response(ps, events) for ps in we.planned_sets]
-        completed = sum(1 for ps in we.planned_sets if ps.performed_set is not None)
+        planned_sets = [
+            _build_planned_set_response(ps, events, active_exceptions) for ps in we.planned_sets
+        ]
+        completed = sum(1 for ps in we.planned_sets if _is_set_performed(ps))
+        skipped = sum(
+            1
+            for ps in we.planned_sets
+            if not _is_set_performed(ps) and _is_set_skipped(ps, active_exceptions)
+        )
         total = len(we.planned_sets)
 
         started_at: str | None = None
@@ -674,16 +1026,57 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
         )
         if started_evt is not None:
             started_at = started_evt.occurred_at.isoformat()
-        completed_evts = sorted(
+
+        resolving_types = frozenset(
+            {"exercise_completed", "exercise_skipped", "set_completed", "set_skipped"}
+        )
+        resolving_events = sorted(
             [
                 e
                 for e in events
-                if e.event_type == "exercise_completed" and e.workout_exercise_id == we.id
+                if e.workout_exercise_id == we.id and e.event_type in resolving_types
             ],
             key=lambda e: e.occurred_at,
         )
-        if completed_evts:
-            completed_at = completed_evts[-1].occurred_at.isoformat()
+        if resolving_events:
+            completed_at = resolving_events[-1].occurred_at.isoformat()
+
+        is_complete = completed == total
+
+        is_resolved = True
+        for ps in we.planned_sets:
+            if not _is_set_resolved(ps, active_exceptions):
+                is_resolved = False
+                break
+
+        execution_status: str
+        exercise_exc = None
+        for exc in active_exceptions:
+            if exc.scope == "exercise" and exc.workout_exercise_id == we.id:
+                exercise_exc = exc
+                break
+
+        any_started = _exercise_is_started(we, events)
+        if is_resolved:
+            if skipped == total:
+                execution_status = "skipped"
+            elif completed == total:
+                execution_status = "completed"
+            else:
+                execution_status = "partial"
+        elif any_started:
+            execution_status = "in_progress"
+        else:
+            execution_status = "pending"
+
+        exercise_exception: dict[str, object] | None = None
+        if exercise_exc is not None:
+            exercise_exception = {
+                "scope": exercise_exc.scope,
+                "reason_code": exercise_exc.reason_code,
+                "note": exercise_exc.note,
+                "occurred_at": exercise_exc.occurred_at.isoformat(),
+            }
 
         exercises.append(
             {
@@ -698,8 +1091,12 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
                 "started_at": started_at,
                 "latest_completed_at": completed_at,
                 "completed_set_count": completed,
+                "skipped_set_count": skipped,
                 "total_set_count": total,
-                "is_complete": completed == total,
+                "is_complete": is_complete,
+                "is_resolved": is_resolved,
+                "execution_status": execution_status,
+                "exception": exercise_exception,
                 "planned_sets": planned_sets,
             }
         )
@@ -720,6 +1117,14 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
                         set_position = ps.position
                         break
 
+        event_exception: dict[str, object] | None = None
+        if e.workout_exception_id is not None and e.exception is not None:
+            event_exception = {
+                "scope": e.exception.scope,
+                "reason_code": e.exception.reason_code,
+                "note": e.exception.note,
+            }
+
         timeline.append(
             {
                 "sequence": e.sequence,
@@ -727,6 +1132,7 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
                 "exercise_position": exercise_position,
                 "set_position": set_position,
                 "occurred_at": e.occurred_at.isoformat(),
+                "exception": event_exception,
             }
         )
 
@@ -749,8 +1155,10 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
         "cancelled_at": workout.cancelled_at.isoformat() if workout.cancelled_at else None,
         "server_now": server_now.isoformat(),
         "completed_set_count": progress["completed_set_count"],
+        "skipped_set_count": progress["skipped_set_count"],
         "total_set_count": progress["total_set_count"],
         "all_sets_recorded": progress["all_sets_recorded"],
+        "all_sets_resolved": progress["all_sets_resolved"],
         "current_exercise_position": progress["current_exercise_position"],
         "current_set_position": progress["current_set_position"],
         "current_set_phase": progress["current_set_phase"],
@@ -804,13 +1212,15 @@ def start_exercise(
     if _exercise_is_started(we, workout.events):
         raise ExecutionError("Exercise is already started")
 
+    active_exceptions = _get_active_exceptions(workout)
+
     prev_exercises = [e for e in workout.exercises if e.position < exercise_position]
     for prev in prev_exercises:
-        if not _exercise_is_complete(prev):
+        if not _exercise_is_fully_resolved(prev, active_exceptions):
             raise ExecutionError("Exercise cannot be started yet")
 
-    earliest_incomplete = _earliest_incomplete_planned_set(we)
-    if earliest_incomplete is None:
+    earliest_unresolved = _earliest_unresolved_planned_set(we, active_exceptions)
+    if earliest_unresolved is None:
         raise ExecutionError("Exercise has no incomplete sets")
 
     now = datetime.datetime.utcnow()
@@ -823,7 +1233,7 @@ def start_exercise(
         "set_started",
         now,
         workout_exercise_id=we.id,
-        workout_planned_set_id=earliest_incomplete.id,
+        workout_planned_set_id=earliest_unresolved.id,
     )
     session.commit()
     return _load_workout_full(session, workout_id)
@@ -855,7 +1265,11 @@ def start_set(
     if ps.performed_set is not None:
         raise ExecutionError("Workout set is already complete")
 
-    earliest = _earliest_incomplete_planned_set(we)
+    active_exceptions = _get_active_exceptions(workout)
+    if _is_set_skipped(ps, active_exceptions):
+        raise ExecutionError("Workout set is already skipped")
+
+    earliest = _earliest_unresolved_planned_set(we, active_exceptions)
     if earliest is None or ps.id != earliest.id:
         raise ExecutionError("Workout set is not current")
 
@@ -878,11 +1292,24 @@ def start_set(
     return _load_workout_full(session, workout_id)
 
 
-def _earliest_incomplete_planned_set(we: WorkoutExercise) -> WorkoutPlannedSet | None:
+def _earliest_unresolved_planned_set(
+    we: WorkoutExercise,
+    active_exceptions: list[WorkoutException],
+) -> WorkoutPlannedSet | None:
     for ps in we.planned_sets:
-        if ps.performed_set is None:
+        if not _is_set_resolved(ps, active_exceptions):
             return ps
     return None
+
+
+def _exercise_is_fully_resolved(
+    we: WorkoutExercise,
+    active_exceptions: list[WorkoutException],
+) -> bool:
+    for ps in we.planned_sets:
+        if not _is_set_resolved(ps, active_exceptions):
+            return False
+    return True
 
 
 # ────────────────── set completion ──────────────────
@@ -911,6 +1338,11 @@ def complete_set(
 
     if not _exercise_is_started(we, workout.events):
         raise ExecutionError("Exercise has not been started")
+
+    active_exceptions = _get_active_exceptions(workout)
+
+    if _is_set_skipped(ps, active_exceptions):
+        raise ExecutionError("Workout set is already skipped")
 
     now = datetime.datetime.utcnow()
 
@@ -949,7 +1381,9 @@ def complete_set(
         session.commit()
         return _load_workout_full(session, workout_id)
 
-    _validate_current_set(we, set_position)
+    earliest = _earliest_unresolved_planned_set(we, active_exceptions)
+    if earliest is None or ps.id != earliest.id:
+        raise ExecutionError("Workout set is not current")
 
     phase = _derive_set_phase(ps, workout.events)
     if phase != "set_in_progress":
@@ -1068,16 +1502,6 @@ def _get_planned_set_by_position(we: WorkoutExercise, position: int) -> WorkoutP
 
 def _exercise_is_complete(we: WorkoutExercise) -> bool:
     return all(ps.performed_set is not None for ps in we.planned_sets)
-
-
-def _validate_current_set(we: WorkoutExercise, set_position: int) -> None:
-    earliest_incomplete = None
-    for ps in we.planned_sets:
-        if ps.performed_set is None:
-            earliest_incomplete = ps.position
-            break
-    if earliest_incomplete is None or set_position != earliest_incomplete:
-        raise ExecutionError("Workout set is not current")
 
 
 def _validate_performed_value(target_type: str, value: float) -> None:

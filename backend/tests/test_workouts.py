@@ -21,7 +21,6 @@ from app.models import Exercise
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 F13_REVISION = "5f6392b90798"
 F14_REVISION = "693e3945d24a"
-F14_2_REVISION = "f14_2_set_started"
 PREVIOUS_REVISION = "f11a1b2c3d4e"
 
 
@@ -179,9 +178,7 @@ def _complete(
     )
 
 
-def _start_exercise(
-    client: TestClient, token: str, workout_id: int, ex_pos: int
-) -> Any:
+def _start_exercise(client: TestClient, token: str, workout_id: int, ex_pos: int) -> Any:
     return client.post(
         f"/api/workouts/{workout_id}/exercises/{ex_pos}/start",
         headers=_headers(token),
@@ -272,6 +269,7 @@ def test_scheduled_start_snapshots_complete_prescription_and_resumes(client: Tes
         "rest_after_set_seconds": 90,
         "notes": "Working set",
         "performance": None,
+        "exception": None,
     }
 
     assert workout["current_set_phase"] is None
@@ -423,7 +421,7 @@ def test_f13_migration_fresh_schema_and_safe_rerun(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f13_fresh.db').as_posix()}"
     _run_alembic(database_url, "upgrade", "head")
     _run_alembic(database_url, "upgrade", "head")
-    assert F14_2_REVISION in _run_alembic(database_url, "current").stdout
+    assert "f15_exceptions" in _run_alembic(database_url, "current").stdout
 
     engine = create_engine(database_url)
     schema = inspect(engine)
@@ -772,8 +770,15 @@ def test_adjusted_completion(client: TestClient) -> None:
     _start_exercise(client, token, workout_id, 1)
 
     response = _complete(
-        client, token, workout_id, 1, 1,
-        entry_mode="adjusted", value=8, weight=40.0, rir=1,
+        client,
+        token,
+        workout_id,
+        1,
+        1,
+        entry_mode="adjusted",
+        value=8,
+        weight=40.0,
+        rir=1,
     )
     assert response.status_code == 200, response.text
     workout = response.json()
@@ -894,8 +899,15 @@ def test_set_edit_preserves_original_completed_at(client: TestClient) -> None:
     _complete(client, token, workout_id, 1, 1)
 
     response = _complete(
-        client, token, workout_id, 1, 1,
-        entry_mode="adjusted", value=12, weight=45.0, rir=1,
+        client,
+        token,
+        workout_id,
+        1,
+        1,
+        entry_mode="adjusted",
+        value=12,
+        weight=45.0,
+        rir=1,
     )
     assert response.status_code == 200, response.text
     workout = response.json()
@@ -1078,8 +1090,15 @@ def test_cancelled_workout_rejects_execution(client: TestClient) -> None:
     assert complete_resp.status_code == 409
 
     update_resp = _complete(
-        client, token, workout_id, 1, 1,
-        entry_mode="adjusted", value=5, weight=30.0, rir=0,
+        client,
+        token,
+        workout_id,
+        1,
+        1,
+        entry_mode="adjusted",
+        value=5,
+        weight=30.0,
+        rir=0,
     )
     assert update_resp.status_code == 409
 
@@ -1113,8 +1132,15 @@ def test_invalid_path_positions(client: TestClient) -> None:
     assert complete_bad.json()["detail"] == "Workout set not found"
 
     update_bad = _complete(
-        client, token, workout_id, 99, 1,
-        entry_mode="adjusted", value=5, weight=None, rir=None,
+        client,
+        token,
+        workout_id,
+        99,
+        1,
+        entry_mode="adjusted",
+        value=5,
+        weight=None,
+        rir=None,
     )
     assert update_bad.status_code == 404
 
@@ -1139,8 +1165,15 @@ def test_ownership_isolation_for_execution(client: TestClient) -> None:
     assert complete_resp.status_code == 404
 
     update_resp = _complete(
-        client, other, workout_id, 1, 1,
-        entry_mode="adjusted", value=5, weight=None, rir=None,
+        client,
+        other,
+        workout_id,
+        1,
+        1,
+        entry_mode="adjusted",
+        value=5,
+        weight=None,
+        rir=None,
     )
     assert update_resp.status_code == 404
 
@@ -1233,7 +1266,7 @@ def test_f14_2_migration_upgrade_and_legacy_timing(tmp_path: Path) -> None:
 def test_f14_2_migration_fresh_and_rerun(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f14_2_fresh.db').as_posix()}"
     _run_alembic(database_url, "upgrade", "head")
-    assert F14_2_REVISION in _run_alembic(database_url, "current").stdout
+    assert "f15_exceptions" in _run_alembic(database_url, "current").stdout
     _run_alembic(database_url, "upgrade", "head")
 
     engine = create_engine(database_url)
@@ -1244,3 +1277,646 @@ def test_f14_2_migration_fresh_and_rerun(tmp_path: Path) -> None:
         assert connection.execute(text("PRAGMA integrity_check")).scalar_one() == "ok"
         assert connection.execute(text("PRAGMA foreign_key_check")).all() == []
     engine.dispose()
+
+
+# ────────────────── F15 exception helpers ──────────────────
+
+
+def _ready_plan_multi_sets(client: TestClient, token: str, set_count: int = 3) -> tuple[int, int]:
+    routine = _create_routine(client, token, "Multi-Set Plan")
+    day = _create_day(client, token, routine["id"], "Push")
+    _configure_day_multi_sets(client, token, routine["id"], day["id"], set_count=set_count)
+    _activate(client, token, routine["id"])
+    return routine["id"], day["id"]
+
+
+def _ready_plan_two_ex_two_sets(client: TestClient, token: str) -> tuple[int, int]:
+    routine = _create_routine(client, token, "Two-Ex-Two-Set")
+    day = _create_day(client, token, routine["id"], "Full Body")
+    _configure_day_multi_sets(
+        client, token, routine["id"], day["id"], set_count=2, exercise_index=0
+    )
+    _configure_day_multi_sets(
+        client, token, routine["id"], day["id"], set_count=2, exercise_index=1
+    )
+    _activate(client, token, routine["id"])
+    return routine["id"], day["id"]
+
+
+def _skip_set(
+    client: TestClient,
+    token: str,
+    workout_id: int,
+    exercise_pos: int,
+    set_pos: int,
+    reason_code: str | None = None,
+    note: str | None = None,
+) -> Any:
+    body: dict[str, str | None] = {}
+    if reason_code is not None:
+        body["reason_code"] = reason_code
+    if note is not None:
+        body["note"] = note
+    return client.post(
+        f"/api/workouts/{workout_id}/exercises/{exercise_pos}/sets/{set_pos}/skip",
+        json=body if body else {},
+        headers=_headers(token),
+    )
+
+
+def _undo_set_skip(
+    client: TestClient,
+    token: str,
+    workout_id: int,
+    exercise_pos: int,
+    set_pos: int,
+) -> Any:
+    return client.delete(
+        f"/api/workouts/{workout_id}/exercises/{exercise_pos}/sets/{set_pos}/skip",
+        headers=_headers(token),
+    )
+
+
+def _skip_exercise(
+    client: TestClient,
+    token: str,
+    workout_id: int,
+    exercise_pos: int,
+    reason_code: str | None = None,
+    note: str | None = None,
+) -> Any:
+    body: dict[str, str | None] = {}
+    if reason_code is not None:
+        body["reason_code"] = reason_code
+    if note is not None:
+        body["note"] = note
+    return client.post(
+        f"/api/workouts/{workout_id}/exercises/{exercise_pos}/skip",
+        json=body if body else {},
+        headers=_headers(token),
+    )
+
+
+def _undo_exercise_skip(
+    client: TestClient,
+    token: str,
+    workout_id: int,
+    exercise_pos: int,
+) -> Any:
+    return client.delete(
+        f"/api/workouts/{workout_id}/exercises/{exercise_pos}/skip",
+        headers=_headers(token),
+    )
+
+
+# ────────────────── F15 set skip tests ──────────────────
+
+
+def test_skip_awaiting_set_without_feedback(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    r = _skip_set(client, token, workout["id"], 1, 1)
+    assert r.status_code == 200, r.text
+    updated = r.json()
+
+    assert updated["skipped_set_count"] == 1
+    assert updated["completed_set_count"] == 0
+    assert updated["all_sets_recorded"] is False
+    assert updated["all_sets_resolved"] is False
+
+    ps = updated["exercises"][0]["planned_sets"][0]
+    assert ps["performance"] is None
+    assert ps["exception"] is not None
+    assert ps["exception"]["scope"] == "set"
+    assert ps["exception"]["reason_code"] is None
+    assert ps["exception"]["note"] is None
+
+    events = updated["events"]
+    assert events[-1]["event_type"] == "set_skipped"
+    assert events[-1]["exception"]["scope"] == "set"
+
+
+def test_skip_in_progress_set_closes_attempt(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+    _start_set(client, token, workout["id"], 1, 1)
+
+    r = _skip_set(client, token, workout["id"], 1, 1)
+    assert r.status_code == 200, r.text
+    updated = r.json()
+
+    ps = updated["exercises"][0]["planned_sets"][0]
+    assert ps["exception"] is not None
+    assert ps["performance"] is None
+
+    event_types = [e["event_type"] for e in updated["events"]]
+    assert "set_started" in event_types
+    assert "set_skipped" in event_types
+    assert "set_completed" not in event_types
+
+
+def test_skip_set_with_reason_and_note(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    r = _skip_set(client, token, workout["id"], 1, 1, reason_code="too_fatigued", note="Exhausted")
+    assert r.status_code == 200, r.text
+    updated = r.json()
+
+    exc = updated["exercises"][0]["planned_sets"][0]["exception"]
+    assert exc["reason_code"] == "too_fatigued"
+    assert exc["note"] == "Exhausted"
+
+    event = updated["events"][-1]
+    assert event["exception"]["reason_code"] == "too_fatigued"
+    assert event["exception"]["note"] == "Exhausted"
+
+
+def test_skip_set_other_requires_note(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    r = _skip_set(client, token, workout["id"], 1, 1, reason_code="other")
+    assert r.status_code == 422, r.text
+
+    r2 = _skip_set(client, token, workout["id"], 1, 1, reason_code="other", note="Reason details")
+    assert r2.status_code == 200, r2.text
+
+
+def test_skip_set_advances_to_next_unresolved(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=3)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    r = _skip_set(client, token, workout["id"], 1, 1)
+    assert r.status_code == 200
+    updated = r.json()
+
+    assert updated["current_set_position"] == 2
+    assert updated["current_set_phase"] == "awaiting_set_start"
+
+
+def test_skip_final_set_triggers_transition(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_ex_two_sets(client, token)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    _complete(client, token, workout["id"], 1, 1)
+    r = _skip_set(client, token, workout["id"], 1, 2)
+    assert r.status_code == 200
+    updated = r.json()
+
+    assert updated["transition_to_exercise_position"] == 2
+    assert updated["exercises"][0]["execution_status"] == "partial"
+    assert updated["exercises"][0]["is_resolved"] is True
+
+
+def test_undo_set_skip_restores_work(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    _skip_set(client, token, workout["id"], 1, 1)
+    r = _undo_set_skip(client, token, workout["id"], 1, 1)
+    assert r.status_code == 200, r.text
+    updated = r.json()
+
+    ps = updated["exercises"][0]["planned_sets"][0]
+    assert ps["exception"] is None
+    assert ps["performance"] is None
+    assert updated["skipped_set_count"] == 0
+
+    event_types = [e["event_type"] for e in updated["events"]]
+    assert "set_skipped" in event_types
+    assert "set_skip_reverted" in event_types
+
+
+def test_undo_set_skip_requires_restart(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    _skip_set(client, token, workout["id"], 1, 1)
+    _undo_set_skip(client, token, workout["id"], 1, 1)
+
+    r = _complete(client, token, workout["id"], 1, 1)
+    assert r.status_code == 409, r.text
+    assert "has not been started" in r.json()["detail"]
+
+
+def test_progress_all_sets_resolved_after_all_skipped(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+    _skip_set(client, token, workout["id"], 1, 1)
+    _skip_set(client, token, workout["id"], 1, 2)
+
+    updated = client.get(f"/api/workouts/{workout['id']}", headers=_headers(token)).json()
+    assert updated["all_sets_resolved"] is True
+    assert updated["all_sets_recorded"] is False
+    assert updated["completed_set_count"] == 0
+    assert updated["skipped_set_count"] == 2
+    assert updated["resume_url"] == f"/workouts/{workout['id']}"
+
+
+# ────────────────── F15 exercise skip tests ──────────────────
+
+
+def test_skip_exercise_before_start(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_ex_two_sets(client, token)
+    workout = _start(client, token, day_id).json()
+
+    r = _skip_exercise(client, token, workout["id"], 1, reason_code="not_enough_time")
+    assert r.status_code == 200, r.text
+    updated = r.json()
+
+    ex = updated["exercises"][0]
+    assert ex["execution_status"] == "skipped"
+    assert ex["is_resolved"] is True
+    assert ex["completed_set_count"] == 0
+    assert ex["skipped_set_count"] == 2
+
+    for ps in ex["planned_sets"]:
+        assert ps["exception"] is not None
+        assert ps["exception"]["scope"] == "exercise"
+
+    events = updated["events"]
+    assert events[-1]["event_type"] == "exercise_skipped"
+
+
+def test_skip_exercise_after_partial_preserves_performed(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_ex_two_sets(client, token)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+    _complete(client, token, workout["id"], 1, 1)
+
+    r = _skip_exercise(client, token, workout["id"], 1)
+    assert r.status_code == 200, r.text
+    updated = r.json()
+
+    ex = updated["exercises"][0]
+    assert ex["execution_status"] == "partial"
+    assert ex["completed_set_count"] == 1
+    assert ex["skipped_set_count"] == 1
+
+    assert ex["planned_sets"][0]["performance"] is not None
+    assert ex["planned_sets"][1]["exception"] is not None
+
+
+def test_undo_exercise_skip_restores_remaining(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_ex_two_sets(client, token)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+    _complete(client, token, workout["id"], 1, 1)
+    _skip_exercise(client, token, workout["id"], 1)
+
+    r = _undo_exercise_skip(client, token, workout["id"], 1)
+    assert r.status_code == 200, r.text
+    updated = r.json()
+
+    ex = updated["exercises"][0]
+    assert ex["exception"] is None
+    assert ex["skipped_set_count"] == 0
+    assert ex["is_resolved"] is False
+
+    event_types = [e["event_type"] for e in updated["events"]]
+    assert "exercise_skipped" in event_types
+    assert "exercise_skip_reverted" in event_types
+
+
+def test_undo_exercise_skip_closes_in_progress_set_and_requires_restart(
+    client: TestClient,
+) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_ex_two_sets(client, token)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    skipped = _skip_exercise(client, token, workout["id"], 1)
+    assert skipped.status_code == 200, skipped.text
+
+    reverted = _undo_exercise_skip(client, token, workout["id"], 1)
+    assert reverted.status_code == 200, reverted.text
+    restored = reverted.json()
+    assert restored["current_set_position"] == 1
+    assert restored["current_set_phase"] == "awaiting_set_start"
+    assert restored["current_set_started_at"] is None
+
+    completion = _complete(client, token, workout["id"], 1, 1)
+    assert completion.status_code == 409
+    assert "has not been started" in completion.json()["detail"]
+
+    restarted = _start_set(client, token, workout["id"], 1, 1)
+    assert restarted.status_code == 200, restarted.text
+    assert restarted.json()["current_set_phase"] == "set_in_progress"
+
+
+# ────────────────── F15 conflict / rejection tests ──────────────────
+
+
+def test_skip_already_complete_set_rejected(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+    _complete(client, token, workout["id"], 1, 1)
+
+    r = _skip_set(client, token, workout["id"], 1, 1)
+    assert r.status_code == 409
+    assert "already complete" in r.json()["detail"]
+
+
+def test_skip_already_skipped_set_rejected(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    _skip_set(client, token, workout["id"], 1, 1)
+    r = _skip_set(client, token, workout["id"], 1, 1)
+    assert r.status_code == 409
+
+
+def test_skip_exercise_already_resolved_rejected(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_ex_two_sets(client, token)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+    _complete(client, token, workout["id"], 1, 1)
+    _start_set(client, token, workout["id"], 1, 2)
+    _complete(client, token, workout["id"], 1, 2)
+
+    r = _skip_exercise(client, token, workout["id"], 1)
+    assert r.status_code == 409
+    assert "already resolved" in r.json()["detail"]
+
+
+def test_skip_exercise_already_skipped_rejected(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_ex_two_sets(client, token)
+    workout = _start(client, token, day_id).json()
+
+    _skip_exercise(client, token, workout["id"], 1)
+    r = _skip_exercise(client, token, workout["id"], 1)
+    assert r.status_code == 409
+    assert "already skipped" in r.json()["detail"]
+
+
+def test_undo_not_skipped_set_rejected(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    r = _undo_set_skip(client, token, workout["id"], 1, 1)
+    assert r.status_code == 409
+    assert "not skipped" in r.json()["detail"]
+
+
+def test_skip_set_not_current_rejected(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=3)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    r = _skip_set(client, token, workout["id"], 1, 2)
+    assert r.status_code == 409
+
+    r2 = _skip_set(client, token, workout["id"], 1, 99)
+    assert r2.status_code == 404
+
+
+def test_skip_set_unstarted_exercise_rejected(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_ex_two_sets(client, token)
+    workout = _start(client, token, day_id).json()
+
+    r = _skip_set(client, token, workout["id"], 1, 1)
+    assert r.status_code == 409
+    assert "has not been started" in r.json()["detail"]
+
+
+def test_skip_exercise_before_earlier_resolved_rejected(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_ex_two_sets(client, token)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    r = _skip_exercise(client, token, workout["id"], 2)
+    assert r.status_code == 409
+    assert "cannot be skipped yet" in r.json()["detail"]
+
+
+def test_skip_set_covered_by_exercise_exception_rejected(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_two_ex_two_sets(client, token)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    _skip_exercise(client, token, workout["id"], 1)
+    r = _skip_set(client, token, workout["id"], 1, 2)
+    assert r.status_code == 409
+
+
+# ────────────────── F15 other tests ──────────────────
+
+
+def test_reverse_skip_after_later_progress_returns_earliest_unresolved(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+    _skip_set(client, token, workout["id"], 1, 1)
+    _start_set(client, token, workout["id"], 1, 2)
+    _complete(client, token, workout["id"], 1, 2)
+
+    r = _undo_set_skip(client, token, workout["id"], 1, 1)
+    assert r.status_code == 200, r.text
+    updated = r.json()
+
+    assert updated["current_exercise_position"] == 1
+    assert updated["current_set_position"] == 1
+    assert updated["skipped_set_count"] == 0
+
+
+def test_cancelled_workout_rejects_skip(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+    client.post(f"/api/workouts/{workout['id']}/cancel", headers=_headers(token))
+
+    r1 = _skip_set(client, token, workout["id"], 1, 1)
+    assert r1.status_code == 409
+    assert "not active" in r1.json()["detail"]
+
+    r2 = _skip_exercise(client, token, workout["id"], 1)
+    assert r2.status_code == 409
+    assert "not active" in r2.json()["detail"]
+
+
+def test_skip_note_trimmed(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    r = _skip_set(client, token, workout["id"], 1, 1, note="  trimmed example  ")
+    assert r.status_code == 200
+    updated = r.json()
+    assert updated["exercises"][0]["planned_sets"][0]["exception"]["note"] == "trimmed example"
+
+
+def test_skip_authentication_and_ownership(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    client.cookies.clear()
+    assert (
+        client.post(f"/api/workouts/{workout['id']}/exercises/1/sets/1/skip", json={}).status_code
+        == 401
+    )
+    assert (
+        client.delete(f"/api/workouts/{workout['id']}/exercises/1/sets/1/skip").status_code == 401
+    )
+    assert (
+        client.post(f"/api/workouts/{workout['id']}/exercises/1/skip", json={}).status_code == 401
+    )
+    assert client.delete(f"/api/workouts/{workout['id']}/exercises/1/skip").status_code == 401
+
+    other_token, _ = _register(client, "other-owner@example.com")
+    assert _skip_set(client, other_token, workout["id"], 1, 1).status_code == 404
+    assert _undo_set_skip(client, other_token, workout["id"], 1, 1).status_code == 404
+    assert _skip_exercise(client, other_token, workout["id"], 1).status_code == 404
+    assert _undo_exercise_skip(client, other_token, workout["id"], 1).status_code == 404
+
+
+def test_skip_invalid_path_and_body(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan_multi_sets(client, token, set_count=2)
+    workout = _start(client, token, day_id).json()
+    _start_exercise(client, token, workout["id"], 1)
+
+    assert (
+        client.post(
+            f"/api/workouts/{workout['id']}/exercises/1/sets/0/skip",
+            json={},
+            headers=_headers(token),
+        ).status_code
+        == 422
+    )
+
+    assert (
+        client.post(
+            f"/api/workouts/{workout['id']}/exercises/1/sets/1/skip",
+            json={"reason_code": "invalid"},
+            headers=_headers(token),
+        ).status_code
+        == 422
+    )
+
+    assert (
+        client.post(
+            f"/api/workouts/{workout['id']}/exercises/0/skip",
+            json={},
+            headers=_headers(token),
+        ).status_code
+        == 422
+    )
+
+
+# ────────────────── F15 migration tests ──────────────────
+
+
+def test_f15_migration_fresh_and_upgrade(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'f15_fresh.db').as_posix()}"
+    _run_alembic(database_url, "upgrade", "head")
+    _run_alembic(database_url, "upgrade", "head")
+
+    assert "f15_exceptions" in _run_alembic(database_url, "current").stdout
+
+    engine = create_engine(database_url)
+    schema = inspect(engine)
+    assert "workout_exceptions" in schema.get_table_names()
+    exc_checks = {c["name"] for c in schema.get_check_constraints("workout_exceptions")}
+    assert "ck_workout_exceptions_scope" in exc_checks
+    assert "ck_workout_exceptions_reason_code" in exc_checks
+    assert "ck_workout_exceptions_scope_refs" in exc_checks
+
+    event_checks = {c["name"] for c in schema.get_check_constraints("workout_events")}
+    assert "ck_workout_events_event_type" in event_checks
+
+    with engine.connect() as connection:
+        assert connection.execute(text("PRAGMA integrity_check")).scalar_one() == "ok"
+        assert connection.execute(text("PRAGMA foreign_key_check")).all() == []
+    engine.dispose()
+
+    upgrade_db = f"sqlite:///{(tmp_path / 'f15_upgrade.db').as_posix()}"
+    _run_alembic(upgrade_db, "upgrade", "f14_2_set_started")
+
+    upgrade_engine = create_engine(upgrade_db, connect_args={"check_same_thread": False})
+    with upgrade_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO users (id, email, password_hash, created_at) VALUES "
+                "(9001, 'upgrade@example.com', 'hash', CURRENT_TIMESTAMP)"
+            )
+        )
+    upgrade_engine.dispose()
+
+    _run_alembic(upgrade_db, "upgrade", "head")
+
+    upgrade_engine2 = create_engine(upgrade_db, connect_args={"check_same_thread": False})
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=upgrade_engine2)
+
+    def override_get_session() -> Generator[Session, None, None]:
+        s = session_factory()
+        try:
+            yield s
+        finally:
+            s.close()
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        with TestClient(app) as migrated_client:
+            token, _ = _register(migrated_client, "upgrade-user@example.com")
+            _, day_id = _ready_plan_two_ex_two_sets(migrated_client, token)
+            workout_id = _start(migrated_client, token, day_id).json()["id"]
+
+            _start_exercise(migrated_client, token, workout_id, 1)
+
+            r = _skip_set(migrated_client, token, workout_id, 1, 1)
+            assert r.status_code == 200, r.text
+            updated = r.json()
+            assert updated["skipped_set_count"] == 1
+            assert updated["exercises"][0]["planned_sets"][0]["exception"] is not None
+
+            r2 = _undo_set_skip(migrated_client, token, workout_id, 1, 1)
+            assert r2.status_code == 200, r2.text
+
+            _complete(migrated_client, token, workout_id, 1, 1)
+            _complete(migrated_client, token, workout_id, 1, 2)
+
+            migrated_client.post(f"/api/workouts/{workout_id}/cancel", headers=_headers(token))
+    finally:
+        app.dependency_overrides.clear()
+        upgrade_engine2.dispose()

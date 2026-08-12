@@ -66,6 +66,20 @@ class AdjustedPerformance(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+class SkipRequest(BaseModel):
+    reason_code: str | None = None
+    note: str | None = None
+
+    @field_validator("reason_code", mode="before")
+    @classmethod
+    def reject_boolean_reason(cls, value: object) -> object:
+        if isinstance(value, bool):
+            raise ValueError("reason_code must be a string or null, not a boolean")
+        return value
+
+    model_config = {"extra": "forbid"}
+
+
 def _parse_date(date_str: str) -> datetime.date:
     return datetime.date.fromisoformat(date_str)
 
@@ -85,8 +99,19 @@ def _execution_error_to_http(error: str) -> tuple[int, str]:
         "Workout set is already started": (409, "Workout set is already started"),
         "Workout set is already complete": (409, "Workout set is already complete"),
         "Workout set has not been started": (409, "Workout set has not been started"),
+        "Workout set is already skipped": (409, "Workout set is already skipped"),
+        "Workout set is not skipped": (409, "Workout set is not skipped"),
+        "Exercise cannot be skipped yet": (409, "Exercise cannot be skipped yet"),
+        "Exercise is already resolved": (409, "Exercise is already resolved"),
+        "Exercise is already skipped": (409, "Exercise is already skipped"),
+        "Exercise is not skipped": (409, "Exercise is not skipped"),
+        "Unsupported reason code": (422, "Unsupported reason code"),
     }
     if error.startswith("Invalid performed"):
+        return (422, error)
+    if error.startswith("A note is required"):
+        return (422, error)
+    if error.startswith("Note exceeds"):
         return (422, error)
     return mapping.get(error, (500, "Unable to process request"))
 
@@ -356,6 +381,127 @@ def mark_incomplete(
             workout_id,
             exercise_position,
             set_position,
+        )
+    except workout_service.ExecutionError as e:
+        code, detail = _execution_error_to_http(str(e))
+        raise HTTPException(status_code=code, detail=detail)
+
+    return workout_service._build_workout_response(workout)
+
+
+# ────────────────── F15 exception endpoints ──────────────────
+
+
+@router.post("/api/workouts/{workout_id}/exercises/{exercise_position}/sets/{set_position}/skip")
+def skip_set(
+    workout_id: int,
+    exercise_position: int,
+    set_position: int,
+    body: SkipRequest,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if workout_id <= 0 or exercise_position <= 0 or set_position <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "path parameters must be positive integers"}],
+        )
+
+    try:
+        workout = workout_service.skip_set(
+            session,
+            user.id,
+            workout_id,
+            exercise_position,
+            set_position,
+            reason_code=body.reason_code,
+            note=body.note,
+        )
+    except workout_service.ExecutionError as e:
+        code, detail = _execution_error_to_http(str(e))
+        raise HTTPException(status_code=code, detail=detail)
+
+    return workout_service._build_workout_response(workout)
+
+
+@router.delete("/api/workouts/{workout_id}/exercises/{exercise_position}/sets/{set_position}/skip")
+def undo_skip_set(
+    workout_id: int,
+    exercise_position: int,
+    set_position: int,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if workout_id <= 0 or exercise_position <= 0 or set_position <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "path parameters must be positive integers"}],
+        )
+
+    try:
+        workout = workout_service.revert_skip_set(
+            session,
+            user.id,
+            workout_id,
+            exercise_position,
+            set_position,
+        )
+    except workout_service.ExecutionError as e:
+        code, detail = _execution_error_to_http(str(e))
+        raise HTTPException(status_code=code, detail=detail)
+
+    return workout_service._build_workout_response(workout)
+
+
+@router.post("/api/workouts/{workout_id}/exercises/{exercise_position}/skip")
+def skip_exercise(
+    workout_id: int,
+    exercise_position: int,
+    body: SkipRequest,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if workout_id <= 0 or exercise_position <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "workout_id and exercise_position must be positive integers"}],
+        )
+
+    try:
+        workout = workout_service.skip_exercise(
+            session,
+            user.id,
+            workout_id,
+            exercise_position,
+            reason_code=body.reason_code,
+            note=body.note,
+        )
+    except workout_service.ExecutionError as e:
+        code, detail = _execution_error_to_http(str(e))
+        raise HTTPException(status_code=code, detail=detail)
+
+    return workout_service._build_workout_response(workout)
+
+
+@router.delete("/api/workouts/{workout_id}/exercises/{exercise_position}/skip")
+def undo_skip_exercise(
+    workout_id: int,
+    exercise_position: int,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if workout_id <= 0 or exercise_position <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "workout_id and exercise_position must be positive integers"}],
+        )
+
+    try:
+        workout = workout_service.revert_skip_exercise(
+            session,
+            user.id,
+            workout_id,
+            exercise_position,
         )
     except workout_service.ExecutionError as e:
         code, detail = _execution_error_to_http(str(e))

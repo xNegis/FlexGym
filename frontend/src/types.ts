@@ -199,6 +199,20 @@ interface WorkoutEvent {
   exercise_position: number | null;
   set_position: number | null;
   occurred_at: string;
+  exception: WorkoutEventException | null;
+}
+
+interface WorkoutEventException {
+  scope: "set" | "exercise";
+  reason_code: string | null;
+  note: string | null;
+}
+
+interface WorkoutExceptionProjection {
+  scope: "set" | "exercise";
+  reason_code: string | null;
+  note: string | null;
+  occurred_at: string;
 }
 
 interface WorkoutPlannedSetSnapshot {
@@ -210,6 +224,7 @@ interface WorkoutPlannedSetSnapshot {
   rest_after_set_seconds: number | null;
   notes: string | null;
   performance: PerformedSet | null;
+  exception: WorkoutExceptionProjection | null;
 }
 
 interface WorkoutExerciseSnapshot {
@@ -225,8 +240,12 @@ interface WorkoutExerciseSnapshot {
   started_at: string | null;
   latest_completed_at: string | null;
   completed_set_count: number;
+  skipped_set_count: number;
   total_set_count: number;
   is_complete: boolean;
+  is_resolved: boolean;
+  execution_status: "pending" | "in_progress" | "completed" | "partial" | "skipped";
+  exception: WorkoutExceptionProjection | null;
 }
 
 interface WorkoutSession {
@@ -247,8 +266,10 @@ interface WorkoutSession {
   exercises: WorkoutExerciseSnapshot[];
   server_now: string;
   completed_set_count: number;
+  skipped_set_count: number;
   total_set_count: number;
   all_sets_recorded: boolean;
+  all_sets_resolved: boolean;
   current_exercise_position: number | null;
   current_set_position: number | null;
   current_set_phase: string | null;
@@ -289,6 +310,8 @@ export {
   type TrainingDay,
   type User,
   type WorkoutEvent,
+  type WorkoutEventException,
+  type WorkoutExceptionProjection,
   type WorkoutExerciseSnapshot,
   type WorkoutPlannedSetSnapshot,
   type WorkoutSession,

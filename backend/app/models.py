@@ -341,6 +341,11 @@ class WorkoutSession(Base):
         cascade="all, delete-orphan",
         order_by="WorkoutEvent.sequence",
     )
+    exceptions: Mapped[list["WorkoutException"]] = relationship(
+        "WorkoutException",
+        back_populates="workout",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint("id", "user_id", name="uq_workout_session_id_user_id"),
@@ -498,6 +503,52 @@ class PerformedSet(Base):
     )
 
 
+class WorkoutException(Base):
+    __tablename__ = "workout_exceptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workout_session_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workout_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    workout: Mapped["WorkoutSession"] = relationship("WorkoutSession")
+    workout_exercise_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workout_exercises.id", ondelete="SET NULL"), nullable=False
+    )
+    workout_planned_set_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("workout_planned_sets.id", ondelete="SET NULL"), nullable=True
+    )
+    scope: Mapped[str] = mapped_column(String, nullable=False)
+    reason_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    occurred_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+
+    events: Mapped[list["WorkoutEvent"]] = relationship(
+        "WorkoutEvent",
+        back_populates="exception",
+        foreign_keys="WorkoutEvent.workout_exception_id",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "scope IN ('set', 'exercise')",
+            name="ck_workout_exceptions_scope",
+        ),
+        CheckConstraint(
+            "reason_code IS NULL OR reason_code IN ("
+            "'not_enough_time','too_fatigued','equipment_unavailable','unable_to_perform','other'"
+            ")",
+            name="ck_workout_exceptions_reason_code",
+        ),
+        CheckConstraint(
+            "(scope = 'set' AND workout_planned_set_id IS NOT NULL) OR "
+            "(scope = 'exercise' AND workout_planned_set_id IS NULL)",
+            name="ck_workout_exceptions_scope_refs",
+        ),
+    )
+
+
 class WorkoutEvent(Base):
     __tablename__ = "workout_events"
 
@@ -514,8 +565,17 @@ class WorkoutEvent(Base):
     workout_planned_set_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("workout_planned_sets.id", ondelete="SET NULL"), nullable=True
     )
+    workout_exception_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("workout_exceptions.id", ondelete="SET NULL"), nullable=True
+    )
     occurred_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+
+    exception: Mapped["WorkoutException | None"] = relationship(
+        "WorkoutException",
+        back_populates="events",
+        foreign_keys=[workout_exception_id],
     )
 
     __table_args__ = (
@@ -527,7 +587,9 @@ class WorkoutEvent(Base):
             "event_type IN ("
             "'workout_started','exercise_started','set_started',"
             "'set_completed','set_updated','set_marked_incomplete',"
-            "'exercise_completed','workout_cancelled'"
+            "'exercise_completed','workout_cancelled',"
+            "'set_skipped','set_skip_reverted',"
+            "'exercise_skipped','exercise_skip_reverted'"
             ")",
             name="ck_workout_events_event_type",
         ),

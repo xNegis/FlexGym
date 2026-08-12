@@ -17,7 +17,7 @@ from app.db import get_session
 from app.main import app
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-F11_REVISION = "f14_2_set_started"
+F11_REVISION = "f15_exceptions"
 PREVIOUS_REVISION = "c31f5a8d2e04"
 
 

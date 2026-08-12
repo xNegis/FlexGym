@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Check, Clock3, ClockAlert, Edit3, Info, X } from "lucide-react";
+import { Check, Clock3, ClockAlert, Edit3, Info, SkipForward, Undo2, X } from "lucide-react";
 import {
   fetchWorkout,
   markSetIncomplete,
   recordSetPerformance,
+  skipExercise,
+  skipSet,
   startExercise,
   startSet,
+  undoSkipExercise,
+  undoSkipSet,
   UnauthenticatedError,
   updateSetPerformance,
   type SetPerformanceResult,
+  type SkipBody,
+  type SkipResult,
   type WorkoutResult,
 } from "../api";
 import { useAuth } from "../context";
@@ -28,8 +34,18 @@ import Alert from "../ui/Alert";
 import { LoadingState } from "../ui/LoadingState";
 import EmptyState from "../ui/EmptyState";
 import Dialog from "../ui/Dialog";
-import { Field, TextInput } from "../ui/Field";
+import { Field, Select, TextArea, TextInput } from "../ui/Field";
 import styles from "./Screen.module.css";
+
+const SKIP_REASON_LABELS: Record<string, string> = {
+  not_enough_time: "Not enough time",
+  too_fatigued: "Too fatigued",
+  equipment_unavailable: "Equipment unavailable",
+  unable_to_perform: "Unable to perform",
+  other: "Other",
+};
+
+const SKIP_REASON_CODES = Object.keys(SKIP_REASON_LABELS);
 
 function targetLabel(targetType: string, value: number): string {
   if (targetType === "repetitions") return `${value}`;
@@ -88,7 +104,7 @@ function computeTransitionTimer(
   nextExercise: WorkoutExerciseSnapshot | undefined,
   clientReceivedAt: number,
 ): { seconds: number; overtime: boolean } | null {
-  if (!exercise || !exercise.is_complete || !nextExercise) return null;
+  if (!exercise || !exercise.is_resolved || !nextExercise) return null;
   const serverTime = new Date(serverNow).getTime();
   const estimatedServerNow = serverTime + (Date.now() - clientReceivedAt);
 
@@ -132,6 +148,15 @@ export default function WorkoutExecutionScreen() {
     performed_weight_kg: string;
     performed_rir: string;
   } | null>(null);
+
+  const [skipDialogOpen, setSkipDialogOpen] = useState<"set" | "exercise" | null>(null);
+  const [skipReason, setSkipReason] = useState("");
+  const [skipNote, setSkipNote] = useState("");
+  const [skipError, setSkipError] = useState<string | null>(null);
+  const [skipPending, setSkipPending] = useState(false);
+  const [undoPending, setUndoPending] = useState<{ setPos?: number; exercise?: boolean } | null>(
+    null,
+  );
 
   const workoutId = Number(workoutIdParam);
   const exercisePosition = Number(exercisePosParam);
@@ -193,6 +218,12 @@ export default function WorkoutExecutionScreen() {
     setStarting(false);
     setTransitionStarting(false);
     setAdjustDraft(null);
+    setSkipDialogOpen(null);
+    setSkipReason("");
+    setSkipNote("");
+    setSkipError(null);
+    setSkipPending(false);
+    setUndoPending(null);
   }, []);
 
   const handleApiError = useCallback(
@@ -206,6 +237,7 @@ export default function WorkoutExecutionScreen() {
       setAdjusting(false);
       setStarting(false);
       setTransitionStarting(false);
+      setSkipPending(false);
       return true;
     },
     [logout],
@@ -223,8 +255,10 @@ export default function WorkoutExecutionScreen() {
 
   const currentSet = useMemo(() => {
     if (!exercise) return null;
-    const idx = exercise.planned_sets.findIndex((s) => s.performance == null);
-    return idx >= 0 ? exercise.planned_sets[idx] : null;
+    for (const s of exercise.planned_sets) {
+      if (s.performance == null && s.exception == null) return s;
+    }
+    return null;
   }, [exercise]);
 
   const handleStartExercise = useCallback(async () => {
@@ -288,9 +322,7 @@ export default function WorkoutExecutionScreen() {
           const weight = adjustDraft!.performed_weight_kg.trim()
             ? Number(adjustDraft!.performed_weight_kg)
             : null;
-          const rir = adjustDraft!.performed_rir.trim()
-            ? Number(adjustDraft!.performed_rir)
-            : null;
+          const rir = adjustDraft!.performed_rir.trim() ? Number(adjustDraft!.performed_rir) : null;
           result = await recordSetPerformance(workout.id, exercisePosition, setPosition, {
             entry_mode: "adjusted",
             performed_value: value,
@@ -387,9 +419,110 @@ export default function WorkoutExecutionScreen() {
     [workout, exercisePosition, applyWorkout, handleApiError],
   );
 
+  const handleSkipConfirm = useCallback(async () => {
+    if (!workout || !skipDialogOpen) return;
+    setSkipPending(true);
+    setSkipError(null);
+    try {
+      const body: SkipBody = {};
+      if (skipReason) body.reason_code = skipReason;
+      if (skipNote.trim()) body.note = skipNote.trim();
+
+      let result: SkipResult;
+      if (skipDialogOpen === "set" && currentSet) {
+        result = await skipSet(workout.id, exercisePosition, currentSet.position, body);
+      } else {
+        result = await skipExercise(workout.id, exercisePosition, body);
+      }
+      if ("notFound" in result) {
+        setNotFound(true);
+        setSkipPending(false);
+        return;
+      }
+      if ("detail" in result) {
+        setSkipError(result.detail);
+        setSkipPending(false);
+        return;
+      }
+      applyWorkout(result);
+    } catch (err) {
+      handleApiError(err, "skip");
+    }
+  }, [
+    workout,
+    skipDialogOpen,
+    skipReason,
+    skipNote,
+    currentSet,
+    exercisePosition,
+    applyWorkout,
+    handleApiError,
+  ]);
+
+  const handleUndoSetSkip = useCallback(
+    async (setPosition: number) => {
+      if (!workout) return;
+      setUndoPending({ setPos: setPosition });
+      try {
+        const result = await undoSkipSet(workout.id, exercisePosition, setPosition);
+        if ("notFound" in result) {
+          setNotFound(true);
+          setUndoPending(null);
+          return;
+        }
+        if ("detail" in result) {
+          setSaveError(result.detail);
+          setUndoPending(null);
+          return;
+        }
+        applyWorkout(result);
+      } catch (err) {
+        handleApiError(err, "undo skip");
+      }
+    },
+    [workout, exercisePosition, applyWorkout, handleApiError],
+  );
+
+  const handleUndoExerciseSkip = useCallback(async () => {
+    if (!workout || !exercise) return;
+    setUndoPending({ exercise: true });
+    try {
+      const result = await undoSkipExercise(workout.id, exercisePosition);
+      if ("notFound" in result) {
+        setNotFound(true);
+        setUndoPending(null);
+        return;
+      }
+      if ("detail" in result) {
+        setSaveError(result.detail);
+        setUndoPending(null);
+        return;
+      }
+      applyWorkout(result);
+    } catch (err) {
+      handleApiError(err, "undo skip");
+    }
+  }, [workout, exercisePosition, exercise, applyWorkout, handleApiError]);
+
+  const openSkipDialog = (scope: "set" | "exercise") => {
+    setSkipDialogOpen(scope);
+    setSkipReason("");
+    setSkipNote("");
+    setSkipError(null);
+  };
+
+  const closeSkipDialog = () => {
+    if (!skipPending) {
+      setSkipError(null);
+      setSkipDialogOpen(null);
+    }
+  };
+
   const setPhase = workout?.current_set_phase ?? null;
   const isAwaitingStart = setPhase === "awaiting_set_start";
   const isSetInProgress = setPhase === "set_in_progress";
+
+  const isExerciseSkipped = exercise?.exception?.scope === "exercise";
 
   const restTimer = useMemo(() => {
     if (!workout || !isAwaitingStart) return null;
@@ -407,7 +540,7 @@ export default function WorkoutExecutionScreen() {
   }, [workout, exercise, nextExercise, serverReceivedAt, timerTick]);
 
   const showTransition =
-    exercise?.is_complete &&
+    exercise?.is_resolved &&
     nextExercise != null &&
     workout?.transition_to_exercise_position === exercisePosition + 1;
 
@@ -466,7 +599,6 @@ export default function WorkoutExecutionScreen() {
   if (!exercise || !workout) return null;
 
   const plannedSets = exercise.planned_sets;
-  const completedSets = plannedSets.filter((s) => s.performance != null);
 
   const openAdjust = (ps: WorkoutPlannedSetSnapshot) => {
     setAdjustSet(ps);
@@ -503,6 +635,11 @@ export default function WorkoutExecutionScreen() {
 
   const isExerciseStarted = exercise.started_at != null;
 
+  const skipNoteError =
+    skipReason === "other" && !skipNote.trim()
+      ? "A note is required when 'Other' is selected."
+      : null;
+
   return (
     <>
       <AppHeader
@@ -523,7 +660,13 @@ export default function WorkoutExecutionScreen() {
           {showTransition && nextExercise && transitionTimer && (
             <Card>
               <div className={`${styles.stack4} ${styles.centered}`}>
-                <Badge variant="success">Exercise complete</Badge>
+                {isExerciseSkipped ? (
+                  <Badge variant="warning">Skipped</Badge>
+                ) : exercise.execution_status === "partial" ? (
+                  <Badge variant="accent">Partial</Badge>
+                ) : (
+                  <Badge variant="success">Exercise complete</Badge>
+                )}
                 <div className={styles.stack2}>
                   <div className={styles.textCompactMuted}>Next</div>
                   <div className={styles.cardTitle}>{nextExercise.exercise_name}</div>
@@ -555,6 +698,19 @@ export default function WorkoutExecutionScreen() {
                     {formatTimer(transitionTimer.seconds, false)}
                   </span>
                 </div>
+                {isExerciseSkipped && (
+                  <div className={`${styles.stack2} ${styles.centered}`}>
+                    <Button
+                      variant="secondary"
+                      fullWidth
+                      onClick={handleUndoExerciseSkip}
+                      disabled={undoPending != null || isCancelled}
+                    >
+                      <Undo2 size={16} aria-hidden="true" />
+                      <span>{undoPending?.exercise ? "Undoing..." : "Undo skip"}</span>
+                    </Button>
+                  </div>
+                )}
                 <Button
                   variant="primary"
                   fullWidth
@@ -595,16 +751,19 @@ export default function WorkoutExecutionScreen() {
                   <div className={styles.rowBetween}>
                     <div>
                       <div className={styles.textCompactMuted}>
-                        {isAwaitingStart && (
+                        {isExerciseSkipped && <Badge variant="warning">Skipped</Badge>}
+                        {!isExerciseSkipped && isAwaitingStart && (
                           <Badge variant="accent">Awaiting set start</Badge>
                         )}
-                        {isSetInProgress && (
+                        {!isExerciseSkipped && isSetInProgress && (
                           <Badge variant="accent">Set in progress</Badge>
                         )}
-                        {isExerciseStarted && !isAwaitingStart && !isSetInProgress && (
-                          <Badge variant="accent">In progress</Badge>
-                        )}
-                        {!isExerciseStarted && (
+                        {!isExerciseSkipped &&
+                          isExerciseStarted &&
+                          !isAwaitingStart &&
+                          !isSetInProgress &&
+                          !currentSet && <Badge variant="accent">In progress</Badge>}
+                        {!isExerciseSkipped && !isExerciseStarted && (
                           <Badge variant="default">Not started</Badge>
                         )}
                       </div>
@@ -651,7 +810,31 @@ export default function WorkoutExecutionScreen() {
                     </div>
                   )}
 
-                  {currentSet && (
+                  {isExerciseSkipped && (
+                    <div className={`${styles.stack3} ${styles.centered}`}>
+                      <div className={styles.textCompactMuted}>This exercise has been skipped.</div>
+                      {exercise.exception?.reason_code && (
+                        <div className={styles.textCompactMuted}>
+                          Reason:{" "}
+                          {SKIP_REASON_LABELS[exercise.exception.reason_code] ??
+                            exercise.exception.reason_code}
+                        </div>
+                      )}
+                      {exercise.exception?.note && (
+                        <div className={styles.textCompactMuted}>{exercise.exception.note}</div>
+                      )}
+                      <Button
+                        variant="secondary"
+                        onClick={handleUndoExerciseSkip}
+                        disabled={undoPending != null || isCancelled}
+                      >
+                        <Undo2 size={16} aria-hidden="true" />
+                        <span>{undoPending?.exercise ? "Undoing..." : "Undo skip"}</span>
+                      </Button>
+                    </div>
+                  )}
+
+                  {!isExerciseSkipped && currentSet && (
                     <>
                       <div className={styles.centered}>
                         <div className={styles.textCompactMuted}>
@@ -662,7 +845,10 @@ export default function WorkoutExecutionScreen() {
                         <div className={styles.timerCircle}>
                           <span className={styles.timerTextLarge}>
                             {adjustDraft
-                              ? targetLabel(exercise.target_type, Number(adjustDraft.performed_value) || currentSet.target_value)
+                              ? targetLabel(
+                                  exercise.target_type,
+                                  Number(adjustDraft.performed_value) || currentSet.target_value,
+                                )
                               : targetLabel(exercise.target_type, currentSet.target_value)}
                           </span>
                         </div>
@@ -685,9 +871,9 @@ export default function WorkoutExecutionScreen() {
                         )}
                         {currentSet.tempo != null && (
                           <span className={styles.textCompactMuted}>
-                            Tempo: eccentric {currentSet.tempo.eccentric_seconds}s · stretch pause{" "}
-                            {currentSet.tempo.stretched_pause_seconds}s · concentric{" "}
-                            {currentSet.tempo.concentric_seconds}s · peak contraction{" "}
+                            Tempo: eccentric {currentSet.tempo.eccentric_seconds}s &middot; stretch
+                            pause {currentSet.tempo.stretched_pause_seconds}s &middot; concentric{" "}
+                            {currentSet.tempo.concentric_seconds}s &middot; peak contraction{" "}
                             {currentSet.tempo.peak_contraction_seconds}s
                           </span>
                         )}
@@ -708,18 +894,29 @@ export default function WorkoutExecutionScreen() {
                     </>
                   )}
 
-                  {!isExerciseStarted && (
-                    <Button
-                      variant="primary"
-                      fullWidth
-                      onClick={handleStartExercise}
-                      disabled={starting || isCancelled}
-                    >
-                      {starting ? "Starting..." : "Start first exercise"}
-                    </Button>
+                  {!isExerciseSkipped && !isExerciseStarted && (
+                    <div className={styles.stack2}>
+                      <Button
+                        variant="primary"
+                        fullWidth
+                        onClick={handleStartExercise}
+                        disabled={starting || isCancelled}
+                      >
+                        {starting ? "Starting..." : "Start first exercise"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        fullWidth
+                        onClick={() => openSkipDialog("exercise")}
+                        disabled={isCancelled}
+                      >
+                        <SkipForward size={16} aria-hidden="true" />
+                        <span>Skip exercise</span>
+                      </Button>
+                    </div>
                   )}
 
-                  {isAwaitingStart && currentSet && (
+                  {!isExerciseSkipped && isAwaitingStart && currentSet && (
                     <div className={styles.stack2}>
                       <Button
                         variant="primary"
@@ -738,10 +935,29 @@ export default function WorkoutExecutionScreen() {
                       >
                         Adjust set
                       </Button>
+                      <div className={styles.row2}>
+                        <Button
+                          variant="ghost"
+                          fullWidth
+                          onClick={() => openSkipDialog("set")}
+                          disabled={saving || isCancelled}
+                        >
+                          <SkipForward size={16} aria-hidden="true" />
+                          <span>Skip set</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          fullWidth
+                          onClick={() => openSkipDialog("exercise")}
+                          disabled={saving || isCancelled}
+                        >
+                          <span>Skip exercise</span>
+                        </Button>
+                      </div>
                     </div>
                   )}
 
-                  {isSetInProgress && currentSet && (
+                  {!isExerciseSkipped && isSetInProgress && currentSet && (
                     <div className={styles.stack2}>
                       <Button
                         variant="primary"
@@ -751,7 +967,7 @@ export default function WorkoutExecutionScreen() {
                         disabled={saving || isCancelled}
                       >
                         {saving
-                          ? "Saving…"
+                          ? "Saving..."
                           : currentSet.position === plannedSets.length
                             ? "Finish exercise"
                             : "Next set"}
@@ -764,14 +980,39 @@ export default function WorkoutExecutionScreen() {
                       >
                         Adjust set
                       </Button>
+                      <div className={styles.row2}>
+                        <Button
+                          variant="ghost"
+                          fullWidth
+                          onClick={() => openSkipDialog("set")}
+                          disabled={saving || isCancelled}
+                        >
+                          <SkipForward size={16} aria-hidden="true" />
+                          <span>Skip set</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          fullWidth
+                          onClick={() => openSkipDialog("exercise")}
+                          disabled={saving || isCancelled}
+                        >
+                          <span>Skip exercise</span>
+                        </Button>
+                      </div>
                     </div>
                   )}
 
-                  {isExerciseStarted && !currentSet && !showTransition && (
+                  {!isExerciseSkipped && isExerciseStarted && !currentSet && !showTransition && (
                     <div className={`${styles.stack4} ${styles.centered}`}>
-                      <Badge variant="success">Exercise complete</Badge>
+                      {exercise.execution_status === "partial" ? (
+                        <Badge variant="accent">Partial</Badge>
+                      ) : (
+                        <Badge variant="success">Exercise complete</Badge>
+                      )}
                       <div className={styles.textCompactMuted}>
-                        All {plannedSets.length} set{plannedSets.length === 1 ? "" : "s"} recorded
+                        {exercise.execution_status === "partial"
+                          ? `${exercise.completed_set_count} recorded · ${exercise.skipped_set_count} skipped`
+                          : `All ${plannedSets.length} set${plannedSets.length === 1 ? "" : "s"} recorded`}
                       </div>
                     </div>
                   )}
@@ -780,56 +1021,105 @@ export default function WorkoutExecutionScreen() {
 
               <div className={styles.stack3}>
                 <div className={styles.textCompactMuted}>
-                  {completedSets.length} of {plannedSets.length} set
-                  {plannedSets.length === 1 ? "" : "s"} completed
+                  {exercise.completed_set_count} completed
+                  {exercise.skipped_set_count > 0 &&
+                    ` · ${exercise.skipped_set_count} skipped`}{" "}
+                  &middot; {exercise.total_set_count} set
+                  {exercise.total_set_count === 1 ? "" : "s"}
+                  {exercise.execution_status === "partial" && " (partial)"}
+                  {exercise.execution_status === "skipped" && " (skipped)"}
                 </div>
-                {completedSets.map((ps) => {
-                  const perf = ps.performance!;
-                  return (
-                    <div
-                      key={ps.position}
-                      className={`${styles.setSummary} ${perf.entry_mode === "adjusted" ? styles.setSummaryAdjusted : ""}`}
-                    >
-                      <div className={styles.rowBetween}>
-                        <div className={styles.row2}>
-                          <Check size={16} className={styles.setCheck} />
-                          <span className={styles.setLabel}>Set {ps.position}</span>
-                          <span className={styles.setValue}>
-                            {performedLabel(exercise.target_type, perf)}
-                          </span>
-                          {perf.entry_mode === "adjusted" && (
-                            <Badge variant="warning">Adjusted</Badge>
+                {plannedSets.map((ps) => {
+                  if (ps.performance) {
+                    const perf = ps.performance!;
+                    return (
+                      <div
+                        key={ps.position}
+                        className={`${styles.setSummary} ${perf.entry_mode === "adjusted" ? styles.setSummaryAdjusted : ""}`}
+                      >
+                        <div className={styles.rowBetween}>
+                          <div className={styles.row2}>
+                            <Check size={16} className={styles.setCheck} />
+                            <span className={styles.setLabel}>Set {ps.position}</span>
+                            <span className={styles.setValue}>
+                              {performedLabel(exercise.target_type, perf)}
+                            </span>
+                            {perf.entry_mode === "adjusted" && (
+                              <Badge variant="warning">Adjusted</Badge>
+                            )}
+                          </div>
+                          <div className={styles.row1}>
+                            <Button
+                              variant="ghost"
+                              size="small"
+                              onClick={() => openAdjust(ps)}
+                              aria-label={`Edit set ${ps.position}`}
+                              disabled={isCancelled}
+                            >
+                              <Edit3 size={14} aria-hidden="true" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="small"
+                              onClick={() => handleMarkIncomplete(ps.position)}
+                              aria-label={`Mark set ${ps.position} incomplete`}
+                              disabled={saving || isCancelled}
+                            >
+                              <X size={14} aria-hidden="true" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className={`${styles.textCompactMuted} ${styles.mt1}`}>
+                          {performedSetSummary(perf)}
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (ps.exception) {
+                    const exc = ps.exception;
+                    return (
+                      <div key={ps.position} className={styles.setSummary}>
+                        <div className={styles.rowBetween}>
+                          <div className={styles.row2}>
+                            <SkipForward size={16} className={styles.textCaptionMuted} />
+                            <span className={styles.setLabel}>Set {ps.position}</span>
+                            <span className={styles.textCompactMuted}>
+                              Skipped
+                              {exc.scope === "exercise" && " (exercise)"}
+                            </span>
+                          </div>
+                          {exc.scope === "set" && (
+                            <div className={styles.row1}>
+                              <Button
+                                variant="ghost"
+                                size="small"
+                                onClick={() => handleUndoSetSkip(ps.position)}
+                                aria-label={`Undo skip set ${ps.position}`}
+                                disabled={undoPending != null || isCancelled}
+                              >
+                                {undoPending?.setPos === ps.position ? (
+                                  <span className={styles.textCompactMuted}>Undoing...</span>
+                                ) : (
+                                  <Undo2 size={14} aria-hidden="true" />
+                                )}
+                              </Button>
+                            </div>
                           )}
                         </div>
-                        <div className={styles.row1}>
-                          <Button
-                            variant="ghost"
-                            size="small"
-                            onClick={() => openAdjust(ps)}
-                            aria-label={`Edit set ${ps.position}`}
-                            disabled={isCancelled}
-                          >
-                            <Edit3 size={14} aria-hidden="true" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="small"
-                            onClick={() => handleMarkIncomplete(ps.position)}
-                            aria-label={`Mark set ${ps.position} incomplete`}
-                            disabled={saving || isCancelled}
-                          >
-                            <X size={14} aria-hidden="true" />
-                          </Button>
-                        </div>
+                        {exc.reason_code && (
+                          <div className={`${styles.textCompactMuted} ${styles.mt1}`}>
+                            {SKIP_REASON_LABELS[exc.reason_code] ?? exc.reason_code}
+                          </div>
+                        )}
+                        {exc.note && (
+                          <div className={`${styles.textCompactMuted} ${styles.mt1}`}>
+                            {exc.note}
+                          </div>
+                        )}
                       </div>
-                      <div className={`${styles.textCompactMuted} ${styles.mt1}`}>
-                        {performedSetSummary(perf)}
-                      </div>
-                    </div>
-                  );
-                })}
-                {completedSets.length < plannedSets.length &&
-                  plannedSets.slice(completedSets.length).map((ps) => (
+                    );
+                  }
+                  return (
                     <div key={ps.position} className={styles.setSummary}>
                       <div className={styles.rowBetween}>
                         <div className={styles.row2}>
@@ -845,7 +1135,8 @@ export default function WorkoutExecutionScreen() {
                         {ps.target_rir != null && `RIR ${ps.target_rir}`}
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -923,6 +1214,75 @@ export default function WorkoutExecutionScreen() {
               onChange={(e) => setAdjustRir(e.target.value)}
             />
           </Field>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={skipDialogOpen != null}
+        title={
+          skipDialogOpen === "set"
+            ? `Skip set ${currentSet?.position ?? ""}`
+            : `Skip ${exercise.exercise_name}`
+        }
+        onClose={closeSkipDialog}
+        actions={
+          <div className={styles.row2}>
+            <Button variant="secondary" onClick={closeSkipDialog} disabled={skipPending}>
+              {skipDialogOpen === "set" ? "Keep set" : "Keep exercise"}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSkipConfirm}
+              disabled={skipPending || (skipReason === "other" && !skipNote.trim())}
+            >
+              {skipPending
+                ? "Skipping..."
+                : skipDialogOpen === "set"
+                  ? "Skip set"
+                  : "Skip exercise"}
+            </Button>
+          </div>
+        }
+      >
+        <div className={styles.stack3}>
+          {skipError && <Alert variant="error">{skipError}</Alert>}
+          {skipDialogOpen === "exercise" && (
+            <p className={styles.textCompactMuted}>
+              This will skip only the remaining sets. Any already performed sets will be preserved.
+            </p>
+          )}
+          {skipDialogOpen === "set" && (
+            <p className={styles.textCompactMuted}>
+              Skipping set {currentSet?.position} of {exercise.exercise_name}.
+            </p>
+          )}
+          <Field label="Reason" optional htmlFor="skip-reason">
+            <Select
+              id="skip-reason"
+              value={skipReason}
+              onChange={(e) => setSkipReason(e.target.value)}
+            >
+              <option value="">No reason</option>
+              {SKIP_REASON_CODES.map((code) => (
+                <option key={code} value={code}>
+                  {SKIP_REASON_LABELS[code]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Details" optional={skipReason !== "other"} htmlFor="skip-note">
+            <TextArea
+              id="skip-note"
+              value={skipNote}
+              onChange={(e) => setSkipNote(e.target.value)}
+              rows={2}
+            />
+          </Field>
+          {skipNoteError && (
+            <span className={styles.textCaptionWarning} role="alert">
+              {skipNoteError}
+            </span>
+          )}
         </div>
       </Dialog>
     </>

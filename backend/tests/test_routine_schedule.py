@@ -20,7 +20,7 @@ from app.main import app
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 F10_INITIAL_REVISION = "aab110d57981"
-F10_REVISION = "f14_2_set_started"
+F10_REVISION = "f15_exceptions"
 PREVIOUS_REVISION = "273789964714"
 
 WEEKDAY_NAMES = [
@@ -602,7 +602,7 @@ def test_f10_downgrade_preserves_multiple_training_day_positions(tmp_path: Path)
         positions = connection.execute(
             text("SELECT name, position FROM training_days ORDER BY position")
         ).all()
-    assert positions == [("Push", 1), ("Pull", 2)]
+    assert [tuple(row) for row in positions] == [("Push", 1), ("Pull", 2)]
     downgraded_engine.dispose()
 
 

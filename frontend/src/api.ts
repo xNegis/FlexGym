@@ -15,12 +15,14 @@ import type {
   StartContext,
   StartContextState,
   TrainingDay,
+  WorkoutEventException,
+  WorkoutExceptionProjection,
   WorkoutExerciseSnapshot,
   WorkoutPlannedSetSnapshot,
   WorkoutSession,
 } from "./types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://192.168.1.134:8000";
 
 const EXERCISE_MUSCLES = new Set([
   "chest",
@@ -1556,6 +1558,7 @@ function isWorkoutPlannedSetSnapshot(
         ? Number.isInteger(v.target_value) && v.target_value >= 1
         : true;
   const perfOk = v.performance === null || isPerformedSet(v.performance);
+  const excOk = v.exception === null || isWorkoutExceptionProjection(v.exception);
   return (
     typeof v.position === "number" &&
     Number.isInteger(v.position) &&
@@ -1569,7 +1572,8 @@ function isWorkoutPlannedSetSnapshot(
       (typeof v.rest_after_set_seconds === "number" &&
         Number.isInteger(v.rest_after_set_seconds))) &&
     (v.notes === null || typeof v.notes === "string") &&
-    perfOk
+    perfOk &&
+    excOk
   );
 }
 
@@ -1593,6 +1597,40 @@ function isPerformedSet(value: unknown): value is WorkoutPlannedSetSnapshot["per
         v.observed_duration_seconds >= 0)) &&
     typeof v.updated_at === "string" &&
     v.updated_at.length > 0
+  );
+}
+
+const SUPPORTED_REASON_CODES = new Set([
+  "not_enough_time",
+  "too_fatigued",
+  "equipment_unavailable",
+  "unable_to_perform",
+  "other",
+]);
+
+function isValidReasonCode(value: unknown): boolean {
+  return value === null || (typeof value === "string" && SUPPORTED_REASON_CODES.has(value));
+}
+
+function isWorkoutExceptionProjection(value: unknown): value is WorkoutExceptionProjection {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    (v.scope === "set" || v.scope === "exercise") &&
+    isValidReasonCode(v.reason_code) &&
+    (v.note === null || typeof v.note === "string") &&
+    typeof v.occurred_at === "string" &&
+    v.occurred_at.length > 0
+  );
+}
+
+function isWorkoutEventException(value: unknown): value is WorkoutEventException {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    (v.scope === "set" || v.scope === "exercise") &&
+    isValidReasonCode(v.reason_code) &&
+    (v.note === null || typeof v.note === "string")
   );
 }
 
@@ -1622,11 +1660,20 @@ function isWorkoutExerciseSnapshot(value: unknown): value is WorkoutExerciseSnap
     typeof v.completed_set_count === "number" &&
     Number.isInteger(v.completed_set_count) &&
     v.completed_set_count >= 0 &&
+    typeof v.skipped_set_count === "number" &&
+    Number.isInteger(v.skipped_set_count) &&
+    v.skipped_set_count >= 0 &&
     typeof v.total_set_count === "number" &&
     Number.isInteger(v.total_set_count) &&
     v.total_set_count >= 1 &&
-    v.completed_set_count <= v.total_set_count &&
+    v.completed_set_count + v.skipped_set_count <= v.total_set_count &&
     typeof v.is_complete === "boolean" &&
+    typeof v.is_resolved === "boolean" &&
+    typeof v.execution_status === "string" &&
+    ["pending", "in_progress", "completed", "partial", "skipped"].includes(
+      v.execution_status as string,
+    ) &&
+    (v.exception === null || isWorkoutExceptionProjection(v.exception)) &&
     Array.isArray(v.planned_sets) &&
     v.planned_sets.length >= 1 &&
     v.planned_sets.every(
@@ -1640,14 +1687,31 @@ function isWorkoutExerciseSnapshot(value: unknown): value is WorkoutExerciseSnap
 function isWorkoutSession(value: unknown): value is WorkoutSession {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
+  const skipEventTypes = new Set([
+    "set_skipped",
+    "set_skip_reverted",
+    "exercise_skipped",
+    "exercise_skip_reverted",
+  ]);
   const eventsOk =
     Array.isArray(v.events) &&
     v.events.length >= 1 &&
     v.events.every((event: unknown, index: number) => {
       if (typeof event !== "object" || event === null) return false;
       const e = event as Record<string, unknown>;
+      const previousEvent = index > 0 ? (v.events as unknown[])[index - 1] : null;
+      const previousSequence =
+        typeof previousEvent === "object" && previousEvent !== null
+          ? (previousEvent as Record<string, unknown>).sequence
+          : null;
+      const isSkipEvent = typeof e.event_type === "string" && skipEventTypes.has(e.event_type);
       return (
-        e.sequence === index + 1 &&
+        typeof e.sequence === "number" &&
+        Number.isInteger(e.sequence) &&
+        e.sequence >= 1 &&
+        (index === 0
+          ? e.sequence === 1
+          : typeof previousSequence === "number" && e.sequence > previousSequence) &&
         typeof e.event_type === "string" &&
         [
           "workout_started",
@@ -1658,6 +1722,10 @@ function isWorkoutSession(value: unknown): value is WorkoutSession {
           "set_marked_incomplete",
           "exercise_completed",
           "workout_cancelled",
+          "set_skipped",
+          "set_skip_reverted",
+          "exercise_skipped",
+          "exercise_skip_reverted",
         ].includes(e.event_type) &&
         (e.exercise_position === null ||
           (typeof e.exercise_position === "number" &&
@@ -1668,7 +1736,8 @@ function isWorkoutSession(value: unknown): value is WorkoutSession {
             Number.isInteger(e.set_position) &&
             e.set_position >= 1)) &&
         typeof e.occurred_at === "string" &&
-        e.occurred_at.length > 0
+        e.occurred_at.length > 0 &&
+        (isSkipEvent ? isWorkoutEventException(e.exception) : e.exception === null)
       );
     });
   return (
@@ -1704,11 +1773,15 @@ function isWorkoutSession(value: unknown): value is WorkoutSession {
     typeof v.completed_set_count === "number" &&
     Number.isInteger(v.completed_set_count) &&
     v.completed_set_count >= 0 &&
+    typeof v.skipped_set_count === "number" &&
+    Number.isInteger(v.skipped_set_count) &&
+    v.skipped_set_count >= 0 &&
     typeof v.total_set_count === "number" &&
     Number.isInteger(v.total_set_count) &&
     v.total_set_count >= 1 &&
-    v.completed_set_count <= v.total_set_count &&
+    v.completed_set_count + v.skipped_set_count <= v.total_set_count &&
     typeof v.all_sets_recorded === "boolean" &&
+    typeof v.all_sets_resolved === "boolean" &&
     (v.current_exercise_position === null ||
       (typeof v.current_exercise_position === "number" &&
         Number.isInteger(v.current_exercise_position) &&
@@ -1984,6 +2057,99 @@ export async function markSetIncomplete(
   if (!response.ok) {
     if (response.status === 404) return { notFound: true };
     return { detail: safeErrorDetail(result, response.status, "Unable to mark incomplete") };
+  }
+  if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
+  return result;
+}
+
+export type SkipResult = WorkoutSession | { notFound: true } | { detail: string };
+
+export interface SkipBody {
+  reason_code?: string | null;
+  note?: string | null;
+}
+
+export async function skipSet(
+  workoutId: number,
+  exercisePosition: number,
+  setPosition: number,
+  body: SkipBody = {},
+): Promise<SkipResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/sets/${setPosition}/skip`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (response.status === 401) throw new UnauthenticatedError();
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) return { notFound: true };
+    return { detail: safeErrorDetail(result, response.status, "Unable to skip set") };
+  }
+  if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
+  return result;
+}
+
+export async function undoSkipSet(
+  workoutId: number,
+  exercisePosition: number,
+  setPosition: number,
+): Promise<SkipResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/sets/${setPosition}/skip`,
+    { method: "DELETE", credentials: "include" },
+  );
+  if (response.status === 401) throw new UnauthenticatedError();
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) return { notFound: true };
+    return { detail: safeErrorDetail(result, response.status, "Unable to undo skip") };
+  }
+  if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
+  return result;
+}
+
+export async function skipExercise(
+  workoutId: number,
+  exercisePosition: number,
+  body: SkipBody = {},
+): Promise<SkipResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/skip`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (response.status === 401) throw new UnauthenticatedError();
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) return { notFound: true };
+    return { detail: safeErrorDetail(result, response.status, "Unable to skip exercise") };
+  }
+  if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
+  return result;
+}
+
+export async function undoSkipExercise(
+  workoutId: number,
+  exercisePosition: number,
+): Promise<SkipResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/skip`,
+    { method: "DELETE", credentials: "include" },
+  );
+  if (response.status === 401) throw new UnauthenticatedError();
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) return { notFound: true };
+    return { detail: safeErrorDetail(result, response.status, "Unable to undo skip") };
   }
   if (!isWorkoutSession(result)) throw new Error("Invalid workout response");
   return result;

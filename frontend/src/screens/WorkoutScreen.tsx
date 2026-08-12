@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CalendarCheck, Info, Play } from "lucide-react";
+import { CalendarCheck, Info, Play, SkipForward } from "lucide-react";
 import {
   cancelWorkout,
   fetchWorkout,
@@ -105,8 +105,9 @@ export default function WorkoutScreen() {
   const isInProgress = workout?.status === "in_progress";
   const isCancelled = workout?.status === "cancelled";
   const noExerciseStarted =
-    workout?.all_sets_recorded === false &&
+    workout?.all_sets_resolved === false &&
     workout?.completed_set_count === 0 &&
+    workout?.skipped_set_count === 0 &&
     workout?.current_exercise_position == null &&
     workout?.transition_to_exercise_position == null;
   const firstExercise = workout?.exercises[0];
@@ -188,6 +189,9 @@ export default function WorkoutScreen() {
                     {isInProgress && workout.all_sets_recorded && (
                       <Badge variant="success">All sets recorded</Badge>
                     )}
+                    {isInProgress && workout.all_sets_resolved && !workout.all_sets_recorded && (
+                      <Badge variant="accent">All sets resolved</Badge>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -202,7 +206,9 @@ export default function WorkoutScreen() {
                 </div>
                 {isInProgress && (
                   <div className={styles.textCompactMuted}>
-                    {workout.completed_set_count} of {workout.total_set_count} sets completed
+                    {workout.completed_set_count} completed
+                    {workout.skipped_set_count > 0 &&
+                      ` · ${workout.skipped_set_count} skipped`} of {workout.total_set_count} sets
                   </div>
                 )}
                 <div className={styles.textCompactMuted}>
@@ -225,7 +231,7 @@ export default function WorkoutScreen() {
                     {startingExercise ? "Starting…" : "Start first exercise"}
                   </Button>
                 )}
-                {canResume && !workout.all_sets_recorded && workout.resume_url && (
+                {canResume && !workout.all_sets_resolved && workout.resume_url && (
                   <Button variant="primary" fullWidth onClick={() => navigate(workout.resume_url!)}>
                     Resume workout
                   </Button>
@@ -255,12 +261,21 @@ export default function WorkoutScreen() {
                           </div>
                         </div>
                         <div className={styles.row1}>
-                          {isInProgress && ex.completed_set_count > 0 && (
-                            <Badge variant="accent">
-                              {ex.completed_set_count}/{ex.total_set_count}
-                            </Badge>
+                          {isInProgress &&
+                            (ex.completed_set_count > 0 || ex.skipped_set_count > 0) && (
+                              <Badge variant="accent">
+                                {ex.completed_set_count}/{ex.total_set_count}
+                              </Badge>
+                            )}
+                          {ex.is_complete && ex.execution_status === "completed" && (
+                            <Badge variant="success">Done</Badge>
                           )}
-                          {ex.is_complete && <Badge variant="success">Done</Badge>}
+                          {ex.execution_status === "partial" && (
+                            <Badge variant="accent">Partial</Badge>
+                          )}
+                          {ex.execution_status === "skipped" && (
+                            <Badge variant="warning">Skipped</Badge>
+                          )}
                           {ex.instructions && (
                             <Info
                               size={14}
@@ -289,17 +304,27 @@ export default function WorkoutScreen() {
                             className={`${styles.rowBetween} ${styles.rowWrap2}`}
                           >
                             <span className={styles.textCompactMuted}>Set {ps.position}</span>
-                            <span>
-                              {ex.target_type === "distance_meters"
-                                ? `${ps.target_value} m`
-                                : ex.target_type === "duration_seconds"
-                                  ? `${ps.target_value}s`
-                                  : `${ps.target_value}`}
-                              {ps.target_weight_kg != null && ` @ ${ps.target_weight_kg} kg`}
-                              {ps.target_rir != null && ` — RIR ${ps.target_rir}`}
-                              {ps.tempo != null &&
-                                ` · Tempo ${ps.tempo.eccentric_seconds}-${ps.tempo.stretched_pause_seconds}-${ps.tempo.concentric_seconds}-${ps.tempo.peak_contraction_seconds}`}
-                            </span>
+                            {ps.exception ? (
+                              <div className={styles.row1}>
+                                <SkipForward size={12} className={styles.textCaptionMuted} />
+                                <span className={styles.textCaptionMuted}>
+                                  Skipped
+                                  {ps.exception.scope === "exercise" ? " (exercise)" : ""}
+                                </span>
+                              </div>
+                            ) : (
+                              <span>
+                                {ex.target_type === "distance_meters"
+                                  ? `${ps.target_value} m`
+                                  : ex.target_type === "duration_seconds"
+                                    ? `${ps.target_value}s`
+                                    : `${ps.target_value}`}
+                                {ps.target_weight_kg != null && ` @ ${ps.target_weight_kg} kg`}
+                                {ps.target_rir != null && ` — RIR ${ps.target_rir}`}
+                                {ps.tempo != null &&
+                                  ` · Tempo ${ps.tempo.eccentric_seconds}-${ps.tempo.stretched_pause_seconds}-${ps.tempo.concentric_seconds}-${ps.tempo.peak_contraction_seconds}`}
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>
