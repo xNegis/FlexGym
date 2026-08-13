@@ -1,6 +1,6 @@
 # F20.1 — Exercise Progress Refinement
 
-**Status:** Implemented and independently validated; awaiting product-owner manual UI validation.
+**Status:** Completed and product-owner validated on 2026-08-13.
 
 ## Objective
 
