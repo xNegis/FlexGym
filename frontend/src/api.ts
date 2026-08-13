@@ -6,12 +6,16 @@ import type {
   ConfiguredSet,
   ConfiguredSetTempo,
   ExerciseDetail,
+  ExerciseChartItem,
+  ExerciseChartPage,
   ExerciseHistoryPage,
   ExerciseHistorySession,
   ExerciseHistorySet,
   ExerciseProgressItem,
   ExerciseSummary,
   FitnessProfile,
+  ProgressPeriod,
+  ProgressRange,
   Routine,
   ScheduleSlot,
   ScheduleSlotType,
@@ -2386,11 +2390,11 @@ function isExerciseHistorySession(value: unknown): value is ExerciseHistorySessi
     (v.heaviest_weight_kg === null ||
       (typeof v.heaviest_weight_kg === "number" &&
         Number.isFinite(v.heaviest_weight_kg) &&
-        v.heaviest_weight_kg >= 0)) &&
+        v.heaviest_weight_kg > 0)) &&
     (v.estimated_1rm_kg === null ||
       (typeof v.estimated_1rm_kg === "number" &&
         Number.isFinite(v.estimated_1rm_kg) &&
-        v.estimated_1rm_kg >= 0)) &&
+        v.estimated_1rm_kg > 0)) &&
     Array.isArray(v.sets) &&
     v.sets.length >= 1 &&
     v.sets.every(isExerciseHistorySet);
@@ -2412,23 +2416,77 @@ function isExerciseHistorySession(value: unknown): value is ExerciseHistorySessi
   const totalReps = sets.reduce((sum, set) => sum + set.performed_reps, 0);
   if (v.total_reps !== totalReps) return false;
 
-  const weightedSets = sets.filter(
+  const positiveWeightedSets = sets.filter(
     (set): set is ExerciseHistorySet & { performed_weight_kg: number } =>
-      set.performed_weight_kg !== null,
+      set.performed_weight_kg !== null && set.performed_weight_kg > 0,
   );
-  if (weightedSets.length === 0) {
+  if (positiveWeightedSets.length === 0) {
     return v.heaviest_weight_kg === null && v.estimated_1rm_kg === null;
   }
 
-  const heaviestWeight = Math.max(...weightedSets.map((set) => set.performed_weight_kg));
+  const heaviestWeight = Math.max(...positiveWeightedSets.map((set) => set.performed_weight_kg));
   const estimated1Rm = Math.max(
-    ...weightedSets.map((set) => set.performed_weight_kg * (1 + set.performed_reps / 30)),
+    ...positiveWeightedSets.map((set) => set.performed_weight_kg * (1 + set.performed_reps / 30)),
   );
   const isRoundedMetric = (actual: unknown, expected: number) =>
     typeof actual === "number" && Math.abs(actual - expected) <= 0.005001;
   return (
     isRoundedMetric(v.heaviest_weight_kg, heaviestWeight) &&
     isRoundedMetric(v.estimated_1rm_kg, estimated1Rm)
+  );
+}
+
+const PROGRESS_PERIODS: Set<ProgressPeriod> = new Set(["1m", "3m", "6m", "1y", "all"]);
+
+function isProgressRange(value: unknown): value is ProgressRange {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const throughLocalDate = v.through_local_date;
+  const validShape =
+    typeof v.period === "string" &&
+    PROGRESS_PERIODS.has(v.period as ProgressPeriod) &&
+    (v.from_local_date === null ||
+      (typeof v.from_local_date === "string" && isValidCalendarDate(v.from_local_date))) &&
+    typeof throughLocalDate === "string" &&
+    isValidCalendarDate(throughLocalDate);
+  if (!validShape) return false;
+  if (v.period === "all") return v.from_local_date === null;
+  return typeof v.from_local_date === "string" && v.from_local_date <= throughLocalDate;
+}
+
+function shiftProgressMonths(localDate: string, months: number): string {
+  const [year, month, day] = localDate.split("-").map(Number);
+  const totalMonth = year * 12 + (month - 1) + months;
+  const targetYear = Math.floor(totalMonth / 12);
+  const targetMonthIndex = totalMonth - targetYear * 12;
+  const finalDay = new Date(targetYear, targetMonthIndex + 1, 0).getDate();
+  return `${String(targetYear).padStart(4, "0")}-${String(targetMonthIndex + 1).padStart(2, "0")}-${String(Math.min(day, finalDay)).padStart(2, "0")}`;
+}
+
+function isRequestedProgressRange(
+  range: ProgressRange,
+  period: ProgressPeriod,
+  localDate: string,
+): boolean {
+  const monthOffsets: Partial<Record<ProgressPeriod, number>> = {
+    "1m": -1,
+    "3m": -3,
+    "6m": -6,
+    "1y": -12,
+  };
+  const expectedFrom =
+    period === "all" ? null : shiftProgressMonths(localDate, monthOffsets[period] as number);
+  return (
+    range.period === period &&
+    range.through_local_date === localDate &&
+    range.from_local_date === expectedFrom
+  );
+}
+
+function isInsideProgressRange(localDate: string, range: ProgressRange): boolean {
+  return (
+    localDate <= range.through_local_date &&
+    (range.from_local_date === null || localDate >= range.from_local_date)
   );
 }
 
@@ -2442,6 +2500,8 @@ function isExerciseHistoryPage(value: unknown): value is ExerciseHistoryPage {
     typeof exercise.name === "string" &&
     exercise.name.trim().length > 0 &&
     exercise.name.length <= 120 &&
+    isProgressRange(v.range) &&
+    typeof v.has_any_history === "boolean" &&
     Array.isArray(v.items) &&
     v.items.every(isExerciseHistorySession) &&
     (v.next_cursor === null ||
@@ -2455,6 +2515,9 @@ function isExerciseHistoryPage(value: unknown): value is ExerciseHistoryPage {
 
   const items = v.items as ExerciseHistorySession[];
   if (new Set(items.map((item) => item.workout_id)).size !== items.length) return false;
+  const range = v.range as ProgressRange;
+  if (!items.every((item) => isInsideProgressRange(item.local_date, range))) return false;
+  if (v.has_any_history === false && (items.length > 0 || v.next_cursor !== null)) return false;
   return items.every((item, index) => {
     if (index === 0) return true;
     const previous = items[index - 1];
@@ -2465,21 +2528,153 @@ function isExerciseHistoryPage(value: unknown): value is ExerciseHistoryPage {
   });
 }
 
+function isExerciseChartItem(value: unknown): value is ExerciseChartItem {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.workout_id !== "number" ||
+    !Number.isInteger(v.workout_id) ||
+    v.workout_id <= 0 ||
+    typeof v.routine_name !== "string" ||
+    v.routine_name.trim().length <= 0 ||
+    typeof v.selected_training_day_name !== "string" ||
+    v.selected_training_day_name.trim().length <= 0 ||
+    typeof v.local_date !== "string" ||
+    !isValidCalendarDate(v.local_date) ||
+    (v.status !== "completed" && v.status !== "cancelled") ||
+    typeof v.terminal_at !== "string" ||
+    !isValidTimestamp(v.terminal_at) ||
+    typeof v.heaviest_weight_kg !== "number" ||
+    !Number.isFinite(v.heaviest_weight_kg) ||
+    v.heaviest_weight_kg <= 0 ||
+    typeof v.estimated_1rm_kg !== "number" ||
+    !Number.isFinite(v.estimated_1rm_kg) ||
+    v.estimated_1rm_kg <= 0 ||
+    !Array.isArray(v.sets) ||
+    v.sets.length < 1 ||
+    !v.sets.every(isExerciseHistorySet)
+  ) {
+    return false;
+  }
+
+  const sets = v.sets as ExerciseHistorySet[];
+  for (let index = 1; index < sets.length; index += 1) {
+    const previous = sets[index - 1];
+    const current = sets[index];
+    if (
+      current.exercise_position < previous.exercise_position ||
+      (current.exercise_position === previous.exercise_position &&
+        current.set_position <= previous.set_position)
+    ) {
+      return false;
+    }
+  }
+
+  const positiveWeightedSets = sets.filter(
+    (set): set is ExerciseHistorySet & { performed_weight_kg: number } =>
+      set.performed_weight_kg !== null && set.performed_weight_kg > 0,
+  );
+  if (positiveWeightedSets.length === 0) return false;
+
+  const heaviestWeight = Math.max(...positiveWeightedSets.map((set) => set.performed_weight_kg));
+  const estimated1Rm = Math.max(
+    ...positiveWeightedSets.map((set) => set.performed_weight_kg * (1 + set.performed_reps / 30)),
+  );
+  return (
+    Math.abs(v.heaviest_weight_kg - heaviestWeight) <= 0.005001 &&
+    Math.abs(v.estimated_1rm_kg - estimated1Rm) <= 0.005001
+  );
+}
+
+function isExerciseChartPage(value: unknown): value is ExerciseChartPage {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.exercise !== "object" || v.exercise === null) return false;
+  const exercise = v.exercise as Record<string, unknown>;
+  if (!(
+    isValidSlug(exercise.slug) &&
+    typeof exercise.name === "string" &&
+    exercise.name.trim().length > 0 &&
+    exercise.name.length <= 120 &&
+    isProgressRange(v.range) &&
+    typeof v.has_any_history === "boolean" &&
+    Array.isArray(v.items) &&
+    v.items.every(isExerciseChartItem)
+  )) {
+    return false;
+  }
+
+  const items = v.items as ExerciseChartItem[];
+  if (new Set(items.map((item) => item.workout_id)).size !== items.length) return false;
+  const range = v.range as ProgressRange;
+  if (!items.every((item) => isInsideProgressRange(item.local_date, range))) return false;
+  if (v.has_any_history === false && items.length > 0) return false;
+  return items.every((item, index) => {
+    if (index === 0) return true;
+    const previous = items[index - 1];
+    const localDateComparison =
+      previous.local_date === item.local_date ? 0 : previous.local_date < item.local_date ? -1 : 1;
+    if (localDateComparison < 0) return true;
+    if (localDateComparison > 0) return false;
+    const terminalComparison = Date.parse(previous.terminal_at) - Date.parse(item.terminal_at);
+    return (
+      terminalComparison < 0 || (terminalComparison === 0 && previous.workout_id < item.workout_id)
+    );
+  });
+}
+
 export interface ExerciseHistoryParams {
+  period: ProgressPeriod;
+  localDate: string;
   cursor?: string;
   limit?: number;
 }
 
 export type ExerciseHistoryResult = ExerciseHistoryPage | { notFound: true };
 
+export async function fetchExerciseChart(
+  slug: string,
+  period: ProgressPeriod,
+  localDate: string,
+): Promise<ExerciseChartPage | { notFound: true }> {
+  const url = new URL(
+    `${API_BASE_URL}/api/progress/exercises/${encodeURIComponent(slug)}/chart`,
+    window.location.origin,
+  );
+  url.searchParams.set("period", period);
+  url.searchParams.set("local_date", localDate);
+
+  const response = await fetch(url.toString(), { credentials: "include" });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 404) {
+    return { notFound: true };
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load exercise chart");
+  }
+  const data: unknown = await response.json();
+  if (
+    !isExerciseChartPage(data) ||
+    data.exercise.slug !== slug ||
+    !isRequestedProgressRange(data.range, period, localDate)
+  ) {
+    throw new Error("Invalid exercise chart response");
+  }
+  return data;
+}
+
 export async function fetchExerciseHistory(
   slug: string,
-  params: ExerciseHistoryParams = {},
+  params: ExerciseHistoryParams,
 ): Promise<ExerciseHistoryResult> {
   const url = new URL(
     `${API_BASE_URL}/api/progress/exercises/${encodeURIComponent(slug)}/history`,
     window.location.origin,
   );
+  url.searchParams.set("period", params.period);
+  url.searchParams.set("local_date", params.localDate);
   if (params.cursor) url.searchParams.set("cursor", params.cursor);
   if (params.limit) url.searchParams.set("limit", String(params.limit));
 
@@ -2494,7 +2689,11 @@ export async function fetchExerciseHistory(
     throw new Error("Unable to load exercise history");
   }
   const data: unknown = await response.json();
-  if (!isExerciseHistoryPage(data) || data.exercise.slug !== slug) {
+  if (
+    !isExerciseHistoryPage(data) ||
+    data.exercise.slug !== slug ||
+    !isRequestedProgressRange(data.range, params.period, params.localDate)
+  ) {
     throw new Error("Invalid exercise history response");
   }
   return data;

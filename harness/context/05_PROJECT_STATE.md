@@ -81,16 +81,27 @@ migrations, waits for backend health, and verifies the application endpoints.
 
 Phase 2 — Workout Tracking is completed. F16 remains intentionally omitted from the current MVP.
 
-F20 — Progress Area and Exercise Performance History is implemented and awaiting final manual UI
-validation. `Progress` replaces `History`
+F20 — Progress Area and Exercise Performance History is implemented and validated. `Progress`
+replaces `History`
 in primary navigation and owns the Workouts and Exercises sections at `/progress/workouts` and
 `/progress/exercises`, preserving the F18 workout-history experience and adding read-only exercise
 performance history with Total reps, Heaviest weight, and Epley Estimated 1RM metrics, an accessible
-line chart, and cursor-paginated session history. Backend tests and frontend static validation pass.
-F20 adds no migration; the configured local database remains at repository head. Product-owner
-responsive and interaction review is the remaining completion gate.
+line chart, and cursor-paginated session history. Backend tests and frontend static validation pass,
+and the product owner completed the final production UI review, including the refined chart-point
+set detail and zero-anchored Total reps scale. F20 adds no migration; the configured local database
+remains at repository head.
 
-Phase 3 — Progress & Analytics is in progress. F20 is the first implemented increment.
+F20.1 — Exercise Progress Refinement is implemented and has passed independent automated and static
+validation. Exercise charts now use Estimated 1RM by default with Heaviest weight as the alternative,
+exclude null and zero loads from weight-based projections, expose route-backed `1M`, `3M`, `6M`,
+`1Y`, and `All` periods, and load the complete oldest-first chart independently from the paginated
+session history. Total reps remains factual session context rather than a chart metric. F20.1 adds no
+migration; the configured local database remains at repository head. Product-owner manual responsive,
+interaction, and accessibility review is the remaining completion gate.
+
+Phase 3 — Progress & Analytics is in progress. F20 is the first implemented increment. The remaining
+roadmap sequence is F20.1 — Exercise Progress Refinement, F21 — Workout Statistics and Activity
+Trends, F22 — Body Weight Tracking, F23 — Body Weight Progress, and F24 — Progress Dashboard.
 
 ## Completed Features
 
@@ -113,6 +124,7 @@ Phase 3 — Progress & Analytics is in progress. F20 is the first implemented in
 * F17 — Workout Completion
 * F18 — Workout History
 * F19 — Dockerise App and Prepare Environment Variables
+* F20 — Progress Area and Exercise Performance History
 
 ## Skipped Features
 
@@ -121,8 +133,8 @@ Phase 3 — Progress & Analytics is in progress. F20 is the first implemented in
 
 ## Next Feature
 
-Complete the product-owner manual responsive, interaction, and accessibility review for F20 before
-selecting the next Phase 3 — Progress & Analytics increment.
+Complete the product-owner manual responsive, interaction, and accessibility review for F20.1
+before specifying F21 — Workout Statistics and Activity Trends.
 
 ## Existing Feature Specifications
 
@@ -146,7 +158,9 @@ selecting the next Phase 3 — Progress & Analytics increment.
 * `harness/features/16_discomfort_and_pain_reporting.md` (intentionally omitted from current MVP)
 * `harness/features/17_workout_completion.md` (completed)
 * `harness/features/18_workout_history.md` (completed)
-* `harness/features/20_progress_exercise_history.md` (implemented; awaiting final manual UI validation)
+* `harness/features/20_progress_exercise_history.md` (completed)
+* `harness/features/20_1_exercise_progress_refinement.md` (implemented; awaiting product-owner
+  manual UI validation)
 
 ## Current Technology
 
@@ -163,7 +177,7 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (296 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
+pytest (315 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
 completion gate for current MVP features under DEC-019
 
 Code Quality:
@@ -186,4 +200,5 @@ Per-feature AI implementation costs and models are recorded in
 
 ## Open Questions
 
-None currently blocking F20 manual validation.
+No product decisions currently block F20.1. The remaining completion gate is the product-owner
+manual UI review defined by the feature specification and DEC-019.

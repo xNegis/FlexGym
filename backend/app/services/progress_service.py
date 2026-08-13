@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import base64
+import calendar
 import datetime
 import hashlib
 import hmac
 import json
 import re
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -18,6 +19,8 @@ from app.models import PerformedSet, WorkoutExercise, WorkoutPlannedSet, Workout
 from app.services.exercise_service import get_exercise_by_slug
 
 TERMINAL_STATUSES = ("completed", "cancelled")
+
+PERIODS = ("1m", "3m", "6m", "1y", "all")
 
 _PROGRESS_CURSOR_VERSION = 1
 _PROGRESS_CURSOR_MAX_LENGTH = 512
@@ -34,6 +37,28 @@ def _workout_terminal_at(workout: WorkoutSession) -> datetime.datetime | None:
 
 def _epley_1rm(weight: float, reps: float) -> float:
     return weight * (1 + reps / 30)
+
+
+# ────────────────── periods (FR-3 / FR-4) ──────────────────
+
+
+def _shift_months(value: datetime.date, months: int) -> datetime.date:
+    total = value.year * 12 + (value.month - 1) + months
+    year, month_index = divmod(total, 12)
+    month = month_index + 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return datetime.date(year, month, day)
+
+
+def resolve_period(
+    period: str, local_date: datetime.date
+) -> tuple[datetime.date | None, datetime.date]:
+    if period not in PERIODS:
+        raise ValueError("Unsupported progress period")
+    months = {"1m": -1, "3m": -3, "6m": -6, "1y": -12}.get(period)
+    if months is None:
+        return None, local_date
+    return _shift_months(local_date, months), local_date
 
 
 # ────────────────── exercise list (FR-3) ──────────────────
@@ -115,12 +140,19 @@ def list_exercise_progress(session: Session, user_id: int) -> list[dict[str, obj
 
 
 def _encode_progress_cursor(
-    user_id: int, slug: str, terminal_at: datetime.datetime, workout_id: int
+    user_id: int,
+    slug: str,
+    period: str,
+    through_date: datetime.date,
+    terminal_at: datetime.datetime,
+    workout_id: int,
 ) -> str:
     payload = {
         "v": _PROGRESS_CURSOR_VERSION,
         "u": user_id,
         "e": slug,
+        "p": period,
+        "d": through_date.isoformat(),
         "t": terminal_at.isoformat(),
         "i": workout_id,
     }
@@ -129,7 +161,13 @@ def _encode_progress_cursor(
     return base64.urlsafe_b64encode(raw + signature).decode("ascii").rstrip("=")
 
 
-def _decode_progress_cursor(token: str, user_id: int, slug: str) -> tuple[datetime.datetime, int]:
+def _decode_progress_cursor(
+    token: str,
+    user_id: int,
+    slug: str,
+    period: str,
+    through_date: datetime.date,
+) -> tuple[datetime.datetime, int]:
     if not token or len(token) > _PROGRESS_CURSOR_MAX_LENGTH:
         raise ProgressError("Invalid cursor")
     if not _PROGRESS_CURSOR_RE.fullmatch(token):
@@ -150,11 +188,15 @@ def _decode_progress_cursor(token: str, user_id: int, slug: str) -> tuple[dateti
         payload = json.loads(raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
         raise ProgressError("Invalid cursor") from None
-    if not isinstance(payload, dict) or set(payload.keys()) != {"v", "u", "e", "t", "i"}:
+    if not isinstance(payload, dict) or set(payload.keys()) != {"v", "u", "e", "p", "d", "t", "i"}:
         raise ProgressError("Invalid cursor")
     if payload.get("v") != _PROGRESS_CURSOR_VERSION:
         raise ProgressError("Invalid cursor")
     if payload.get("e") != slug:
+        raise ProgressError("Invalid cursor")
+    if payload.get("p") != period:
+        raise ProgressError("Invalid cursor")
+    if payload.get("d") != through_date.isoformat():
         raise ProgressError("Invalid cursor")
     cursor_user_id = payload.get("u")
     if (
@@ -255,7 +297,7 @@ def _build_history_items(
                     }
                 )
                 total_reps += reps
-                if weight is not None:
+                if weight is not None and weight > 0:
                     if max_weight is None or weight > max_weight:
                         max_weight = weight
                     epley = _epley_1rm(weight, reps)
@@ -280,20 +322,8 @@ def _build_history_items(
     return items
 
 
-def get_exercise_history(
-    session: Session,
-    user_id: int,
-    slug: str,
-    cursor: str | None,
-    limit: int,
-) -> dict[str, object] | None:
-    catalog = get_exercise_by_slug(session, slug)
-    if catalog is None:
-        return None
-
-    terminal = func.coalesce(WorkoutSession.completed_at, WorkoutSession.cancelled_at)
-
-    performed_exists = (
+def _performed_exists_expr(slug: str) -> Any:
+    return (
         select(PerformedSet.id)
         .join(WorkoutPlannedSet, PerformedSet.workout_planned_set_id == WorkoutPlannedSet.id)
         .join(WorkoutExercise, WorkoutPlannedSet.workout_exercise_id == WorkoutExercise.id)
@@ -305,14 +335,109 @@ def get_exercise_history(
         .exists()
     )
 
+
+def _has_any_history(session: Session, user_id: int, slug: str) -> bool:
+    exists = (
+        select(PerformedSet.id)
+        .join(WorkoutPlannedSet, PerformedSet.workout_planned_set_id == WorkoutPlannedSet.id)
+        .join(WorkoutExercise, WorkoutPlannedSet.workout_exercise_id == WorkoutExercise.id)
+        .join(WorkoutSession, WorkoutExercise.workout_session_id == WorkoutSession.id)
+        .where(
+            WorkoutSession.user_id == user_id,
+            WorkoutSession.status.in_(TERMINAL_STATUSES),
+            WorkoutExercise.exercise_slug == slug,
+            WorkoutExercise.target_type == "repetitions",
+        )
+        .exists()
+    )
+    return session.query(exists).scalar() is True
+
+
+def _period_filters(
+    query: Any, from_date: datetime.date | None, through_date: datetime.date
+) -> Any:
+    if from_date is not None:
+        query = query.filter(WorkoutSession.local_date >= from_date)
+    return query.filter(WorkoutSession.local_date <= through_date)
+
+
+def get_exercise_chart(
+    session: Session,
+    user_id: int,
+    slug: str,
+    period: str,
+    local_date: datetime.date,
+) -> dict[str, object] | None:
+    catalog = get_exercise_by_slug(session, slug)
+    if catalog is None:
+        return None
+
+    from_date, through_date = resolve_period(period, local_date)
+
+    terminal = func.coalesce(WorkoutSession.completed_at, WorkoutSession.cancelled_at)
+    performed_exists = _performed_exists_expr(slug)
+
     query = session.query(WorkoutSession).filter(
         WorkoutSession.user_id == user_id,
         WorkoutSession.status.in_(TERMINAL_STATUSES),
         performed_exists,
     )
+    query = _period_filters(query, from_date, through_date)
+
+    workouts = query.order_by(
+        WorkoutSession.local_date.asc(), terminal.asc(), WorkoutSession.id.asc()
+    ).all()
+
+    items = _build_history_items(session, workouts, slug)
+    chart_items = [
+        {key: value for key, value in item.items() if key != "total_reps"}
+        for item in items
+        if item["heaviest_weight_kg"] is not None
+    ]
+
+    name = _resolve_latest_snapshot_name(session, user_id, slug) or catalog.name
+
+    return {
+        "exercise": {"slug": slug, "name": name},
+        "range": {
+            "period": period,
+            "from_local_date": from_date.isoformat() if from_date is not None else None,
+            "through_local_date": through_date.isoformat(),
+        },
+        "has_any_history": _has_any_history(session, user_id, slug),
+        "items": chart_items,
+    }
+
+
+def get_exercise_history(
+    session: Session,
+    user_id: int,
+    slug: str,
+    period: str,
+    local_date: datetime.date,
+    cursor: str | None,
+    limit: int,
+) -> dict[str, object] | None:
+    catalog = get_exercise_by_slug(session, slug)
+    if catalog is None:
+        return None
+
+    from_date, through_date = resolve_period(period, local_date)
+
+    terminal = func.coalesce(WorkoutSession.completed_at, WorkoutSession.cancelled_at)
+    performed_exists = _performed_exists_expr(slug)
+
+    query = session.query(WorkoutSession).filter(
+        WorkoutSession.user_id == user_id,
+        WorkoutSession.status.in_(TERMINAL_STATUSES),
+        performed_exists,
+    )
+    query = _period_filters(query, from_date, through_date)
 
     if cursor is not None:
-        cursor_terminal, cursor_id = _decode_progress_cursor(cursor, user_id, slug)
+        cursor_terminal, cursor_id = _decode_progress_cursor(
+            cursor, user_id, slug, period, through_date
+        )
         query = query.filter(
             or_(
                 terminal < cursor_terminal,
@@ -332,12 +457,20 @@ def get_exercise_history(
         last = page_rows[-1]
         last_terminal = _workout_terminal_at(last)
         if last_terminal is not None:
-            next_cursor = _encode_progress_cursor(user_id, slug, last_terminal, last.id)
+            next_cursor = _encode_progress_cursor(
+                user_id, slug, period, through_date, last_terminal, last.id
+            )
 
     name = _resolve_latest_snapshot_name(session, user_id, slug) or catalog.name
 
     return {
         "exercise": {"slug": slug, "name": name},
+        "range": {
+            "period": period,
+            "from_local_date": from_date.isoformat() if from_date is not None else None,
+            "through_local_date": through_date.isoformat(),
+        },
+        "has_any_history": _has_any_history(session, user_id, slug),
         "items": items,
         "next_cursor": next_cursor,
     }

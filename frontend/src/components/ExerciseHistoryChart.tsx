@@ -13,7 +13,6 @@ export interface ExerciseHistoryPoint {
 
 interface ExerciseHistoryChartProps {
   title: string;
-  unit: "reps" | "kg";
   points: ExerciseHistoryPoint[];
 }
 
@@ -24,8 +23,8 @@ const PAD_TOP = 14;
 const PAD_BOTTOM = 30;
 const DOT_RADIUS = 4;
 
-function formatValue(unit: "reps" | "kg", value: number): string {
-  return unit === "reps" ? `${Math.round(value)}` : `${Number(value.toFixed(1))}`;
+function formatValue(value: number): string {
+  return `${Number(value.toFixed(1))}`;
 }
 
 function formatShortDate(iso: string): string {
@@ -36,9 +35,18 @@ function formatShortDate(iso: string): string {
   });
 }
 
+function formatFullDate(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function formatSetDetail(set: ExerciseHistorySet): string {
   const facts = [`${set.performed_reps} reps`];
-  if (set.performed_weight_kg !== null) {
+  if (set.performed_weight_kg !== null && set.performed_weight_kg > 0) {
     facts.push(`${Number(set.performed_weight_kg.toFixed(1))} kg`);
   }
   if (set.performed_rir !== null) {
@@ -57,7 +65,7 @@ function groupSetsByOccurrence(sets: ExerciseHistorySet[]): ExerciseHistorySet[]
   return Array.from(occurrences.values());
 }
 
-export default function ExerciseHistoryChart({ title, unit, points }: ExerciseHistoryChartProps) {
+export default function ExerciseHistoryChart({ title, points }: ExerciseHistoryChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
@@ -81,11 +89,9 @@ export default function ExerciseHistoryChart({ title, unit, points }: ExerciseHi
   const plotHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
 
   const values = points.flatMap((point) => (point.value === null ? [] : [point.value]));
-  let min = unit === "reps" ? 0 : values.length > 0 ? Math.min(...values) : 0;
+  let min = values.length > 0 ? Math.min(...values) : 0;
   let max = values.length > 0 ? Math.max(...values) : 1;
-  if (unit === "reps" && max <= 0) {
-    max = 1;
-  } else if (min === max) {
+  if (min === max) {
     const padding = Math.max(1, Math.abs(min) * 0.1);
     min -= padding;
     max += padding;
@@ -144,7 +150,7 @@ export default function ExerciseHistoryChart({ title, unit, points }: ExerciseHi
                 y2={PAD_TOP + plotHeight}
               />
               <text className={styles.axisText} x={PAD_LEFT - 6} y={PAD_TOP + 4} textAnchor="end">
-                {formatValue(unit, max)} {unit}
+                {formatValue(max)} kg
               </text>
               <text
                 className={styles.axisText}
@@ -152,7 +158,7 @@ export default function ExerciseHistoryChart({ title, unit, points }: ExerciseHi
                 y={PAD_TOP + plotHeight + 4}
                 textAnchor="end"
               >
-                {formatValue(unit, min)} {unit}
+                {formatValue(min)} kg
               </text>
               {points.length > 0 && (
                 <text
@@ -203,7 +209,7 @@ export default function ExerciseHistoryChart({ title, unit, points }: ExerciseHi
               const point = points[index];
               if (point.value === null) return null;
               const statusLabel = point.status === "completed" ? "Completed" : "Cancelled";
-              const label = `${formatShortDate(point.date)}, ${formatValue(unit, point.value)} ${unit}, ${statusLabel}, ${point.sessionName}`;
+              const label = `${formatFullDate(point.date)}, ${formatValue(point.value)} kg, ${statusLabel}, ${point.sessionName}`;
               return (
                 <button
                   key={point.workoutId}
@@ -222,11 +228,9 @@ export default function ExerciseHistoryChart({ title, unit, points }: ExerciseHi
       <div className={styles.detail} aria-live="polite">
         {selectedPoint && selectedPoint.value !== null && selectedCoord ? (
           <>
-            <span className={styles.detailValue}>
-              {formatValue(unit, selectedPoint.value)} {unit}
-            </span>
+            <span className={styles.detailValue}>{formatValue(selectedPoint.value)} kg</span>
             <span className={styles.detailMeta}>
-              {formatShortDate(selectedPoint.date)} ·{" "}
+              {formatFullDate(selectedPoint.date)} ·{" "}
               {selectedPoint.status === "completed" ? "Completed" : "Cancelled"} ·{" "}
               {selectedPoint.sessionName}
             </span>

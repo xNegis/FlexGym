@@ -1,5 +1,7 @@
 # F20 — Progress Area and Exercise Performance History
 
+**Status:** Completed and product-owner validated on 2026-08-13.
+
 ## Objective
 
 Introduce `Progress` as the permanent home for historical and analytical views, preserve the

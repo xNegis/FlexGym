@@ -389,3 +389,29 @@ progress score or evidence of hypertrophy, fat loss, health, or workout quality.
 assign positive or negative meaning to a metric change unless a later feature explicitly defines
 and validates that interpretation. This preserves the architectural distinction between facts,
 deterministic projections, derived signals, and later AI reasoning.
+
+---
+
+## DEC-023 — Exercise progress charts use positive observed load and complete rolling periods
+
+**Status:** Accepted
+
+F20.1 refines the first exercise-progress model after product review. Total repetitions remain
+historical session and set facts but are not a standalone progress chart because their movement is
+confounded by load, set count, programming, and repetition range.
+
+Exercise charts use Estimated 1RM as the default metric and Heaviest weight as the direct-load
+alternative. For these projections, only `performed_weight_kg > 0` is a usable observed load. Null
+and zero weights produce no metric point; zero remains an untouched persisted fact and is not
+globally redefined outside Progress. Estimated 1RM continues to use the Epley formula without a
+repetition threshold or RIR adjustment.
+
+Exercise progress supports rolling `1M`, `3M`, `6M`, `1Y`, and `All` periods, with `3M` as the
+default. Period membership uses the workout's captured local date and inclusive bounds calculated
+by the backend from a client-supplied current local date. The chart contains every qualifying
+workout in the selected period independently of the paginated textual history and begins at the
+oldest actual plotted workout rather than reserving empty space to the theoretical period boundary.
+
+This decision supersedes DEC-022 only where DEC-022 makes Total reps a permanent selectable chart
+metric or treats a recorded zero as usable input to a weight-based exercise-progress projection.
+The broader separation of facts, deterministic metrics, interpretation, and AI remains unchanged.

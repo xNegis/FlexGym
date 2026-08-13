@@ -309,7 +309,15 @@ interface WorkoutHistoryPage {
   next_cursor: string | null;
 }
 
-type ExerciseHistoryMetric = "total_reps" | "heaviest_weight" | "estimated_1rm";
+type ExerciseHistoryMetric = "heaviest_weight" | "estimated_1rm";
+
+type ProgressPeriod = "1m" | "3m" | "6m" | "1y" | "all";
+
+interface ProgressRange {
+  period: ProgressPeriod;
+  from_local_date: string | null;
+  through_local_date: string;
+}
 
 interface ExerciseProgressItem {
   exercise_slug: string;
@@ -341,8 +349,29 @@ interface ExerciseHistorySession {
   sets: ExerciseHistorySet[];
 }
 
+interface ExerciseChartItem {
+  workout_id: number;
+  routine_name: string;
+  selected_training_day_name: string;
+  local_date: string;
+  status: "completed" | "cancelled";
+  terminal_at: string;
+  heaviest_weight_kg: number;
+  estimated_1rm_kg: number;
+  sets: ExerciseHistorySet[];
+}
+
+interface ExerciseChartPage {
+  exercise: { slug: string; name: string };
+  range: ProgressRange;
+  has_any_history: boolean;
+  items: ExerciseChartItem[];
+}
+
 interface ExerciseHistoryPage {
   exercise: { slug: string; name: string };
+  range: ProgressRange;
+  has_any_history: boolean;
   items: ExerciseHistorySession[];
   next_cursor: string | null;
 }
@@ -360,10 +389,14 @@ export {
   type ExerciseHistoryPage,
   type ExerciseHistorySession,
   type ExerciseHistorySet,
+  type ExerciseChartItem,
+  type ExerciseChartPage,
   type ExerciseProgressItem,
   type ExerciseSummary,
   type FitnessProfile,
   type PerformedSet,
+  type ProgressPeriod,
+  type ProgressRange,
   type Routine,
   type ScheduleRestSlot,
   type ScheduleSlot,

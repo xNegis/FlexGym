@@ -128,22 +128,129 @@ Completion of this phase should make the product independently useful as a worko
 
 Goal: understand what has happened without using AI.
 
-Current intended sequence begins with:
+Phase 3 turns the workout facts captured through Phase 2 into factual historical and analytical
+views. It must keep observed facts, deterministic projections, goal-dependent interpretation, and
+future adaptation signals distinguishable. A chart moving up or down does not by itself mean that
+the user is progressing or regressing.
 
-* F20 — Progress Area and Exercise Performance History
+Current intended sequence:
+
+* F20 — Progress Area and Exercise Performance History (completed)
+* F20.1 — Exercise Progress Refinement
+* F21 — Workout Statistics and Activity Trends
+* F22 — Body Weight Tracking
+* F23 — Body Weight Progress
+* F24 — Progress Dashboard
+
+### F20 — Progress Area and Exercise Performance History
 
 F20 replaces History in primary navigation with a broader Progress destination. It preserves the
-existing workout-history view and adds exercise performance history using factual performed sets,
-Total reps, Heaviest weight, and Epley Estimated 1RM. It does not interpret changes against the
-user's goal or classify them as positive or negative.
+existing workout-history view and adds exercise performance history from owned performed-set facts
+in completed and partially performed cancelled workouts.
 
-Planned areas:
+For each eligible exercise, the user can inspect previous sessions, performed sets, repetitions,
+optional weight and RIR, Heaviest weight, Total reps, and Epley Estimated 1RM. The selected metric
+is displayed over time in an accessible chart, and each point remains explainable through the
+underlying session and set facts.
 
-* Exercise history
-* Progress charts
-* Workout statistics
-* Body-weight tracking
-* Body progress
+F20 is descriptive. It does not interpret changes against the user's goal, classify them as
+positive or negative, identify records or stagnation, or propose adaptations.
+
+### F20.1 — Exercise Progress Refinement
+
+F20.1 sharpens the distinction between exercise performance and exercise activity. Total reps
+remains available as factual session and set context, but is removed as an independently selectable
+progress chart because repetitions naturally fluctuate with load, programming, set count, and rep
+range and therefore do not describe progression by themselves.
+
+Exercise progress charts retain:
+
+* Heaviest weight, as the largest directly observed external load in a qualifying session.
+* Estimated 1RM, as the existing deterministic Epley projection that combines observed load and
+  repetitions.
+
+The exercise detail adds route-backed rolling time ranges shared by its chart and session history:
+`1M`, `3M`, `6M`, `1Y`, and `All`. `3M` is the default range. Changing the range resets pagination,
+refresh and Browser Back preserve both range and metric, and exercises without qualifying observed
+weight receive an explicit unavailable state rather than invented zero values.
+
+F20.1 does not add max-repetition charts, volume, personal records, trend judgements, or stagnation
+detection. DEC-023 records the refined metric, positive-weight, and complete-period rules and
+supersedes the affected parts of the initial F20 decision.
+
+### F21 — Workout Statistics and Activity Trends
+
+F21 answers aggregate activity questions such as whether the user is training regularly, training
+more or less frequently, how much recorded work is being performed, and how often started workouts
+are completed. It adds a Statistics or Overview perspective under Progress and reuses the Phase 3
+time-range convention where appropriate.
+
+The factual period summary and temporal views cover:
+
+* Completed workouts.
+* Cancelled workouts, kept explicitly separate from completed workouts.
+* Completion ratio over terminal workouts, without calling it plan adherence.
+* Performed sets, including performed facts retained in a subsequently cancelled workout.
+* Skipped sets and skipped exercises.
+* Recorded workout duration, clearly labelled as elapsed session time rather than time under
+  tension.
+* Structured skip-reason distribution, including pain or discomfort.
+* Weekly activity charts and a compact calendar of days on which workout activity was recorded.
+
+F21 does not claim that more training, sets, or time is inherently better. It does not calculate
+plan adherence because the application cannot yet reconstruct every historically expected workout
+or distinguish every intentional rest day from a missed session.
+
+Training volume in kilograms is deferred until load semantics are explicit for dumbbells,
+unilateral exercises, bodyweight work, assisted movements, machines, and missing observed weight.
+Muscle-distribution statistics are also deferred until primary and secondary muscle contributions
+have a deliberate, non-duplicative rule. F21 adds no streaks, weekly targets, scores, records,
+recommendations, or AI interpretation.
+
+### F22 — Body Weight Tracking
+
+F22 introduces user-owned body-weight measurements as historical facts. The user can record a
+weight in kilograms for a local measurement date, attach an optional note, browse the chronological
+history, edit an incorrect entry, and delete an entry through explicit confirmation. Multiple
+measurements are preserved rather than overwriting history.
+
+The feature must define one canonical relationship between measurement history and the existing
+profile `weight_kg` value so the product cannot expose contradictory concepts of current weight. A
+migration must not invent a historical measurement date when the application does not know when an
+existing profile value was measured.
+
+F22 covers capture and factual history only. It does not add charts, trends, target weight,
+composition measurements, photographs, or positive/negative interpretation.
+
+### F23 — Body Weight Progress
+
+F23 visualizes the measurements introduced by F22. It adds a body-weight chart using the shared
+`1M`, `3M`, `6M`, `1Y`, and `All` ranges, shows the first and latest measurement in the selected
+period and their absolute kilogram difference, and exposes notes associated with plotted facts.
+
+It also adds a clearly labelled deterministic trend, preferably a time-based seven-day moving
+average rather than an average of the last seven entries, so irregular measurement frequency does
+not silently change the meaning. Its specification must define same-day measurements, gaps, single
+measurements, empty periods, boundary dates, and how raw and smoothed series coexist.
+
+F23 describes direction and magnitude but does not decide whether gaining or losing weight is good,
+claim goal fulfilment, infer causation from training, forecast future weight, or recommend changes.
+
+### F24 — Progress Dashboard
+
+F24 makes `/progress` a factual summary of the implemented Progress perspectives rather than a new
+analytics source. It composes existing projections into a concise overview containing recent
+workouts, workout and performed-set activity for the selected period, weekly consistency context,
+the latest body-weight measurement and factual period change, recently trained exercises, and
+direct routes to Workouts, Exercises, Statistics, and Body Weight.
+
+The first dashboard does not rank exercises by improvement, identify stagnation, create a general
+progress score, or surface warnings and recommendations. Those concepts are derived signals and
+belong in Phase 4 unless a later feature first defines transparent deterministic rules for them.
+
+Completion of Phase 3 should let the user inspect exercise performance, overall training activity,
+and body-weight evolution while preserving a clear boundary between what happened and what the
+application thinks should happen next.
 
 ---
 
