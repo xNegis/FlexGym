@@ -43,8 +43,7 @@ export default function LoginScreen() {
   return (
     <form onSubmit={handleSubmit} noValidate className={styles.stack5}>
       <div>
-        <h2 className={styles.screenTitle}>Log in to FlexGym</h2>
-        <p className={styles.textBodyMuted}>Enter your credentials to continue</p>
+        <h2 className={styles.screenTitle}>Log in</h2>
       </div>
 
       {error && <Alert variant="error">{error}</Alert>}
