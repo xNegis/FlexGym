@@ -119,9 +119,12 @@ entry with both counts.
 
 The compact calendar covers the range start through the through date. For `All`, it starts at the
 month containing the first active day, and is empty when there is none. It never invents activity
-for blank days. Each active day exposes a visible count where practical and equivalent accessible
-text, for example: `12 August — 2 workouts: 1 completed, 1 cancelled`. Blank days explicitly read
-as no recorded terminal workout.
+for blank days. Each active day exposes its total terminal-workout count. When a day contains a
+cancelled workout, it also shows a compact `C` cancellation count; a cancelled-only day uses the
+existing warning treatment and pattern, explained by a visible legend. The visual calendar itself
+retains equivalent accessible text, for example: `12 August — 2 workouts: 1 completed, 1
+cancelled`; no separate activity-day list is rendered below it. Blank days explicitly read as no
+recorded terminal workout.
 
 Color may support scanning, but cannot be the sole cue. Where seven 44-pixel day targets cannot fit
 at narrow widths or 200% zoom, replace the visual grid with the ordered activity-day list rather

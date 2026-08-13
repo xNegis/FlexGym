@@ -180,13 +180,43 @@
 /* ────────────────── activity calendar ────────────────── */
 
 .calendarGridWrap {
-  display: none;
+  display: block;
 }
 
-@media (min-width: 360px) {
-  .calendarGridWrap {
-    display: block;
-  }
+.calendarLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.calendarLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font: var(--text-body-compact);
+}
+
+.calendarLegendSwatch {
+  width: 0.875rem;
+  height: 0.875rem;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.calendarLegendSwatchCompleted {
+  background: var(--color-accent-soft);
+}
+
+.calendarLegendSwatchCancelled {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-warning-soft),
+    var(--color-warning-soft) 3px,
+    var(--color-warning) 3px,
+    var(--color-warning) 6px
+  );
 }
 
 .calendarMonth {
@@ -217,9 +247,13 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--space-1);
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 
 .calendarDay {
+  position: relative;
   display: flex;
   min-height: 2.5rem;
   flex-direction: column;
@@ -235,6 +269,16 @@
 .calendarDayActive {
   background: var(--color-accent-soft);
   color: var(--color-text);
+}
+
+.calendarDayCancelled {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-warning-soft),
+    var(--color-warning-soft) 3px,
+    var(--color-surface) 3px,
+    var(--color-surface) 6px
+  );
 }
 
 .calendarDayNumber {
@@ -255,20 +299,16 @@
   font-weight: 500;
 }
 
-.activityDayList {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.activityDayItem {
-  padding: var(--space-2) 0;
-  border-bottom: var(--border-width) solid var(--color-border);
+.calendarDayCountCancelled {
+  background: var(--color-warning);
   color: var(--color-text);
-  font: var(--text-body-compact);
 }
 
-.activityDayItem:last-child {
-  border-bottom: none;
+.calendarCancelledCount {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  color: var(--color-text);
+  font: var(--text-caption);
+  font-weight: 600;
 }

@@ -223,57 +223,93 @@ function ActivityCalendar({
 
   return (
     <div>
-      <div className={statisticsStyles.calendarGridWrap} aria-hidden="true">
+      <div className={statisticsStyles.calendarLegend}>
+        <span className={statisticsStyles.calendarLegendItem}>
+          <span
+            className={`${statisticsStyles.calendarLegendSwatch} ${statisticsStyles.calendarLegendSwatchCompleted}`}
+            aria-hidden="true"
+          />
+          Completed
+        </span>
+        <span className={statisticsStyles.calendarLegendItem}>
+          <span
+            className={`${statisticsStyles.calendarLegendSwatch} ${statisticsStyles.calendarLegendSwatchCancelled}`}
+            aria-hidden="true"
+          />
+          C = cancelled
+        </span>
+      </div>
+      <div className={statisticsStyles.calendarGridWrap}>
         {months.map((month) => (
-          <div key={month.label} className={statisticsStyles.calendarMonth}>
+          <section
+            key={month.label}
+            className={statisticsStyles.calendarMonth}
+            aria-label={`${month.label} activity`}
+          >
             <div className={statisticsStyles.calendarMonthTitle}>{month.label}</div>
-            <div className={statisticsStyles.calendarWeekdays}>
+            <div className={statisticsStyles.calendarWeekdays} aria-hidden="true">
               {WEEKDAY_HEADERS.map((weekday) => (
                 <span key={weekday} className={statisticsStyles.calendarWeekday}>
                   {weekday}
                 </span>
               ))}
             </div>
-            <div className={statisticsStyles.calendarGrid}>
+            <ol
+              className={statisticsStyles.calendarGrid}
+              aria-label={`${month.label} activity days`}
+            >
               {month.days.map((date, index) => {
                 const { year, month: monthNumber, day } = parseLocalDate(date);
                 const activity = byDate.get(date);
                 const isActive = activity !== undefined;
+                const completedCount = activity?.completed_workout_count ?? 0;
+                const cancelledCount = activity?.cancelled_workout_count ?? 0;
+                const total = completedCount + cancelledCount;
+                const isCancelledOnly = isActive && completedCount === 0;
+                const accessibleLabel = isActive
+                  ? `${formatLocalDate(date)} — ${pluralize(total, "workout", "workouts")}: ${completedCount} completed, ${cancelledCount} cancelled`
+                  : `${formatLocalDate(date)} — no recorded terminal workout`;
                 const weekday = new Date(Date.UTC(year, monthNumber - 1, day)).getUTCDay();
                 const mondayBasedColumn = ((weekday + 6) % 7) + 1;
                 return (
-                  <div
+                  <li
                     key={date}
                     className={`${statisticsStyles.calendarDay} ${
                       isActive ? statisticsStyles.calendarDayActive : ""
-                    }`}
+                    } ${isCancelledOnly ? statisticsStyles.calendarDayCancelled : ""}`}
                     style={index === 0 ? { gridColumnStart: mondayBasedColumn } : undefined}
+                    aria-label={accessibleLabel}
                   >
-                    <span className={statisticsStyles.calendarDayNumber}>{day}</span>
+                    <span className={statisticsStyles.calendarDayNumber} aria-hidden="true">
+                      {day}
+                    </span>
                     {isActive && (
-                      <span className={statisticsStyles.calendarDayCount}>
-                        {activity.completed_workout_count + activity.cancelled_workout_count}
-                      </span>
+                      <>
+                        <span
+                          className={`${statisticsStyles.calendarDayCount} ${
+                            isCancelledOnly ? statisticsStyles.calendarDayCountCancelled : ""
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {total}
+                        </span>
+                        {cancelledCount > 0 && (
+                          <span
+                            className={statisticsStyles.calendarCancelledCount}
+                            aria-hidden="true"
+                          >
+                            C{cancelledCount}
+                          </span>
+                        )}
+                      </>
                     )}
-                  </div>
+                  </li>
                 );
               })}
-            </div>
-          </div>
+            </ol>
+          </section>
         ))}
       </div>
-
-      <ol className={statisticsStyles.activityDayList}>
-        {activityDays.map((day) => {
-          const total = day.completed_workout_count + day.cancelled_workout_count;
-          return (
-            <li key={day.local_date} className={statisticsStyles.activityDayItem}>
-              {formatLocalDate(day.local_date)} — {pluralize(total, "workout", "workouts")}:{" "}
-              {day.completed_workout_count} completed, {day.cancelled_workout_count} cancelled
-            </li>
-          );
-        })}
-      </ol>
     </div>
   );
 }
