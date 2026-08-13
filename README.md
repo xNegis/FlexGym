@@ -50,6 +50,31 @@ npm run dev
 Open http://localhost:5173 in a browser. A new installation should display registration after
 successfully connecting to the backend.
 
+### Docker deployment
+
+Create a local deployment environment file from the example and adjust its values when needed:
+
+```bash
+cp .env.deploy.example .env.deploy
+```
+
+The deployment file is ignored by Git. Start or update the complete application with:
+
+```bash
+bash scripts/deploy.sh
+```
+
+Alternatively, pass a specific environment file:
+
+```bash
+bash scripts/deploy.sh --env-file /path/to/deploy.env
+```
+
+The script validates the Compose configuration, applies Alembic migrations during backend startup,
+waits for the backend healthcheck, and verifies the backend and frontend endpoints. The
+`VITE_API_BASE_URL` value is a frontend build-time setting, so changing it requires rebuilding the
+frontend image.
+
 ## Running Tests
 
 ### Backend tests

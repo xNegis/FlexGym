@@ -3,10 +3,10 @@ services:
     build:
       context: ./backend
     environment:
-      APP_ENV: development
-      DATABASE_URL: sqlite:////data/db/flexgym.db
-      ALLOWED_ORIGINS: http://localhost:5173
-      JWT_SECRET: flexgym-development-secret-do-not-use-in-production
+      APP_ENV: ${APP_ENV:?APP_ENV is required}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?ALLOWED_ORIGINS is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
     ports:
       - "8000:8000"
     volumes:
@@ -17,10 +17,8 @@ services:
       - uv run alembic upgrade head && exec uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
     healthcheck:
       test:
-        - CMD
-        - python
-        - -c
-        - import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,7 +27,7 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_BASE_URL: http://localhost:8000
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?VITE_API_BASE_URL is required}
     ports:
       - "5173:80"
     depends_on:
