@@ -100,9 +100,11 @@ fi
 
 echo "Checking the public application endpoints..."
 curl --fail --silent --show-error --retry 5 --retry-delay 1 \
-    http://127.0.0.1:8000/api/health >/dev/null
+    --resolve formcadence.app:443:127.0.0.1 \
+    https://formcadence.app/api/health >/dev/null
 curl --fail --silent --show-error --retry 5 --retry-delay 1 \
-    http://127.0.0.1:80/ >/dev/null
+    --resolve formcadence.app:443:127.0.0.1 \
+    https://formcadence.app/ >/dev/null
 
 echo "FlexGym deployed successfully."
 docker compose "${compose_args[@]}" ps

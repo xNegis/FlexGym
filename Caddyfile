@@ -1,0 +1,13 @@
+formcadence.app {
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    handle {
+        reverse_proxy frontend:80
+    }
+}
+
+www.formcadence.app {
+    redir https://formcadence.app{uri} permanent
+}
