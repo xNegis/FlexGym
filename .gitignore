@@ -14,7 +14,7 @@ backend/.env
 backend/local.settings.json
 
 # Deployment
-.env.deploy
+.env
 
 # Frontend
 frontend/node_modules/

@@ -55,7 +55,7 @@ successfully connecting to the backend.
 Create a local deployment environment file from the example and adjust its values when needed:
 
 ```bash
-cp .env.deploy.example .env.deploy
+cp .env.example .env
 ```
 
 The deployment file is ignored by Git. Start or update the complete application with:

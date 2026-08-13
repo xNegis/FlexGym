@@ -17,7 +17,7 @@ The environment file must define:
   JWT_SECRET
   VITE_API_BASE_URL
 
-If --env-file is omitted, .env.deploy is used when it exists. Otherwise,
+If --env-file is omitted, .env is used when it exists. Otherwise,
 Docker Compose reads these variables from the current shell environment and
 its default .env file.
 EOF
@@ -48,8 +48,8 @@ done
 
 cd "$project_dir"
 
-if [[ -z "$env_file" && -f .env.deploy ]]; then
-    env_file=".env.deploy"
+if [[ -z "$env_file" && -f .env ]]; then
+    env_file=".env"
 fi
 
 compose_args=()
@@ -102,7 +102,7 @@ echo "Checking the public application endpoints..."
 curl --fail --silent --show-error --retry 5 --retry-delay 1 \
     http://127.0.0.1:8000/api/health >/dev/null
 curl --fail --silent --show-error --retry 5 --retry-delay 1 \
-    http://127.0.0.1:5173/ >/dev/null
+    http://127.0.0.1:80/ >/dev/null
 
 echo "FlexGym deployed successfully."
 docker compose "${compose_args[@]}" ps
