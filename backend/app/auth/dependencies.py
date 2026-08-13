@@ -11,17 +11,17 @@ from app.models import User
 
 logger = logging.getLogger(__name__)
 
-COOKIE_NAME = "flexgym_token"
+COOKIE_NAME = "auth_token"
 
 
 def get_current_user(
     session: Session = Depends(get_session),
-    flexgym_token: str | None = Cookie(default=None),
+    auth_token: str | None = Cookie(default=None),
 ) -> User:
-    if flexgym_token is None:
+    if auth_token is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
-    user_id = decode_token(flexgym_token)
+    user_id = decode_token(auth_token)
     if user_id is None:
         logger.info("Authentication failed: invalid or expired token")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)

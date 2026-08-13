@@ -75,13 +75,13 @@ def _register(client: TestClient, email: str = "ec@example.com") -> tuple[str, i
         json={"email": email, "password": "a-secure-password-15"},
     )
     assert response.status_code == 201
-    token = response.cookies.get("flexgym_token")
+    token = response.cookies.get("auth_token")
     assert token is not None
     return token, response.json()["id"]
 
 
 def _auth_headers(token: str) -> dict[str, str]:
-    return {"Cookie": f"flexgym_token={token}"}
+    return {"Cookie": f"auth_token={token}"}
 
 
 def _create_routine(client: TestClient, token: str, name: str = "My Routine") -> dict[str, Any]:

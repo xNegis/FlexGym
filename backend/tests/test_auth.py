@@ -36,7 +36,7 @@ def test_multi_account_registration_and_duplicate_email(client: TestClient) -> N
     )
     assert registered.status_code == 201
     assert registered.json() == {"id": 1, "email": "user@example.com"}
-    assert registered.cookies.get("flexgym_token") is not None
+    assert registered.cookies.get("auth_token") is not None
 
     second = client.post(
         "/api/auth/register",
@@ -84,16 +84,16 @@ def test_authenticated_identity(client: TestClient) -> None:
         "/api/auth/register",
         json={"email": "me@example.com", "password": "a-secure-password-15"},
     )
-    token = registered.cookies.get("flexgym_token")
+    token = registered.cookies.get("auth_token")
 
-    current = client.get("/api/auth/me", cookies={"flexgym_token": token})
+    current = client.get("/api/auth/me", cookies={"auth_token": token})
     assert current.status_code == 200
     assert current.json() == {"id": 1, "email": "me@example.com"}
 
     client.cookies.clear()
     assert client.get("/api/auth/me").status_code == 401
     assert (
-        client.get("/api/auth/me", cookies={"flexgym_token": "not.a.valid.token"}).status_code
+        client.get("/api/auth/me", cookies={"auth_token": "not.a.valid.token"}).status_code
         == 401
     )
 
@@ -108,4 +108,4 @@ def test_logout_is_idempotent(client: TestClient) -> None:
     second = client.post("/api/auth/logout")
 
     assert first.status_code == second.status_code == 204
-    assert "flexgym_token" in first.headers.get("set-cookie", "")
+    assert "auth_token" in first.headers.get("set-cookie", "")

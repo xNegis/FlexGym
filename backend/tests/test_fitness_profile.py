@@ -12,7 +12,7 @@ def _register(client: TestClient, email: str = "profile@example.com") -> tuple[s
         json={"email": email, "password": "a-secure-password-15"},
     )
     assert response.status_code == 201
-    token = response.cookies.get("flexgym_token")
+    token = response.cookies.get("auth_token")
     assert token is not None
     return token, response.json()["id"]
 
@@ -36,7 +36,7 @@ def _create_profile(client: TestClient, token: str) -> dict[str, object]:
     response = client.post(
         "/api/fitness-profile",
         json=_VALID_PROFILE,
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert response.status_code == 201
     return cast(dict[str, object], response.json())
@@ -53,7 +53,7 @@ def test_create_and_retrieve_profile(client: TestClient) -> None:
     created = client.post(
         "/api/fitness-profile",
         json=_VALID_PROFILE,
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert created.status_code == 201
     data = created.json()
@@ -71,7 +71,7 @@ def test_create_and_retrieve_profile(client: TestClient) -> None:
 
     retrieved = client.get(
         "/api/fitness-profile",
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert retrieved.status_code == 200
     assert retrieved.json() == data
@@ -85,7 +85,7 @@ def test_unauthenticated_access(client: TestClient) -> None:
 def test_missing_profile(client: TestClient) -> None:
     token, _user_id = _register(client)
 
-    response = client.get("/api/fitness-profile", cookies={"flexgym_token": token})
+    response = client.get("/api/fitness-profile", cookies={"auth_token": token})
     assert response.status_code == 404
     assert response.json() == {"detail": "Fitness profile not found"}
 
@@ -96,7 +96,7 @@ def test_duplicate_creation_preserves_original(client: TestClient) -> None:
     first = client.post(
         "/api/fitness-profile",
         json=_VALID_PROFILE,
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert first.status_code == 201
     first_data = first.json()
@@ -104,14 +104,14 @@ def test_duplicate_creation_preserves_original(client: TestClient) -> None:
     second = client.post(
         "/api/fitness-profile",
         json={**_VALID_PROFILE, "height_cm": 180.0},
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert second.status_code == 409
     assert second.json() == {"detail": "Fitness profile already exists"}
 
     retrieved = client.get(
         "/api/fitness-profile",
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert retrieved.status_code == 200
     assert retrieved.json() == first_data
@@ -123,13 +123,13 @@ def test_invalid_payload_rejected_without_persistence(client: TestClient) -> Non
     response = client.post(
         "/api/fitness-profile",
         json={**_VALID_PROFILE, "height_cm": 999},
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert response.status_code == 422
 
     check = client.get(
         "/api/fitness-profile",
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert check.status_code == 404
 
@@ -155,7 +155,7 @@ def test_update_and_retrieve_profile(client: TestClient) -> None:
     response = client.put(
         "/api/fitness-profile",
         json=updated_payload,
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert response.status_code == 200
     data = response.json()
@@ -172,7 +172,7 @@ def test_update_and_retrieve_profile(client: TestClient) -> None:
 
     retrieved = client.get(
         "/api/fitness-profile",
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert retrieved.status_code == 200
     assert retrieved.json() == data
@@ -185,13 +185,13 @@ def test_invalid_update_preserves_original(client: TestClient) -> None:
     response = client.put(
         "/api/fitness-profile",
         json={**_VALID_PROFILE, "height_cm": 999},
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert response.status_code == 422
 
     retrieved = client.get(
         "/api/fitness-profile",
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert retrieved.status_code == 200
     assert retrieved.json() == original
@@ -203,7 +203,7 @@ def test_delete_and_subsequent_missing_profile(client: TestClient) -> None:
 
     delete_response = client.delete(
         "/api/fitness-profile",
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert delete_response.status_code == 204
     assert delete_response.content == b""
@@ -233,7 +233,7 @@ def test_update_requires_explicit_optional_fields(client: TestClient) -> None:
     response = client.put(
         "/api/fitness-profile",
         json=payload,
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert response.status_code == 422
 
@@ -244,7 +244,7 @@ def test_update_missing_profile(client: TestClient) -> None:
     response = client.put(
         "/api/fitness-profile",
         json=_VALID_PROFILE,
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert response.status_code == 404
     assert response.json() == {"detail": "Fitness profile not found"}
@@ -255,7 +255,7 @@ def test_delete_missing_profile(client: TestClient) -> None:
 
     response = client.delete(
         "/api/fitness-profile",
-        cookies={"flexgym_token": token},
+        cookies={"auth_token": token},
     )
     assert response.status_code == 404
     assert response.json() == {"detail": "Fitness profile not found"}
