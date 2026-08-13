@@ -1608,9 +1608,7 @@ def _encode_history_cursor(
         "i": workout_id,
     }
     raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    signature = hmac.new(
-        get_config().jwt_secret.encode("utf-8"), raw, hashlib.sha256
-    ).digest()
+    signature = hmac.new(get_config().jwt_secret.encode("utf-8"), raw, hashlib.sha256).digest()
     return base64.urlsafe_b64encode(raw + signature).decode("ascii").rstrip("=")
 
 
