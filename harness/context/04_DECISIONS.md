@@ -367,3 +367,25 @@ exercise is skipped and does not derive medical meaning, signals, recommendation
 
 F16 is intentionally omitted rather than treated as completed. It may be reconsidered when
 continued-work discomfort or structured discomfort history is needed for a concrete user flow.
+
+---
+
+## DEC-022 — Progress owns historical perspectives and separates metrics from interpretation
+
+**Status:** Accepted
+
+Phase 3 replaces the primary `History` destination with `Progress` while retaining exactly five
+authenticated navigation items. Progress initially contains Workouts, which preserves F18, and
+Exercises, which exposes performed repetition facts over time. Body and other perspectives remain
+absent until implemented.
+
+Exercise performance initially uses three deterministic per-workout metrics: Total reps, Heaviest
+weight, and Epley Estimated 1RM. Estimated 1RM is calculated for every performed repetition set with
+observed weight using `weight × (1 + repetitions / 30)`, with no repetition-count eligibility
+threshold. RIR remains set-level context rather than an aggregate metric.
+
+These values describe recorded work and estimated strength; they do not constitute a universal
+progress score or evidence of hypertrophy, fat loss, health, or workout quality. Phase 3 UI must not
+assign positive or negative meaning to a metric change unless a later feature explicitly defines
+and validates that interpretation. This preserves the architectural distinction between facts,
+deterministic projections, derived signals, and later AI reasoning.

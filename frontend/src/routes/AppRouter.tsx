@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { AuthProvider } from "../context";
 import { RequireProfile, RedirectIfAuthenticated, RedirectToOnboarding } from "./guards";
 import AppShell from "../layouts/AppShell";
@@ -18,8 +18,22 @@ import TrainingDayExercisesScreen from "../screens/TrainingDayExercisesScreen";
 import PlanRedirect from "../screens/PlanRedirect";
 import TodayScreen from "../screens/TodayScreen";
 import HistoryScreen from "../screens/HistoryScreen";
+import ExerciseProgressScreen from "../screens/ExerciseProgressScreen";
+import ExerciseHistoryScreen from "../screens/ExerciseHistoryScreen";
 import WorkoutScreen from "../screens/WorkoutScreen";
 import WorkoutExecutionScreen from "../screens/WorkoutExecutionScreen";
+
+function LegacyHistoryRedirect() {
+  const [searchParams] = useSearchParams();
+  const statusValues = searchParams.getAll("status");
+  const status = statusValues.length === 1 ? statusValues[0] : null;
+  const containsOnlyStatus = Array.from(searchParams.keys()).every((key) => key === "status");
+  const target =
+    containsOnlyStatus && (status === "completed" || status === "cancelled")
+      ? `/progress/workouts?status=${status}`
+      : "/progress/workouts";
+  return <Navigate to={target} replace />;
+}
 
 export default function AppRouter() {
   return (
@@ -71,7 +85,11 @@ export default function AppRouter() {
             }
           >
             <Route path="/today" element={<TodayScreen />} />
-            <Route path="/history" element={<HistoryScreen />} />
+            <Route path="/progress" element={<Navigate to="/progress/workouts" replace />} />
+            <Route path="/history" element={<LegacyHistoryRedirect />} />
+            <Route path="/progress/workouts" element={<HistoryScreen />} />
+            <Route path="/progress/exercises" element={<ExerciseProgressScreen />} />
+            <Route path="/progress/exercises/:slug" element={<ExerciseHistoryScreen />} />
             <Route path="/workouts/:workoutId" element={<WorkoutScreen />} />
             <Route
               path="/workouts/:workoutId/exercises/:exercisePosition"

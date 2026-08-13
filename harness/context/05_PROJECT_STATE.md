@@ -4,8 +4,8 @@
 
 ## Current Phase
 
-Phase 0 — Foundation and Phase 1 — Training Planning are completed successfully. Phase 2 — Workout
-Tracking is in progress with F13 through F15.1, F17, and F18 completed.
+Phase 0 — Foundation, Phase 1 — Training Planning, and Phase 2 — Workout Tracking are completed
+successfully.
 
 ## Current Status
 
@@ -67,12 +67,30 @@ immediately renders a read-only summary with wall-clock duration, performed/skip
 and compact ordered exercise results, while Today returns to normal start behaviour. Completed
 workouts reject all live mutations and the configured local database is at repository head.
 
-F18 — Workout History is implemented and awaiting final manual UI validation. Authenticated users browse their completed and
+F18 — Workout History is implemented and validated. Authenticated users browse their completed and
 cancelled workouts newest-first at the `/history` destination through an opaque cursor-paginated
 compact projection, with URL-backed `All`/`Completed`/`Cancelled` filtering, incremental `Load more`,
 and distinct empty/error states. Cancelled workouts receive a read-only terminal summary with elapsed
 duration and explicitly distinguishable unresolved sets, and terminal detail associates with History
 in main navigation. F18 adds no migration; the configured local database remains at repository head.
+
+F19 — Dockerise App and Prepare Environment Variables is implemented and validated. The repository
+provides Dockerfiles for the frontend and backend, a Compose deployment configuration, documented
+environment-file templates, and a deployment script that validates the stack configuration, applies
+migrations, waits for backend health, and verifies the application endpoints.
+
+Phase 2 — Workout Tracking is completed. F16 remains intentionally omitted from the current MVP.
+
+F20 — Progress Area and Exercise Performance History is implemented and awaiting final manual UI
+validation. `Progress` replaces `History`
+in primary navigation and owns the Workouts and Exercises sections at `/progress/workouts` and
+`/progress/exercises`, preserving the F18 workout-history experience and adding read-only exercise
+performance history with Total reps, Heaviest weight, and Epley Estimated 1RM metrics, an accessible
+line chart, and cursor-paginated session history. Backend tests and frontend static validation pass.
+F20 adds no migration; the configured local database remains at repository head. Product-owner
+responsive and interaction review is the remaining completion gate.
+
+Phase 3 — Progress & Analytics is in progress. F20 is the first implemented increment.
 
 ## Completed Features
 
@@ -93,6 +111,8 @@ in main navigation. F18 adds no migration; the configured local database remains
 * F15 — Workout Exceptions and Feedback
 * F15.1 — Pain or Discomfort Skip Reason
 * F17 — Workout Completion
+* F18 — Workout History
+* F19 — Dockerise App and Prepare Environment Variables
 
 ## Skipped Features
 
@@ -101,7 +121,8 @@ in main navigation. F18 adds no migration; the configured local database remains
 
 ## Next Feature
 
-Complete F18 manual responsive and accessibility validation before selecting the next roadmap item.
+Complete the product-owner manual responsive, interaction, and accessibility review for F20 before
+selecting the next Phase 3 — Progress & Analytics increment.
 
 ## Existing Feature Specifications
 
@@ -124,6 +145,8 @@ Complete F18 manual responsive and accessibility validation before selecting the
 * `harness/features/15_1_pain_or_discomfort_skip_reason.md` (completed corrective follow-up)
 * `harness/features/16_discomfort_and_pain_reporting.md` (intentionally omitted from current MVP)
 * `harness/features/17_workout_completion.md` (completed)
+* `harness/features/18_workout_history.md` (completed)
+* `harness/features/20_progress_exercise_history.md` (implemented; awaiting final manual UI validation)
 
 ## Current Technology
 
@@ -140,7 +163,7 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (271 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
+pytest (296 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
 completion gate for current MVP features under DEC-019
 
 Code Quality:
@@ -163,4 +186,4 @@ Per-feature AI implementation costs and models are recorded in
 
 ## Open Questions
 
-None currently blocking Phase 2 planning.
+None currently blocking F20 manual validation.

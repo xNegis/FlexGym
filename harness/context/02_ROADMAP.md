@@ -128,6 +128,15 @@ Completion of this phase should make the product independently useful as a worko
 
 Goal: understand what has happened without using AI.
 
+Current intended sequence begins with:
+
+* F20 — Progress Area and Exercise Performance History
+
+F20 replaces History in primary navigation with a broader Progress destination. It preserves the
+existing workout-history view and adds exercise performance history using factual performed sets,
+Total reps, Heaviest weight, and Epley Estimated 1RM. It does not interpret changes against the
+user's goal or classify them as positive or negative.
+
 Planned areas:
 
 * Exercise history

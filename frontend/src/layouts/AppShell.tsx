@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { CalendarCheck, ChevronLeft, Dumbbell, History, LayoutList, User } from "lucide-react";
+import { CalendarCheck, ChevronLeft, Dumbbell, LineChart, LayoutList, User } from "lucide-react";
 import IconButton from "../ui/IconButton";
 import { useWorkoutNav, WorkoutNavProvider } from "../context";
 import styles from "./AppShell.module.css";
@@ -13,7 +13,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Today", path: "/today", icon: <CalendarCheck className={styles.navIcon} /> },
-  { label: "History", path: "/history", icon: <History className={styles.navIcon} /> },
+  { label: "Progress", path: "/progress", icon: <LineChart className={styles.navIcon} /> },
   { label: "Plan", path: "/plan", icon: <LayoutList className={styles.navIcon} /> },
   { label: "Exercises", path: "/exercises", icon: <Dumbbell className={styles.navIcon} /> },
   { label: "Profile", path: "/profile", icon: <User className={styles.navIcon} /> },
@@ -65,9 +65,10 @@ function AppShellContent() {
         location.pathname === "/today" || (isWorkoutRoute && workoutNavStatus === "in_progress")
       );
     }
-    if (path === "/history") {
+    if (path === "/progress") {
       return (
-        location.pathname === "/history" || (isWorkoutRoute && workoutNavStatus === "terminal")
+        location.pathname.startsWith("/progress") ||
+        (isWorkoutRoute && workoutNavStatus === "terminal")
       );
     }
     if (path === "/plan") return location.pathname.startsWith("/plan");

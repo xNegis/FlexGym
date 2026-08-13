@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronRight, History } from "lucide-react";
+import { ChevronRight, ClipboardList } from "lucide-react";
 import { fetchWorkoutHistory, UnauthenticatedError } from "../api";
 import { useAuth } from "../context";
 import type { WorkoutHistoryItem } from "../types";
@@ -13,6 +13,7 @@ import Alert from "../ui/Alert";
 import { LoadingState } from "../ui/LoadingState";
 import EmptyState from "../ui/EmptyState";
 import SegmentedControl from "../ui/SegmentedControl";
+import SectionNav from "../ui/SectionNav";
 import styles from "./Screen.module.css";
 
 type HistoryFilter = "all" | "completed" | "cancelled";
@@ -137,11 +138,21 @@ export default function HistoryScreen() {
 
   return (
     <>
-      <AppHeader title="History" />
+      <AppHeader title="Progress" />
       <Page width="reading">
         <p className={`${styles.textCompactMuted} ${styles.mb4}`}>
           Completed and cancelled workouts appear here, newest first.
         </p>
+
+        <div className={styles.mb4}>
+          <SectionNav
+            label="Progress sections"
+            items={[
+              { value: "workouts", label: "Workouts", to: "/progress/workouts", active: true },
+              { value: "exercises", label: "Exercises", to: "/progress/exercises", active: false },
+            ]}
+          />
+        </div>
 
         <div className={styles.mb4}>
           <SegmentedControl
@@ -166,11 +177,11 @@ export default function HistoryScreen() {
           </div>
         )}
 
-        {items === null && !initialError && <LoadingState label="Loading history..." />}
+        {items === null && !initialError && <LoadingState label="Loading workouts..." />}
 
         {showEmpty && !showFilteredEmpty && (
           <EmptyState
-            icon={<History size={32} />}
+            icon={<ClipboardList size={32} />}
             title="No workouts yet"
             description="Completed and cancelled workouts will appear here."
             action={
@@ -183,7 +194,7 @@ export default function HistoryScreen() {
 
         {showFilteredEmpty && (
           <EmptyState
-            icon={<History size={32} />}
+            icon={<ClipboardList size={32} />}
             title="No matching workouts"
             description="No workouts match this filter."
             action={

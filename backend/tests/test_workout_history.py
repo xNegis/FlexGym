@@ -178,7 +178,7 @@ def _cancel(client: TestClient, token: str, workout_id: int) -> Any:
 
 def _make_completed(client: TestClient, token: str) -> int:
     _, day_id = _ready_plan(client, token)
-    workout_id = _start(client, token, day_id).json()["id"]
+    workout_id = cast(int, _start(client, token, day_id).json()["id"])
     _start_exercise(client, token, workout_id, 1)
     _complete(client, token, workout_id, 1, 1)
     assert _complete_workout(client, token, workout_id).status_code == 200
@@ -187,7 +187,7 @@ def _make_completed(client: TestClient, token: str) -> int:
 
 def _make_cancelled(client: TestClient, token: str, set_count: int = 1) -> int:
     _, day_id = _ready_plan(client, token, set_count=set_count)
-    workout_id = _start(client, token, day_id).json()["id"]
+    workout_id = cast(int, _start(client, token, day_id).json()["id"])
     assert _cancel(client, token, workout_id).status_code == 200
     return workout_id
 

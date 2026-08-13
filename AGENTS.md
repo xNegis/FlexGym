@@ -130,3 +130,14 @@ Be concise when explaining routine implementation work.
 Raise architectural concerns, unclear requirements, scope conflicts, or potentially important product decisions explicitly.
 
 Do not make substantial product decisions implicitly inside implementation code.
+
+## Codex-only orchestration pointer
+
+This section is not an implementation instruction. OpenCode implementation agents must ignore this
+section, must not open the referenced `.codex` runbook, and must not launch or manage other OpenCode
+sessions.
+
+Only when acting as the Codex coordinator and the product owner explicitly asks to launch or manage
+OpenCode, read `.codex/runbooks/opencode_implementation.md`. It records the verified external runner
+configuration and handoff workflow. This pointer must not influence feature scope, architecture,
+implementation, or validation.

@@ -309,6 +309,44 @@ interface WorkoutHistoryPage {
   next_cursor: string | null;
 }
 
+type ExerciseHistoryMetric = "total_reps" | "heaviest_weight" | "estimated_1rm";
+
+interface ExerciseProgressItem {
+  exercise_slug: string;
+  exercise_name: string;
+  session_count: number;
+  last_local_date: string;
+  last_performed_at: string;
+}
+
+interface ExerciseHistorySet {
+  exercise_position: number;
+  set_position: number;
+  performed_reps: number;
+  performed_weight_kg: number | null;
+  performed_rir: number | null;
+  completed_at: string;
+}
+
+interface ExerciseHistorySession {
+  workout_id: number;
+  routine_name: string;
+  selected_training_day_name: string;
+  local_date: string;
+  status: "completed" | "cancelled";
+  terminal_at: string;
+  total_reps: number;
+  heaviest_weight_kg: number | null;
+  estimated_1rm_kg: number | null;
+  sets: ExerciseHistorySet[];
+}
+
+interface ExerciseHistoryPage {
+  exercise: { slug: string; name: string };
+  items: ExerciseHistorySession[];
+  next_cursor: string | null;
+}
+
 export {
   type ActiveRoutine,
   type ActiveWorkoutConflict,
@@ -318,6 +356,11 @@ export {
   type ConfiguredSet,
   type ConfiguredSetTempo,
   type ExerciseDetail,
+  type ExerciseHistoryMetric,
+  type ExerciseHistoryPage,
+  type ExerciseHistorySession,
+  type ExerciseHistorySet,
+  type ExerciseProgressItem,
   type ExerciseSummary,
   type FitnessProfile,
   type PerformedSet,

@@ -6,6 +6,10 @@ import type {
   ConfiguredSet,
   ConfiguredSetTempo,
   ExerciseDetail,
+  ExerciseHistoryPage,
+  ExerciseHistorySession,
+  ExerciseHistorySet,
+  ExerciseProgressItem,
   ExerciseSummary,
   FitnessProfile,
   Routine,
@@ -2279,6 +2283,219 @@ export async function fetchWorkoutHistory(
   const data: unknown = await response.json();
   if (!isWorkoutHistoryPage(data)) {
     throw new Error("Invalid workout history response");
+  }
+  return data;
+}
+
+// ────────────────── progress (F20) ──────────────────
+
+function isValidSlug(value: unknown): value is string {
+  return (
+    typeof value === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length <= 100
+  );
+}
+
+function isExerciseProgressItem(value: unknown): value is ExerciseProgressItem {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    isValidSlug(v.exercise_slug) &&
+    typeof v.exercise_name === "string" &&
+    v.exercise_name.trim().length > 0 &&
+    v.exercise_name.length <= 120 &&
+    typeof v.session_count === "number" &&
+    Number.isInteger(v.session_count) &&
+    v.session_count > 0 &&
+    typeof v.last_local_date === "string" &&
+    isValidCalendarDate(v.last_local_date) &&
+    typeof v.last_performed_at === "string" &&
+    isValidTimestamp(v.last_performed_at)
+  );
+}
+
+function isExerciseProgressList(value: unknown): value is { items: ExerciseProgressItem[] } {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (!Array.isArray(v.items) || !v.items.every(isExerciseProgressItem)) return false;
+  return new Set(v.items.map((item) => item.exercise_slug)).size === v.items.length;
+}
+
+export async function fetchExerciseProgress(): Promise<ExerciseProgressItem[]> {
+  const response = await fetch(`${API_BASE_URL}/api/progress/exercises`, {
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load exercise progress");
+  }
+  const data: unknown = await response.json();
+  if (!isExerciseProgressList(data)) {
+    throw new Error("Invalid exercise progress response");
+  }
+  return data.items;
+}
+
+function isExerciseHistorySet(value: unknown): value is ExerciseHistorySet {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.exercise_position === "number" &&
+    Number.isInteger(v.exercise_position) &&
+    v.exercise_position >= 1 &&
+    typeof v.set_position === "number" &&
+    Number.isInteger(v.set_position) &&
+    v.set_position >= 1 &&
+    typeof v.performed_reps === "number" &&
+    Number.isInteger(v.performed_reps) &&
+    v.performed_reps >= 1 &&
+    (v.performed_weight_kg === null ||
+      (typeof v.performed_weight_kg === "number" &&
+        Number.isFinite(v.performed_weight_kg) &&
+        v.performed_weight_kg >= 0)) &&
+    (v.performed_rir === null ||
+      (typeof v.performed_rir === "number" &&
+        Number.isInteger(v.performed_rir) &&
+        v.performed_rir >= 0 &&
+        v.performed_rir <= 10)) &&
+    typeof v.completed_at === "string" &&
+    isValidTimestamp(v.completed_at)
+  );
+}
+
+function isExerciseHistorySession(value: unknown): value is ExerciseHistorySession {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const baseIsValid =
+    typeof v.workout_id === "number" &&
+    Number.isInteger(v.workout_id) &&
+    v.workout_id > 0 &&
+    typeof v.routine_name === "string" &&
+    v.routine_name.trim().length > 0 &&
+    typeof v.selected_training_day_name === "string" &&
+    v.selected_training_day_name.trim().length > 0 &&
+    typeof v.local_date === "string" &&
+    isValidCalendarDate(v.local_date) &&
+    (v.status === "completed" || v.status === "cancelled") &&
+    typeof v.terminal_at === "string" &&
+    isValidTimestamp(v.terminal_at) &&
+    typeof v.total_reps === "number" &&
+    Number.isInteger(v.total_reps) &&
+    v.total_reps >= 0 &&
+    (v.heaviest_weight_kg === null ||
+      (typeof v.heaviest_weight_kg === "number" &&
+        Number.isFinite(v.heaviest_weight_kg) &&
+        v.heaviest_weight_kg >= 0)) &&
+    (v.estimated_1rm_kg === null ||
+      (typeof v.estimated_1rm_kg === "number" &&
+        Number.isFinite(v.estimated_1rm_kg) &&
+        v.estimated_1rm_kg >= 0)) &&
+    Array.isArray(v.sets) &&
+    v.sets.length >= 1 &&
+    v.sets.every(isExerciseHistorySet);
+  if (!baseIsValid) return false;
+
+  const sets = v.sets as ExerciseHistorySet[];
+  for (let index = 1; index < sets.length; index += 1) {
+    const previous = sets[index - 1];
+    const current = sets[index];
+    if (
+      current.exercise_position < previous.exercise_position ||
+      (current.exercise_position === previous.exercise_position &&
+        current.set_position <= previous.set_position)
+    ) {
+      return false;
+    }
+  }
+
+  const totalReps = sets.reduce((sum, set) => sum + set.performed_reps, 0);
+  if (v.total_reps !== totalReps) return false;
+
+  const weightedSets = sets.filter(
+    (set): set is ExerciseHistorySet & { performed_weight_kg: number } =>
+      set.performed_weight_kg !== null,
+  );
+  if (weightedSets.length === 0) {
+    return v.heaviest_weight_kg === null && v.estimated_1rm_kg === null;
+  }
+
+  const heaviestWeight = Math.max(...weightedSets.map((set) => set.performed_weight_kg));
+  const estimated1Rm = Math.max(
+    ...weightedSets.map((set) => set.performed_weight_kg * (1 + set.performed_reps / 30)),
+  );
+  const isRoundedMetric = (actual: unknown, expected: number) =>
+    typeof actual === "number" && Math.abs(actual - expected) <= 0.005001;
+  return (
+    isRoundedMetric(v.heaviest_weight_kg, heaviestWeight) &&
+    isRoundedMetric(v.estimated_1rm_kg, estimated1Rm)
+  );
+}
+
+function isExerciseHistoryPage(value: unknown): value is ExerciseHistoryPage {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.exercise !== "object" || v.exercise === null) return false;
+  const exercise = v.exercise as Record<string, unknown>;
+  if (!(
+    isValidSlug(exercise.slug) &&
+    typeof exercise.name === "string" &&
+    exercise.name.trim().length > 0 &&
+    exercise.name.length <= 120 &&
+    Array.isArray(v.items) &&
+    v.items.every(isExerciseHistorySession) &&
+    (v.next_cursor === null ||
+      (typeof v.next_cursor === "string" &&
+        v.next_cursor.length > 0 &&
+        v.next_cursor.length <= 512 &&
+        /^[A-Za-z0-9_-]+={0,2}$/.test(v.next_cursor)))
+  )) {
+    return false;
+  }
+
+  const items = v.items as ExerciseHistorySession[];
+  if (new Set(items.map((item) => item.workout_id)).size !== items.length) return false;
+  return items.every((item, index) => {
+    if (index === 0) return true;
+    const previous = items[index - 1];
+    const terminalComparison = Date.parse(previous.terminal_at) - Date.parse(item.terminal_at);
+    return (
+      terminalComparison > 0 || (terminalComparison === 0 && previous.workout_id > item.workout_id)
+    );
+  });
+}
+
+export interface ExerciseHistoryParams {
+  cursor?: string;
+  limit?: number;
+}
+
+export type ExerciseHistoryResult = ExerciseHistoryPage | { notFound: true };
+
+export async function fetchExerciseHistory(
+  slug: string,
+  params: ExerciseHistoryParams = {},
+): Promise<ExerciseHistoryResult> {
+  const url = new URL(
+    `${API_BASE_URL}/api/progress/exercises/${encodeURIComponent(slug)}/history`,
+    window.location.origin,
+  );
+  if (params.cursor) url.searchParams.set("cursor", params.cursor);
+  if (params.limit) url.searchParams.set("limit", String(params.limit));
+
+  const response = await fetch(url.toString(), { credentials: "include" });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 404) {
+    return { notFound: true };
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load exercise history");
+  }
+  const data: unknown = await response.json();
+  if (!isExerciseHistoryPage(data) || data.exercise.slug !== slug) {
+    throw new Error("Invalid exercise history response");
   }
   return data;
 }

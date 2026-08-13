@@ -269,7 +269,7 @@ export default function WorkoutScreen() {
       <AppHeader
         title={workout ? workout.selected_training_day_name : "Workout"}
         showBack
-        onBack={() => navigate(isTerminal ? "/history" : "/today")}
+        onBack={() => navigate(isTerminal ? "/progress/workouts" : "/today")}
       />
       <Page width="reading">
         {error && (
@@ -344,9 +344,9 @@ export default function WorkoutScreen() {
                   variant="primary"
                   fullWidth
                   className={styles.actionButton}
-                  onClick={() => navigate("/history")}
+                  onClick={() => navigate("/progress/workouts")}
                 >
-                  Back to History
+                  Back to workouts
                 </Button>
               </div>
             </Card>
@@ -462,9 +462,9 @@ export default function WorkoutScreen() {
                   variant="primary"
                   fullWidth
                   className={styles.actionButton}
-                  onClick={() => navigate("/history")}
+                  onClick={() => navigate("/progress/workouts")}
                 >
-                  Back to History
+                  Back to workouts
                 </Button>
               </div>
             </Card>
