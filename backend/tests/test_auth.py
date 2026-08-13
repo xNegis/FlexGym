@@ -92,10 +92,7 @@ def test_authenticated_identity(client: TestClient) -> None:
 
     client.cookies.clear()
     assert client.get("/api/auth/me").status_code == 401
-    assert (
-        client.get("/api/auth/me", cookies={"auth_token": "not.a.valid.token"}).status_code
-        == 401
-    )
+    assert client.get("/api/auth/me", cookies={"auth_token": "not.a.valid.token"}).status_code == 401
 
 
 def test_logout_is_idempotent(client: TestClient) -> None:
