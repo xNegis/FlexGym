@@ -37,7 +37,7 @@ class Config:
         defaults = _load_local_settings()
         self.app_env = os.getenv("APP_ENV") or defaults.get("APP_ENV", "development")
         if self.app_env == "development":
-            defaults.setdefault("DATABASE_URL", "sqlite:///flexgym.db")
+            defaults.setdefault("DATABASE_URL", "sqlite:///../data/db/flexgym.db")
             defaults.setdefault("ALLOWED_ORIGINS", "http://localhost:5173")
             defaults.setdefault("JWT_SECRET", _DEV_JWT_SECRET)
         self.database_url = _get_value("DATABASE_URL", defaults)

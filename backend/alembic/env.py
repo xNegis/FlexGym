@@ -13,7 +13,7 @@ if config.config_file_name is not None:
 
 database_url = os.getenv("DATABASE_URL")
 if not database_url:
-    database_url = "sqlite:///flexgym.db"
+    database_url = "sqlite:///../data/db/flexgym.db"
 config.set_main_option("sqlalchemy.url", database_url)
 
 target_metadata = Base.metadata

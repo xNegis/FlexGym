@@ -14,7 +14,7 @@ def test_config_uses_safe_development_defaults(monkeypatch: pytest.MonkeyPatch) 
     config = Config()
 
     assert config.app_env == "development"
-    assert config.database_url == "sqlite:///flexgym.db"
+    assert config.database_url == "sqlite:///../data/db/flexgym.db"
     assert config.allowed_origins == ["http://localhost:5173"]
 
 

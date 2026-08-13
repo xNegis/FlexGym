@@ -8,7 +8,7 @@ dist/
 .ruff_cache/
 
 # Backend
-backend/flexgym*.db
+data/db/*.db
 backend/test*.db
 backend/.env
 backend/local.settings.json
