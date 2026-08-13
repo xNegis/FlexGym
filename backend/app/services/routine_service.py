@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import unicodedata
 
 from sqlalchemy.exc import IntegrityError
@@ -51,12 +52,15 @@ def create_routine(
     if existing is not None:
         raise RoutineNameConflictError("Routine name already exists")
 
+    created_at = datetime.datetime.utcnow()
     routine = Routine(
         user_id=user_id,
         name=name.strip(),
         normalized_name=normalized,
         objective=objective,
         description=description,
+        created_at=created_at,
+        updated_at=created_at,
     )
     session.add(routine)
     try:

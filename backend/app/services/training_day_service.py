@@ -78,7 +78,13 @@ def create_training_day(session: Session, routine_id: int, user_id: int, name: s
     if week_position is None:
         raise TrainingDayLimitError("Routine already has 7 training days")
 
-    day = TrainingDay(routine_id=routine_id, name=name.strip())
+    created_at = datetime.datetime.utcnow()
+    day = TrainingDay(
+        routine_id=routine_id,
+        name=name.strip(),
+        created_at=created_at,
+        updated_at=created_at,
+    )
     session.add(day)
     session.flush()
 

@@ -328,6 +328,7 @@ def create_exercise_config(
     else:
         notes = None
 
+    created_at = datetime.datetime.utcnow()
     config = ExerciseConfiguration(
         training_day_id=day_id,
         exercise_id=exercise.id,
@@ -335,6 +336,8 @@ def create_exercise_config(
         target_type=target_type,
         rest_after_exercise_seconds=rest_after_exercise_seconds,
         notes=notes,
+        created_at=created_at,
+        updated_at=created_at,
     )
     session.add(config)
     session.flush()
