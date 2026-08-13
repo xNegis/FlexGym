@@ -165,10 +165,12 @@ export default function ExerciseHistoryScreen() {
   const chartPoints = useMemo(() => {
     if (items === null) return [];
     const source = items.map((session) => ({
+      workoutId: session.workout_id,
       date: session.local_date,
       value: metricValue(session, metric),
       status: session.status,
       sessionName: session.selected_training_day_name,
+      sets: session.sets,
     }));
     return source.reverse();
   }, [items, metric]);

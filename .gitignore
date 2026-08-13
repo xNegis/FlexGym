@@ -33,3 +33,6 @@ Thumbs.db
 
 # SSH
 ssh/
+
+# Local credentials and operational notes
+local-secrets/

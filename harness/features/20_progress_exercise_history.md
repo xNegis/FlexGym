@@ -105,8 +105,10 @@ The screen contains:
 6. `Load more` when older sessions exist.
 
 The chart is a summary, not the sole representation. Selecting or focusing a point exposes its
-date, metric value, terminal status, and session name. The textual session history remains present
-and fully usable without interpreting the chart visually.
+date, metric value, terminal status, session name, and the complete ordered breakdown of performed
+sets contributing to that workout point. Each set shows repetitions plus available weight and RIR
+context. The textual session history remains present and fully usable without interpreting the
+chart visually.
 
 ### Session history and traceability
 
@@ -244,6 +246,10 @@ Do not substitute zero for null or connect a line in a way that visually asserts
 where none exists. Points are ordered oldest to newest on the chart among the currently loaded
 sessions. Loading an older page extends the series into the past while preserving already confirmed
 facts.
+
+The Total reps chart always anchors its vertical axis at zero because it represents an absolute
+count. Heaviest weight and Estimated 1RM retain a data-adaptive vertical range so their changes
+remain legible without claiming a zero-weight observation.
 
 The chart does not apply smoothing, forecasts, regression, goal ranges, positive/negative colors,
 trend arrows, percentage change, records, or claims of progress. Axis labels and point details state
@@ -521,6 +527,10 @@ document-level horizontal overflow.
   metrics.
 * [ ] Every chart point is reproducible from the displayed performed sets and one point represents
   one workout.
+* [ ] Selecting or focusing a chart point shows every contributing performed set with repetitions
+  and available weight and RIR context.
+* [ ] The Total reps chart uses zero as its vertical-axis minimum; weight-derived charts retain an
+  adaptive range.
 * [ ] Estimated 1RM uses the Epley formula with no repetition-count eligibility branch.
 * [ ] Missing weight removes only the unavailable weight-derived point and never becomes zero.
 * [ ] Completed and cancelled sessions remain explicitly distinguishable; in-progress, skipped, and
