@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: flexgym-production
+  group: formcadence-production
   cancel-in-progress: false
 
 jobs:

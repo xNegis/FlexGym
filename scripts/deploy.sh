@@ -64,7 +64,7 @@ fi
 echo "Validating Docker Compose configuration..."
 docker compose "${compose_args[@]}" config --quiet
 
-echo "Building and starting FlexGym..."
+echo "Building and starting FormCadence..."
 docker compose "${compose_args[@]}" up --build -d
 
 backend_container="$(docker compose "${compose_args[@]}" ps -q backend)"
@@ -108,5 +108,5 @@ curl --fail --silent --show-error --retry 5 --retry-delay 1 \
     --resolve formcadence.app:443:127.0.0.1 \
     https://formcadence.app/ >/dev/null
 
-echo "FlexGym deployed successfully."
+echo "FormCadence deployed successfully."
 docker compose "${compose_args[@]}" ps

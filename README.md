@@ -1,4 +1,4 @@
-# FlexGym
+# FormCadence
 
 Personal-first adaptive fitness application.
 

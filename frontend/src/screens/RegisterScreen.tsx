@@ -53,7 +53,7 @@ export default function RegisterScreen() {
     <form onSubmit={handleSubmit} noValidate className={styles.stack5}>
       <div>
         <h2 className={styles.screenTitle}>Create your account</h2>
-        <p className={styles.textBodyMuted}>Set up your FlexGym account to get started</p>
+        <p className={styles.textBodyMuted}>Set up your FormCadence account to get started</p>
       </div>
 
       {error && <Alert variant="error">{error}</Alert>}

@@ -101,7 +101,7 @@ export default function OnboardingScreen() {
     <form onSubmit={handleSubmit} noValidate className={styles.stack6}>
       <div>
         <h2 className={styles.screenTitle}>Set up your fitness profile</h2>
-        <p className={styles.textBodyMuted}>This helps FlexGym understand your training context</p>
+        <p className={styles.textBodyMuted}>This helps FormCadence understand your training context</p>
       </div>
 
       {error && <Alert variant="error">{error}</Alert>}

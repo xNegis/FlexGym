@@ -9,7 +9,7 @@ export default function AuthLayout() {
         <div className={styles.brandIcon} aria-hidden="true">
           <Dumbbell size={24} />
         </div>
-        <h1 className={styles.brandWordmark}>FlexGym</h1>
+        <h1 className={styles.brandWordmark}>FormCadence</h1>
       </div>
       <div className={styles.content}>
         <div className={styles.card}>

@@ -308,7 +308,7 @@ wheels = [
 ]
 
 [[package]]
-name = "flexgym-backend"
+name = "formcadence-backend"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

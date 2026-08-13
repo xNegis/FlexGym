@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 
 config = get_config()
 
-app = FastAPI(title="FlexGym", version="0.1.0")
+app = FastAPI(title="FormCadence", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
