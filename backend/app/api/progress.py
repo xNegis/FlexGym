@@ -79,6 +79,22 @@ def _parse_limit(value: str | None) -> int:
     return limit
 
 
+@router.get("/progress/statistics")
+def get_workout_statistics(
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    params = request.query_params
+    _require_subset(request, {"period", "local_date"})
+    _reject_repeats(request, ("period", "local_date"))
+
+    period = _parse_period(params.get("period"))
+    local_date = _parse_local_date(params.get("local_date"))
+
+    return progress_service.get_workout_statistics(session, user.id, period, local_date)
+
+
 @router.get("/progress/exercises")
 def list_exercise_progress(
     request: Request,

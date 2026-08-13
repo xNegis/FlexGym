@@ -20,6 +20,7 @@ import TodayScreen from "../screens/TodayScreen";
 import HistoryScreen from "../screens/HistoryScreen";
 import ExerciseProgressScreen from "../screens/ExerciseProgressScreen";
 import ExerciseHistoryScreen from "../screens/ExerciseHistoryScreen";
+import StatisticsScreen from "../screens/StatisticsScreen";
 import WorkoutScreen from "../screens/WorkoutScreen";
 import WorkoutExecutionScreen from "../screens/WorkoutExecutionScreen";
 
@@ -90,6 +91,7 @@ export default function AppRouter() {
             <Route path="/progress/workouts" element={<HistoryScreen />} />
             <Route path="/progress/exercises" element={<ExerciseProgressScreen />} />
             <Route path="/progress/exercises/:slug" element={<ExerciseHistoryScreen />} />
+            <Route path="/progress/statistics" element={<StatisticsScreen />} />
             <Route path="/workouts/:workoutId" element={<WorkoutScreen />} />
             <Route
               path="/workouts/:workoutId/exercises/:exercisePosition"

@@ -99,9 +99,21 @@ session context rather than a chart metric. The full backend suite and backend/f
 pass, and the product owner completed the final manual UI review. F20.1 adds no migration; the
 configured local database remains at repository head.
 
-Phase 3 — Progress & Analytics is in progress. F20 and F20.1 are implemented and validated. The
-remaining roadmap sequence is F21 — Workout Statistics and Activity Trends, F22 — Body Weight
-Tracking, F23 — Body Weight Progress, and F24 — Progress Dashboard.
+F21 — Workout Statistics and Activity Trends is implemented and validated. Progress gains a
+route-backed `/progress/statistics` section alongside Workouts and Exercises. It presents a
+selected-period summary (completed, cancelled, and terminal counts, a completion ratio with an
+explicit denominator, performed sets, effective skipped sets and skipped exercises, and wall-clock
+elapsed session time), a structured skip-reason distribution, complete Monday-through-Sunday weekly
+workout and recorded-work views with equivalent semantic tables, and a compact activity calendar
+with an accessible activity-day list. All values are deterministic read-time projections over owned
+terminal workouts using captured local dates and the effective (non-reversed) exception projection;
+completed and cancelled stay separate and no adherence, volume, target, or trend judgement is added.
+Backend tests and backend/frontend static checks pass. F21 adds no migration; the configured local
+database remains at repository head.
+
+Phase 3 — Progress & Analytics is in progress. F20, F20.1, and F21 are implemented and validated. The
+remaining roadmap sequence is F22 — Body Weight Tracking, F23 — Body Weight Progress, and F24 —
+Progress Dashboard.
 
 ## Completed Features
 
@@ -126,6 +138,7 @@ Tracking, F23 — Body Weight Progress, and F24 — Progress Dashboard.
 * F19 — Dockerise App and Prepare Environment Variables
 * F20 — Progress Area and Exercise Performance History
 * F20.1 — Exercise Progress Refinement
+* F21 — Workout Statistics and Activity Trends
 
 ## Skipped Features
 
@@ -134,7 +147,8 @@ Tracking, F23 — Body Weight Progress, and F24 — Progress Dashboard.
 
 ## Next Feature
 
-Define and specify F21 — Workout Statistics and Activity Trends.
+Implement F22 — Body Weight Tracking. F22 has roadmap-level scope and still requires product
+discussion and an implementation-ready feature specification.
 
 ## Existing Feature Specifications
 
@@ -160,6 +174,7 @@ Define and specify F21 — Workout Statistics and Activity Trends.
 * `harness/features/18_workout_history.md` (completed)
 * `harness/features/20_progress_exercise_history.md` (completed)
 * `harness/features/20_1_exercise_progress_refinement.md` (completed)
+* `harness/features/21_workout_statistics_activity_trends.md` (completed)
 
 ## Current Technology
 
@@ -176,7 +191,7 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (315 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
+pytest (336 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
 completion gate for current MVP features under DEC-019
 
 Code Quality:
@@ -199,5 +214,6 @@ Per-feature AI implementation costs and models are recorded in
 
 ## Open Questions
 
-F21 has roadmap-level scope but still requires product discussion and an implementation-ready
-feature specification.
+F22 — Body Weight Tracking has roadmap-level scope and requires product discussion and an
+implementation-ready feature specification, including a single canonical relationship between body
+weight measurement history and the existing profile `weight_kg` value.

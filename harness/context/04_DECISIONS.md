@@ -415,3 +415,32 @@ oldest actual plotted workout rather than reserving empty space to the theoretic
 This decision supersedes DEC-022 only where DEC-022 makes Total reps a permanent selectable chart
 metric or treats a recorded zero as usable input to a weight-based exercise-progress projection.
 The broader separation of facts, deterministic metrics, interpretation, and AI remains unchanged.
+
+---
+
+## DEC-024 — Workout statistics are terminal, local-date factual projections
+
+**Status:** Accepted
+
+F21 aggregates only owned terminal workout sessions: `completed` and `cancelled`. A session enters
+its selected rolling period through the local date captured when the workout was started, not its
+terminal timestamp. In-progress sessions remain live execution state and are deliberately excluded
+until they reach a terminal outcome.
+
+Completed and cancelled workouts remain separate. Completion ratio is `completed / (completed +
+cancelled)` over terminal sessions in the period and is unavailable when the denominator is zero.
+It describes the observed result of started sessions; it is not plan adherence and cannot establish
+whether a rest day was intentional or a planned workout was missed.
+
+Performed-set, skipped-set, skipped-exercise, duration, weekly, calendar, and skip-reason
+projections use the same terminal-session period. Performed sets remain counted after cancellation.
+Skipped work uses the effective terminal exception state, so a skip that was later reversed is not
+reported. An exercise-level skip counts once as a skipped exercise and covers its actual remaining
+planned sets for the separate skipped-set total. Structured reason distribution counts effective
+skip actions by their original scope; missing feedback remains an explicit "No reason provided"
+category rather than being inferred as another reason.
+
+Recorded duration is the non-negative elapsed interval between the server-owned workout start and
+terminal timestamp. It is not time under tension, active lifting time, rest time, or a quality
+assessment. F21 contains factual counts and temporal organization only; it introduces no targets,
+streaks, volume, adherence, trend judgement, recommendation, or score.

@@ -11,11 +11,18 @@ import json
 import re
 from typing import Any, cast
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import get_config
-from app.models import PerformedSet, WorkoutExercise, WorkoutPlannedSet, WorkoutSession
+from app.models import (
+    PerformedSet,
+    WorkoutEvent,
+    WorkoutException,
+    WorkoutExercise,
+    WorkoutPlannedSet,
+    WorkoutSession,
+)
 from app.services.exercise_service import get_exercise_by_slug
 
 TERMINAL_STATUSES = ("completed", "cancelled")
@@ -473,4 +480,269 @@ def get_exercise_history(
         "has_any_history": _has_any_history(session, user_id, slug),
         "items": items,
         "next_cursor": next_cursor,
+    }
+
+
+# ────────────────── workout statistics (F21) ──────────────────
+
+SUPPORTED_SKIP_REASON_ORDER = (
+    "not_enough_time",
+    "too_fatigued",
+    "equipment_unavailable",
+    "unable_to_perform",
+    "pain_or_discomfort",
+    "other",
+)
+
+
+def _monday_of(value: datetime.date) -> datetime.date:
+    return value - datetime.timedelta(days=value.isoweekday() - 1)
+
+
+def _sunday_of(value: datetime.date) -> datetime.date:
+    return value + datetime.timedelta(days=7 - value.isoweekday())
+
+
+def _statistics_duration_seconds(workout: WorkoutSession) -> int:
+    terminal_at = _workout_terminal_at(workout)
+    if terminal_at is None or workout.started_at is None:
+        return 0
+    return max(0, int((terminal_at - workout.started_at).total_seconds()))
+
+
+def _statistics_performed_counts(session: Session, workout_ids: list[int]) -> dict[int, int]:
+    if not workout_ids:
+        return {}
+    rows = (
+        session.query(
+            WorkoutExercise.workout_session_id.label("wid"),
+            func.count(PerformedSet.id).label("performed"),
+        )
+        .join(WorkoutPlannedSet, WorkoutPlannedSet.workout_exercise_id == WorkoutExercise.id)
+        .join(PerformedSet, PerformedSet.workout_planned_set_id == WorkoutPlannedSet.id)
+        .filter(WorkoutExercise.workout_session_id.in_(workout_ids))
+        .group_by(WorkoutExercise.workout_session_id)
+        .all()
+    )
+    return {wid: performed for wid, performed in rows}
+
+
+def _statistics_active_exceptions(
+    session: Session, workout_ids: list[int]
+) -> list[WorkoutException]:
+    """Effective terminal exceptions: skipped and not reversed (mirrors F18's projection)."""
+    if not workout_ids:
+        return []
+    skip_types = ("set_skipped", "exercise_skipped")
+    revert_types = ("set_skip_reverted", "exercise_skip_reverted")
+    active_ids = (
+        session.query(WorkoutEvent.workout_exception_id)
+        .filter(
+            WorkoutEvent.workout_session_id.in_(workout_ids),
+            WorkoutEvent.workout_exception_id.isnot(None),
+        )
+        .group_by(WorkoutEvent.workout_exception_id)
+        .having(
+            func.max(case((WorkoutEvent.event_type.in_(skip_types), 1), else_=0)) == 1,
+            func.max(case((WorkoutEvent.event_type.in_(revert_types), 1), else_=0)) == 0,
+        )
+        .all()
+    )
+    ids = [row[0] for row in active_ids]
+    if not ids:
+        return []
+    return (
+        session.query(WorkoutException)
+        .filter(
+            WorkoutException.workout_session_id.in_(workout_ids),
+            WorkoutException.id.in_(ids),
+        )
+        .all()
+    )
+
+
+def _statistics_planned_facts(
+    session: Session, workout_ids: list[int]
+) -> list[tuple[int, int, bool]]:
+    if not workout_ids:
+        return []
+    rows = (
+        session.query(
+            WorkoutPlannedSet.id,
+            WorkoutPlannedSet.workout_exercise_id,
+            PerformedSet.id,
+        )
+        .join(WorkoutExercise, WorkoutExercise.id == WorkoutPlannedSet.workout_exercise_id)
+        .outerjoin(PerformedSet, PerformedSet.workout_planned_set_id == WorkoutPlannedSet.id)
+        .filter(WorkoutExercise.workout_session_id.in_(workout_ids))
+        .all()
+    )
+    return [
+        (planned_id, exercise_id, performed_id is not None)
+        for planned_id, exercise_id, performed_id in rows
+    ]
+
+
+def get_workout_statistics(
+    session: Session, user_id: int, period: str, local_date: datetime.date
+) -> dict[str, object]:
+    from_date, through_date = resolve_period(period, local_date)
+
+    query = session.query(WorkoutSession).filter(
+        WorkoutSession.user_id == user_id,
+        WorkoutSession.status.in_(TERMINAL_STATUSES),
+    )
+    if from_date is not None:
+        query = query.filter(WorkoutSession.local_date >= from_date)
+    query = query.filter(WorkoutSession.local_date <= through_date)
+    workouts = query.order_by(WorkoutSession.local_date.asc(), WorkoutSession.id.asc()).all()
+
+    workout_ids = [workout.id for workout in workouts]
+
+    performed_by_workout = _statistics_performed_counts(session, workout_ids)
+    active_exceptions = _statistics_active_exceptions(session, workout_ids)
+    planned_facts = _statistics_planned_facts(session, workout_ids)
+
+    performed_ids: set[int] = set()
+    planned_by_id: dict[int, int] = {}
+    for planned_id, exercise_id, is_performed in planned_facts:
+        planned_by_id[planned_id] = exercise_id
+        if is_performed:
+            performed_ids.add(planned_id)
+
+    set_skipped_ids: set[int] = set()
+    exercise_skipped_ids: set[int] = set()
+    reason_counts: dict[str | None, dict[str, int]] = {}
+
+    for exc in active_exceptions:
+        reason_entry = reason_counts.setdefault(exc.reason_code, {"set": 0, "exercise": 0})
+        if exc.scope == "exercise":
+            exercise_skipped_ids.add(exc.workout_exercise_id)
+            reason_entry["exercise"] += 1
+        elif exc.workout_planned_set_id is not None:
+            set_skipped_ids.add(exc.workout_planned_set_id)
+            reason_entry["set"] += 1
+
+    skipped_set_count = 0
+    for planned_id, exercise_id in planned_by_id.items():
+        if planned_id in performed_ids:
+            continue
+        if planned_id in set_skipped_ids or exercise_id in exercise_skipped_ids:
+            skipped_set_count += 1
+
+    skip_reasons: list[dict[str, object]] = []
+    for code in SUPPORTED_SKIP_REASON_ORDER:
+        row_entry = reason_counts.get(code)
+        if row_entry is not None and (row_entry["set"] or row_entry["exercise"]):
+            skip_reasons.append(
+                {
+                    "reason_code": code,
+                    "set_skip_action_count": row_entry["set"],
+                    "exercise_skip_action_count": row_entry["exercise"],
+                }
+            )
+    null_entry = reason_counts.get(None)
+    if null_entry is not None and (null_entry["set"] or null_entry["exercise"]):
+        skip_reasons.append(
+            {
+                "reason_code": None,
+                "set_skip_action_count": null_entry["set"],
+                "exercise_skip_action_count": null_entry["exercise"],
+            }
+        )
+
+    completed_count = 0
+    cancelled_count = 0
+    performed_total = 0
+    total_elapsed = 0
+    for workout in workouts:
+        if workout.status == "completed":
+            completed_count += 1
+        else:
+            cancelled_count += 1
+        performed_total += performed_by_workout.get(workout.id, 0)
+        total_elapsed += _statistics_duration_seconds(workout)
+
+    terminal_count = completed_count + cancelled_count
+    completion_ratio: float | None = None
+    if terminal_count > 0:
+        completion_ratio = round(completed_count * 100.0 / terminal_count, 2)
+
+    summary = {
+        "completed_workout_count": completed_count,
+        "cancelled_workout_count": cancelled_count,
+        "terminal_workout_count": terminal_count,
+        "completion_ratio_percent": completion_ratio,
+        "performed_set_count": performed_total,
+        "skipped_set_count": skipped_set_count,
+        "skipped_exercise_count": len(exercise_skipped_ids),
+        "total_elapsed_seconds": total_elapsed,
+    }
+
+    weeks: list[dict[str, object]] = []
+    week_start: datetime.date | None = None
+    if from_date is not None:
+        week_start = _monday_of(from_date)
+    elif workouts:
+        week_start = _monday_of(min(workout.local_date for workout in workouts))
+
+    if week_start is not None:
+        week_end = _sunday_of(through_date)
+        bucket: dict[datetime.date, dict[str, int]] = {}
+        for workout in workouts:
+            key = _monday_of(workout.local_date)
+            entry = bucket.setdefault(
+                key, {"completed": 0, "cancelled": 0, "performed": 0, "elapsed": 0}
+            )
+            if workout.status == "completed":
+                entry["completed"] += 1
+            else:
+                entry["cancelled"] += 1
+            entry["performed"] += performed_by_workout.get(workout.id, 0)
+            entry["elapsed"] += _statistics_duration_seconds(workout)
+
+        current = week_start
+        while current <= week_end:
+            entry = bucket.get(
+                current, {"completed": 0, "cancelled": 0, "performed": 0, "elapsed": 0}
+            )
+            weeks.append(
+                {
+                    "week_start_local_date": current.isoformat(),
+                    "week_end_local_date": _sunday_of(current).isoformat(),
+                    "completed_workout_count": entry["completed"],
+                    "cancelled_workout_count": entry["cancelled"],
+                    "performed_set_count": entry["performed"],
+                    "total_elapsed_seconds": entry["elapsed"],
+                }
+            )
+            current += datetime.timedelta(days=7)
+
+    by_day: dict[datetime.date, dict[str, int]] = {}
+    for workout in workouts:
+        entry = by_day.setdefault(workout.local_date, {"completed": 0, "cancelled": 0})
+        if workout.status == "completed":
+            entry["completed"] += 1
+        else:
+            entry["cancelled"] += 1
+
+    activity_days = [
+        {
+            "local_date": day.isoformat(),
+            "completed_workout_count": entry["completed"],
+            "cancelled_workout_count": entry["cancelled"],
+        }
+        for day, entry in sorted(by_day.items())
+    ]
+
+    return {
+        "range": {
+            "period": period,
+            "from_local_date": from_date.isoformat() if from_date is not None else None,
+            "through_local_date": through_date.isoformat(),
+        },
+        "summary": summary,
+        "weeks": weeks,
+        "activity_days": activity_days,
+        "skip_reasons": skip_reasons,
     }

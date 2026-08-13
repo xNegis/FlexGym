@@ -376,6 +376,46 @@ interface ExerciseHistoryPage {
   next_cursor: string | null;
 }
 
+interface WorkoutStatisticsSummary {
+  completed_workout_count: number;
+  cancelled_workout_count: number;
+  terminal_workout_count: number;
+  completion_ratio_percent: number | null;
+  performed_set_count: number;
+  skipped_set_count: number;
+  skipped_exercise_count: number;
+  total_elapsed_seconds: number;
+}
+
+interface WorkoutStatisticsWeek {
+  week_start_local_date: string;
+  week_end_local_date: string;
+  completed_workout_count: number;
+  cancelled_workout_count: number;
+  performed_set_count: number;
+  total_elapsed_seconds: number;
+}
+
+interface WorkoutStatisticsActivityDay {
+  local_date: string;
+  completed_workout_count: number;
+  cancelled_workout_count: number;
+}
+
+interface WorkoutStatisticsSkipReason {
+  reason_code: string | null;
+  set_skip_action_count: number;
+  exercise_skip_action_count: number;
+}
+
+interface WorkoutStatistics {
+  range: ProgressRange;
+  summary: WorkoutStatisticsSummary;
+  weeks: WorkoutStatisticsWeek[];
+  activity_days: WorkoutStatisticsActivityDay[];
+  skip_reasons: WorkoutStatisticsSkipReason[];
+}
+
 export {
   type ActiveRoutine,
   type ActiveWorkoutConflict,
@@ -419,4 +459,9 @@ export {
   type WorkoutHistoryStatus,
   type WorkoutPlannedSetSnapshot,
   type WorkoutSession,
+  type WorkoutStatistics,
+  type WorkoutStatisticsActivityDay,
+  type WorkoutStatisticsSkipReason,
+  type WorkoutStatisticsSummary,
+  type WorkoutStatisticsWeek,
 };

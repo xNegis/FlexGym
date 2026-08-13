@@ -63,6 +63,12 @@ export default function ExerciseProgressScreen() {
             items={[
               { value: "workouts", label: "Workouts", to: "/progress/workouts", active: false },
               { value: "exercises", label: "Exercises", to: "/progress/exercises", active: true },
+              {
+                value: "statistics",
+                label: "Statistics",
+                to: "/progress/statistics",
+                active: false,
+              },
             ]}
           />
         </div>

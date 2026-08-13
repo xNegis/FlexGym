@@ -150,6 +150,12 @@ export default function HistoryScreen() {
             items={[
               { value: "workouts", label: "Workouts", to: "/progress/workouts", active: true },
               { value: "exercises", label: "Exercises", to: "/progress/exercises", active: false },
+              {
+                value: "statistics",
+                label: "Statistics",
+                to: "/progress/statistics",
+                active: false,
+              },
             ]}
           />
         </div>

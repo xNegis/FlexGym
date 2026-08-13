@@ -30,6 +30,11 @@ import type {
   WorkoutHistoryPage,
   WorkoutPlannedSetSnapshot,
   WorkoutSession,
+  WorkoutStatistics,
+  WorkoutStatisticsActivityDay,
+  WorkoutStatisticsSkipReason,
+  WorkoutStatisticsSummary,
+  WorkoutStatisticsWeek,
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://192.168.1.134:8000";
@@ -2695,6 +2700,213 @@ export async function fetchExerciseHistory(
     !isRequestedProgressRange(data.range, params.period, params.localDate)
   ) {
     throw new Error("Invalid exercise history response");
+  }
+  return data;
+}
+
+// ────────────────── workout statistics (F21) ──────────────────
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isWorkoutStatisticsSummary(value: unknown): value is WorkoutStatisticsSummary {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (
+    !isNonNegativeInteger(v.completed_workout_count) ||
+    !isNonNegativeInteger(v.cancelled_workout_count) ||
+    !isNonNegativeInteger(v.terminal_workout_count) ||
+    v.terminal_workout_count !==
+      (v.completed_workout_count as number) + (v.cancelled_workout_count as number) ||
+    !isNonNegativeInteger(v.performed_set_count) ||
+    !isNonNegativeInteger(v.skipped_set_count) ||
+    !isNonNegativeInteger(v.skipped_exercise_count) ||
+    !isNonNegativeInteger(v.total_elapsed_seconds)
+  ) {
+    return false;
+  }
+  const ratio = v.completion_ratio_percent;
+  if (
+    ratio !== null &&
+    (typeof ratio !== "number" || !Number.isFinite(ratio) || ratio < 0 || ratio > 100)
+  ) {
+    return false;
+  }
+  if ((v.terminal_workout_count as number) === 0) return ratio === null;
+  return ratio !== null;
+}
+
+function isCalendarDateMonday(value: string): boolean {
+  if (!isValidCalendarDate(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 1;
+}
+
+function isCalendarDateSunday(value: string): boolean {
+  if (!isValidCalendarDate(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 0;
+}
+
+function shiftLocalDateDays(localDate: string, days: number): string {
+  const [year, month, day] = localDate.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function isWorkoutStatisticsWeek(value: unknown): value is WorkoutStatisticsWeek {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.week_start_local_date === "string" &&
+    isCalendarDateMonday(v.week_start_local_date) &&
+    typeof v.week_end_local_date === "string" &&
+    isCalendarDateSunday(v.week_end_local_date) &&
+    shiftLocalDateDays(v.week_start_local_date, 6) === v.week_end_local_date &&
+    isNonNegativeInteger(v.completed_workout_count) &&
+    isNonNegativeInteger(v.cancelled_workout_count) &&
+    isNonNegativeInteger(v.performed_set_count) &&
+    isNonNegativeInteger(v.total_elapsed_seconds)
+  );
+}
+
+function isWorkoutStatisticsActivityDay(value: unknown): value is WorkoutStatisticsActivityDay {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.local_date === "string" &&
+    isValidCalendarDate(v.local_date) &&
+    isNonNegativeInteger(v.completed_workout_count) &&
+    isNonNegativeInteger(v.cancelled_workout_count)
+  );
+}
+
+const SKIP_REASON_ORDER = [
+  "not_enough_time",
+  "too_fatigued",
+  "equipment_unavailable",
+  "unable_to_perform",
+  "pain_or_discomfort",
+  "other",
+] as const;
+
+function isWorkoutStatisticsSkipReason(value: unknown): value is WorkoutStatisticsSkipReason {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (
+    (v.reason_code !== null &&
+      (typeof v.reason_code !== "string" ||
+        !(SKIP_REASON_ORDER as readonly string[]).includes(v.reason_code))) ||
+    !isNonNegativeInteger(v.set_skip_action_count) ||
+    !isNonNegativeInteger(v.exercise_skip_action_count)
+  ) {
+    return false;
+  }
+  return (v.set_skip_action_count as number) > 0 || (v.exercise_skip_action_count as number) > 0;
+}
+
+function isWorkoutStatistics(value: unknown): value is WorkoutStatistics {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (
+    !isProgressRange(v.range) ||
+    !isWorkoutStatisticsSummary(v.summary) ||
+    !Array.isArray(v.weeks) ||
+    !v.weeks.every(isWorkoutStatisticsWeek) ||
+    !Array.isArray(v.activity_days) ||
+    !v.activity_days.every(isWorkoutStatisticsActivityDay) ||
+    !Array.isArray(v.skip_reasons) ||
+    !v.skip_reasons.every(isWorkoutStatisticsSkipReason)
+  ) {
+    return false;
+  }
+
+  const weeks = v.weeks as WorkoutStatisticsWeek[];
+  let completedAcrossWeeks = 0;
+  let cancelledAcrossWeeks = 0;
+  let performedSetsAcrossWeeks = 0;
+  let elapsedAcrossWeeks = 0;
+  for (let index = 1; index < weeks.length; index += 1) {
+    if (
+      shiftLocalDateDays(weeks[index - 1].week_start_local_date, 7) !==
+      weeks[index].week_start_local_date
+    ) {
+      return false;
+    }
+  }
+  for (const week of weeks) {
+    completedAcrossWeeks += week.completed_workout_count;
+    cancelledAcrossWeeks += week.cancelled_workout_count;
+    performedSetsAcrossWeeks += week.performed_set_count;
+    elapsedAcrossWeeks += week.total_elapsed_seconds;
+  }
+  const summary = v.summary as WorkoutStatisticsSummary;
+  if (
+    completedAcrossWeeks !== summary.completed_workout_count ||
+    cancelledAcrossWeeks !== summary.cancelled_workout_count ||
+    performedSetsAcrossWeeks !== summary.performed_set_count ||
+    elapsedAcrossWeeks !== summary.total_elapsed_seconds
+  ) {
+    return false;
+  }
+
+  const days = v.activity_days as WorkoutStatisticsActivityDay[];
+  const range = v.range as ProgressRange;
+  for (let index = 0; index < days.length; index += 1) {
+    const day = days[index];
+    if (day.local_date > range.through_local_date) return false;
+    if (range.from_local_date !== null && day.local_date < range.from_local_date) return false;
+    if (index > 0 && day.local_date <= days[index - 1].local_date) return false;
+  }
+  const completedAcrossDays = days.reduce((sum, day) => sum + day.completed_workout_count, 0);
+  const cancelledAcrossDays = days.reduce((sum, day) => sum + day.cancelled_workout_count, 0);
+  if (
+    completedAcrossDays !== summary.completed_workout_count ||
+    cancelledAcrossDays !== summary.cancelled_workout_count
+  ) {
+    return false;
+  }
+
+  const reasons = v.skip_reasons as WorkoutStatisticsSkipReason[];
+  const reasonIndex = (code: string | null): number =>
+    code === null
+      ? SKIP_REASON_ORDER.length
+      : (SKIP_REASON_ORDER as readonly string[]).indexOf(code);
+  for (let index = 1; index < reasons.length; index += 1) {
+    if (reasonIndex(reasons[index - 1].reason_code) >= reasonIndex(reasons[index].reason_code)) {
+      return false;
+    }
+  }
+
+  if (summary.terminal_workout_count === 0 && (weeks.length > 0 || days.length > 0)) {
+    return false;
+  }
+
+  return true;
+}
+
+export async function fetchWorkoutStatistics(
+  period: ProgressPeriod,
+  localDate: string,
+): Promise<WorkoutStatistics> {
+  const url = new URL(`${API_BASE_URL}/api/progress/statistics`, window.location.origin);
+  url.searchParams.set("period", period);
+  url.searchParams.set("local_date", localDate);
+
+  const response = await fetch(url.toString(), { credentials: "include" });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load workout statistics");
+  }
+  const data: unknown = await response.json();
+  if (!isWorkoutStatistics(data) || !isRequestedProgressRange(data.range, period, localDate)) {
+    throw new Error("Invalid workout statistics response");
   }
   return data;
 }

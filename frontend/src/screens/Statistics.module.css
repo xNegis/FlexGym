@@ -1,0 +1,270 @@
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ────────────────── legend ────────────────── */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font: var(--text-body-compact);
+}
+
+.legendSwatch {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--color-border);
+}
+
+.legendSwatchCompleted {
+  background: var(--color-accent);
+}
+
+.legendSwatchCancelled {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-warning),
+    var(--color-warning) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+}
+
+.legendSwatchWork {
+  background: var(--color-accent);
+}
+
+/* ────────────────── weekly chart ────────────────── */
+
+.weeklyChart {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+  padding-top: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+  overflow: hidden;
+}
+
+.weekColumn {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.barTrack {
+  display: flex;
+  width: 100%;
+  height: 6rem;
+  flex-direction: column-reverse;
+  align-items: stretch;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  overflow: hidden;
+}
+
+.barSegmentCompleted {
+  background: var(--color-accent);
+}
+
+.barSegmentCancelled {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-warning),
+    var(--color-warning) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+}
+
+.barSegmentWork {
+  background: var(--color-accent);
+}
+
+.barLabel {
+  width: 100%;
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font: var(--text-caption);
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+/* ────────────────── semantic weekly table ────────────────── */
+
+.weeklyTable {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body-compact);
+}
+
+.weeklyTable th,
+.weeklyTable td {
+  padding: var(--space-2) var(--space-2);
+  text-align: right;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.weeklyTable th:first-child,
+.weeklyTable td:first-child {
+  text-align: left;
+}
+
+.weeklyTable th {
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  font-weight: 500;
+}
+
+.weeklyTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ────────────────── skip reasons ────────────────── */
+
+.skipReasonList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.skipReasonRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.skipReasonRow:last-child {
+  border-bottom: none;
+}
+
+.skipReasonLabel {
+  color: var(--color-text);
+  font: var(--text-body);
+}
+
+.skipReasonCounts {
+  color: var(--color-text-muted);
+  font: var(--text-body-compact);
+  text-align: right;
+}
+
+/* ────────────────── activity calendar ────────────────── */
+
+.calendarGridWrap {
+  display: none;
+}
+
+@media (min-width: 360px) {
+  .calendarGridWrap {
+    display: block;
+  }
+}
+
+.calendarMonth {
+  margin-bottom: var(--space-4);
+}
+
+.calendarMonthTitle {
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+  font: var(--text-label);
+  font-weight: 500;
+}
+
+.calendarWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+.calendarWeekday {
+  color: var(--color-text-subtle);
+  font: var(--text-caption);
+  text-align: center;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.calendarDay {
+  display: flex;
+  min-height: 2.5rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-subtle);
+  font: var(--text-caption);
+}
+
+.calendarDayActive {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.calendarDayNumber {
+  font: var(--text-caption);
+}
+
+.calendarDayCount {
+  display: inline-flex;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: var(--text-caption);
+  font-weight: 500;
+}
+
+.activityDayList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.activityDayItem {
+  padding: var(--space-2) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+  color: var(--color-text);
+  font: var(--text-body-compact);
+}
+
+.activityDayItem:last-child {
+  border-bottom: none;
+}
