@@ -118,6 +118,10 @@
   font: var(--text-body-compact);
 }
 
+.weeklyDetails {
+  margin-top: var(--space-2);
+}
+
 .weeklyTable th,
 .weeklyTable td {
   padding: var(--space-2) var(--space-2);

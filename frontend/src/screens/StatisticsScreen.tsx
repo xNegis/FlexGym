@@ -302,6 +302,8 @@ export default function StatisticsScreen() {
   const [data, setData] = useState<WorkoutStatistics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [workMetric, setWorkMetric] = useState<WorkMetric>("sets");
+  const [weeklyWorkoutsDetailsVisible, setWeeklyWorkoutsDetailsVisible] = useState(false);
+  const [weeklyRecordedWorkDetailsVisible, setWeeklyRecordedWorkDetailsVisible] = useState(false);
   const requestSequence = useRef(0);
 
   const load = useCallback(async () => {
@@ -449,30 +451,45 @@ export default function StatisticsScreen() {
                 </span>
               </div>
               <WeeklyBars weeks={data.weeks} mode="workouts" workMetric={workMetric} />
-              <table className={statisticsStyles.weeklyTable}>
-                <caption className={statisticsStyles.visuallyHidden}>
-                  Weekly completed and cancelled workouts
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Week</th>
-                    <th scope="col">Completed</th>
-                    <th scope="col">Cancelled</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.weeks.map((week) => (
-                    <tr key={week.week_start_local_date}>
-                      <th scope="row">
-                        {formatShortDate(week.week_start_local_date)} –{" "}
-                        {formatShortDate(week.week_end_local_date)}
-                      </th>
-                      <td>{week.completed_workout_count}</td>
-                      <td>{week.cancelled_workout_count}</td>
+              <Button
+                variant="ghost"
+                size="small"
+                aria-expanded={weeklyWorkoutsDetailsVisible}
+                aria-controls="weekly-workouts-details"
+                onClick={() => setWeeklyWorkoutsDetailsVisible((visible) => !visible)}
+              >
+                {weeklyWorkoutsDetailsVisible ? "Hide weekly details" : "View weekly details"}
+              </Button>
+              <div
+                id="weekly-workouts-details"
+                hidden={!weeklyWorkoutsDetailsVisible}
+                className={statisticsStyles.weeklyDetails}
+              >
+                <table className={statisticsStyles.weeklyTable}>
+                  <caption className={statisticsStyles.visuallyHidden}>
+                    Weekly completed and cancelled workouts
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Week</th>
+                      <th scope="col">Completed</th>
+                      <th scope="col">Cancelled</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.weeks.map((week) => (
+                      <tr key={week.week_start_local_date}>
+                        <th scope="row">
+                          {formatShortDate(week.week_start_local_date)} –{" "}
+                          {formatShortDate(week.week_end_local_date)}
+                        </th>
+                        <td>{week.completed_workout_count}</td>
+                        <td>{week.cancelled_workout_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </Section>
 
             <Section title="Weekly recorded work">
@@ -487,28 +504,45 @@ export default function StatisticsScreen() {
                 onChange={setWorkMetric}
               />
               <WeeklyBars weeks={data.weeks} mode="work" workMetric={workMetric} />
-              <table className={statisticsStyles.weeklyTable}>
-                <caption className={statisticsStyles.visuallyHidden}>Weekly recorded work</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Week</th>
-                    <th scope="col">Performed sets</th>
-                    <th scope="col">Elapsed time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.weeks.map((week) => (
-                    <tr key={week.week_start_local_date}>
-                      <th scope="row">
-                        {formatShortDate(week.week_start_local_date)} –{" "}
-                        {formatShortDate(week.week_end_local_date)}
-                      </th>
-                      <td>{week.performed_set_count}</td>
-                      <td>{formatDuration(week.total_elapsed_seconds)}</td>
+              <Button
+                variant="ghost"
+                size="small"
+                aria-expanded={weeklyRecordedWorkDetailsVisible}
+                aria-controls="weekly-recorded-work-details"
+                onClick={() => setWeeklyRecordedWorkDetailsVisible((visible) => !visible)}
+              >
+                {weeklyRecordedWorkDetailsVisible ? "Hide weekly details" : "View weekly details"}
+              </Button>
+              <div
+                id="weekly-recorded-work-details"
+                hidden={!weeklyRecordedWorkDetailsVisible}
+                className={statisticsStyles.weeklyDetails}
+              >
+                <table className={statisticsStyles.weeklyTable}>
+                  <caption className={statisticsStyles.visuallyHidden}>
+                    Weekly recorded work
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Week</th>
+                      <th scope="col">Performed sets</th>
+                      <th scope="col">Elapsed time</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.weeks.map((week) => (
+                      <tr key={week.week_start_local_date}>
+                        <th scope="row">
+                          {formatShortDate(week.week_start_local_date)} –{" "}
+                          {formatShortDate(week.week_end_local_date)}
+                        </th>
+                        <td>{week.performed_set_count}</td>
+                        <td>{formatDuration(week.total_elapsed_seconds)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </Section>
 
             <Section title="Skip reasons">

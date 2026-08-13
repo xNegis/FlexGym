@@ -104,8 +104,10 @@ those boundary weeks are full comparisons.
 
 Show a weekly workouts view with status counts distinguishable by text and pattern/legend, not
 color alone. Show a weekly recorded-work view that locally switches between performed sets and
-recorded elapsed session time. Include an equivalent semantic list/table containing every returned
-week and its values so dense bars are never the only representation. Do not smooth, interpolate,
+recorded elapsed session time. Each equivalent semantic weekly table is initially collapsed behind
+its own quiet `View weekly details` control and expands in place; its control updates to `Hide
+weekly details`. The table contains every returned week and its values so dense bars are never the
+only representation, while the initial screen remains scannable. Do not smooth, interpolate,
 forecast, regress, rank, add targets, arrows, percentage-change badges, or positive/negative
 meaning.
 
