@@ -98,4 +98,4 @@ jobs:
             sudo git reset --hard origin/main
             sudo bash scripts/deploy.sh
             sudo docker compose ps
-            sudo curl --fail --silent --show-error http://localhost:8000/api/health
+            sudo curl --fail --silent --show-error https://formcadence.app/api/health
