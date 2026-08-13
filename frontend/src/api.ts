@@ -417,7 +417,7 @@ export async function fetchExercises(params?: {
   primary_muscle?: string;
   equipment?: string;
 }): Promise<ExerciseSummary[]> {
-  const url = new URL(`${API_BASE_URL}/api/exercises`);
+  const url = new URL(`${API_BASE_URL}/api/exercises`, window.location.origin);
   if (params?.search) url.searchParams.set("search", params.search);
   if (params?.primary_muscle) url.searchParams.set("primary_muscle", params.primary_muscle);
   if (params?.equipment) url.searchParams.set("equipment", params.equipment);
@@ -2265,7 +2265,7 @@ function isWorkoutHistoryPage(value: unknown): value is WorkoutHistoryPage {
 export async function fetchWorkoutHistory(
   params: WorkoutHistoryParams = {},
 ): Promise<WorkoutHistoryPage> {
-  const url = new URL(`${API_BASE_URL}/api/workouts/history`);
+  const url = new URL(`${API_BASE_URL}/api/workouts/history`, window.location.origin);
   if (params.status) url.searchParams.set("status", params.status);
   if (params.cursor) url.searchParams.set("cursor", params.cursor);
 
