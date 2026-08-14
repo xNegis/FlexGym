@@ -22,6 +22,7 @@ import ExerciseProgressScreen from "../screens/ExerciseProgressScreen";
 import ExerciseHistoryScreen from "../screens/ExerciseHistoryScreen";
 import StatisticsScreen from "../screens/StatisticsScreen";
 import BodyWeightScreen from "../screens/BodyWeightScreen";
+import BodyWeightPhotosScreen from "../screens/BodyWeightPhotosScreen";
 import WorkoutScreen from "../screens/WorkoutScreen";
 import WorkoutExecutionScreen from "../screens/WorkoutExecutionScreen";
 
@@ -94,6 +95,14 @@ export default function AppRouter() {
             <Route path="/progress/exercises/:slug" element={<ExerciseHistoryScreen />} />
             <Route path="/progress/statistics" element={<StatisticsScreen />} />
             <Route path="/progress/body-weight" element={<BodyWeightScreen />} />
+            <Route
+              path="/progress/body-weight/:measurementDate/photos"
+              element={<BodyWeightPhotosScreen />}
+            />
+            <Route
+              path="/progress/body-weight/:measurementDate/photos"
+              element={<BodyWeightPhotosScreen />}
+            />
             <Route path="/workouts/:workoutId" element={<WorkoutScreen />} />
             <Route
               path="/workouts/:workoutId/exercises/:exercisePosition"

@@ -444,9 +444,9 @@ def _run_alembic(database_url: str, *arguments: str) -> subprocess.CompletedProc
 def test_f22_migration_fresh_database(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f22_fresh.db').as_posix()}"
 
-    _run_alembic(database_url, "upgrade", "head")
+    _run_alembic(database_url, "upgrade", F22_REVISION)
     assert F22_REVISION in _run_alembic(database_url, "current").stdout
-    _run_alembic(database_url, "upgrade", "head")
+    _run_alembic(database_url, "upgrade", F22_REVISION)
 
     engine = create_engine(database_url)
     schema = inspect(engine)

@@ -421,6 +421,7 @@ interface BodyWeightMeasurement {
   measurement_date: string;
   weight_kg: number;
   note: string | null;
+  photo_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -444,11 +445,34 @@ interface BodyWeightSaveResult {
   current_weight: BodyWeightCurrentWeight;
 }
 
+interface BodyProgressPhoto {
+  id: string;
+  display_order: number;
+  width: number;
+  height: number;
+  byte_size: number;
+  created_at: string;
+  content_path: string;
+}
+
+interface BodyProgressPhotoPage {
+  measurement: {
+    measurement_date: string;
+    weight_kg: number;
+    note: string | null;
+  };
+  photos: BodyProgressPhoto[];
+  photo_count: number;
+  remaining_capacity: number;
+}
+
 export {
   type ActiveRoutine,
   type ActiveWorkoutConflict,
   type ActiveWorkoutSummary,
   type AuthScreen,
+  type BodyProgressPhoto,
+  type BodyProgressPhotoPage,
   type BodyWeightCurrentWeight,
   type BodyWeightMeasurement,
   type BodyWeightPage,

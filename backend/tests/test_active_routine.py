@@ -17,7 +17,7 @@ from app.db import get_session
 from app.main import app
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-F11_REVISION = "f22_body_weight"
+F11_REVISION = "f22_1_photo_order_fix"
 PREVIOUS_REVISION = "c31f5a8d2e04"
 
 

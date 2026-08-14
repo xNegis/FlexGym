@@ -20,7 +20,7 @@ from app.models import Exercise
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 F09_REVISION = "273789964714"
-LATEST_REVISION = "f22_body_weight"
+LATEST_REVISION = "f22_1_photo_order_fix"
 PREVIOUS_REVISION = "b61961abf6a5"
 
 

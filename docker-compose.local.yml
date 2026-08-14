@@ -1,0 +1,9 @@
+services:
+  frontend:
+    build:
+      args:
+        VITE_API_BASE_URL: ""
+
+  caddy:
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro

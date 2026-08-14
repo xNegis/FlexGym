@@ -1,0 +1,217 @@
+.stack2 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.contextBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.contextDate {
+  font: var(--text-body);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.contextWeight {
+  font: var(--text-screen-title);
+  color: var(--color-text);
+}
+
+.guidance {
+  font: var(--text-body-compact);
+  color: var(--color-text-muted);
+}
+
+.viewerSkeleton {
+  min-height: 16rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+.viewer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.viewerImage {
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+.contentError {
+  display: flex;
+  min-height: 12rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.viewerControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.viewerPosition {
+  font: var(--text-body-compact);
+  color: var(--color-text-muted);
+}
+
+.reorderRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.thumbnails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.thumbnail {
+  width: 3.5rem;
+  height: 3.5rem;
+  padding: 0;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.thumbnailActive {
+  border-color: var(--color-accent);
+}
+
+.thumbnailImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.uploadSection {
+  margin-top: var(--space-6);
+}
+
+.capacityText {
+  font: var(--text-body-compact);
+  color: var(--color-text-muted);
+}
+
+.draftBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.draftStatus {
+  font: var(--text-body-compact);
+  color: var(--color-text-muted);
+  outline: none;
+}
+
+.draftList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.draftRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.draftPreview {
+  width: 3rem;
+  height: 3rem;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+}
+
+.draftInfo {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.draftName {
+  font: var(--text-body-compact);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draftError {
+  font: var(--text-caption);
+  color: var(--color-danger);
+}
+
+.draftActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
+.draftButtons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.draftSecondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.hiddenInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 380px) {
+  .draftRow {
+    flex-wrap: wrap;
+  }
+
+  .draftInfo {
+    flex-basis: calc(100% - 4rem);
+  }
+
+  .draftActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

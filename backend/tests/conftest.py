@@ -16,6 +16,7 @@ from app.config import reset_config
 from app.db import get_session
 from app.main import app
 from app.models import Base
+from app.storage import FakeObjectStore, get_object_store
 
 
 @pytest.fixture
@@ -41,8 +42,15 @@ def test_session_factory(
 
 
 @pytest.fixture
+def fake_store() -> FakeObjectStore:
+    return FakeObjectStore()
+
+
+@pytest.fixture
 def client(
-    test_db_url: str, test_session_factory: Callable[..., Session]
+    test_db_url: str,
+    test_session_factory: Callable[..., Session],
+    fake_store: FakeObjectStore,
 ) -> Generator[TestClient, None, None]:
     os.environ["DATABASE_URL"] = test_db_url
     reset_config()
@@ -55,6 +63,7 @@ def client(
             session.close()
 
     app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[get_object_store] = lambda: fake_store
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()

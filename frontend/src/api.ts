@@ -2,6 +2,8 @@ import type {
   ActiveRoutine,
   ActiveWorkoutConflict,
   ActiveWorkoutSummary,
+  BodyProgressPhoto,
+  BodyProgressPhotoPage,
   BodyWeightCurrentWeight,
   BodyWeightMeasurement,
   BodyWeightPage,
@@ -2926,6 +2928,10 @@ function isBodyWeightMeasurement(value: unknown): value is BodyWeightMeasurement
     v.weight_kg >= 20 &&
     v.weight_kg <= 500 &&
     (v.note === null || (typeof v.note === "string" && v.note.length <= 1000)) &&
+    typeof v.photo_count === "number" &&
+    Number.isInteger(v.photo_count) &&
+    v.photo_count >= 0 &&
+    v.photo_count <= 5 &&
     typeof v.created_at === "string" &&
     isValidTimestamp(v.created_at) &&
     typeof v.updated_at === "string" &&
@@ -3054,4 +3060,195 @@ export async function deleteBodyWeightMeasurement(
     return { detail: "Body weight measurement not found" };
   }
   return { detail: safeErrorDetail(result, response.status, "Unable to delete measurement") };
+}
+
+// ────────────────── body progress photos (F22.1) ──────────────────
+
+function isValidUuid(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
+function isBodyProgressPhoto(value: unknown): value is BodyProgressPhoto {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    isValidUuid(v.id) &&
+    typeof v.display_order === "number" &&
+    Number.isInteger(v.display_order) &&
+    v.display_order >= 0 &&
+    v.display_order <= 4 &&
+    typeof v.width === "number" &&
+    Number.isInteger(v.width) &&
+    v.width > 0 &&
+    v.width <= 2560 &&
+    typeof v.height === "number" &&
+    Number.isInteger(v.height) &&
+    v.height > 0 &&
+    v.height <= 2560 &&
+    typeof v.byte_size === "number" &&
+    Number.isInteger(v.byte_size) &&
+    v.byte_size > 0 &&
+    typeof v.created_at === "string" &&
+    isValidTimestamp(v.created_at) &&
+    typeof v.content_path === "string" &&
+    v.content_path === `/api/body-progress-photos/${v.id}/content`
+  );
+}
+
+function isBodyProgressPhotoPage(value: unknown): value is BodyProgressPhotoPage {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.measurement !== "object" || v.measurement === null) return false;
+  const measurement = v.measurement as Record<string, unknown>;
+  const measurementOk =
+    typeof measurement.measurement_date === "string" &&
+    isValidCalendarDate(measurement.measurement_date) &&
+    typeof measurement.weight_kg === "number" &&
+    Number.isFinite(measurement.weight_kg) &&
+    (measurement.note === null || typeof measurement.note === "string");
+  if (!measurementOk) return false;
+
+  if (!Array.isArray(v.photos) || !v.photos.every(isBodyProgressPhoto)) return false;
+  const photos = v.photos as BodyProgressPhoto[];
+  const orders = photos.map((photo) => photo.display_order);
+  if (new Set(orders).size !== orders.length) return false;
+  if (orders.some((order, index) => order !== index)) return false;
+  if (new Set(photos.map((photo) => photo.id)).size !== photos.length) return false;
+
+  return (
+    typeof v.photo_count === "number" &&
+    Number.isInteger(v.photo_count) &&
+    v.photo_count === photos.length &&
+    typeof v.remaining_capacity === "number" &&
+    Number.isInteger(v.remaining_capacity) &&
+    v.remaining_capacity === 5 - photos.length
+  );
+}
+
+export type BodyProgressPhotosResult = BodyProgressPhotoPage | { notFound: true };
+
+export async function fetchBodyProgressPhotos(
+  measurementDate: string,
+): Promise<BodyProgressPhotosResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/body-weight-measurements/${encodeURIComponent(measurementDate)}/photos`,
+    { credentials: "include" },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 404) {
+    return { notFound: true };
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load progress photos");
+  }
+  const data: unknown = await response.json();
+  if (!isBodyProgressPhotoPage(data) || data.measurement.measurement_date !== measurementDate) {
+    throw new Error("Invalid progress photos response");
+  }
+  return data;
+}
+
+export type UploadProgressPhotosResult = BodyProgressPhotoPage | { detail: string };
+
+export async function uploadProgressPhotos(
+  measurementDate: string,
+  files: File[],
+): Promise<UploadProgressPhotosResult> {
+  const form = new FormData();
+  for (const file of files) {
+    form.append("photos", file);
+  }
+  const response = await fetch(
+    `${API_BASE_URL}/api/body-weight-measurements/${encodeURIComponent(measurementDate)}/photos`,
+    { method: "POST", credentials: "include", body: form },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (response.status !== 201) {
+    if (response.status === 404) {
+      return { detail: "Body weight measurement not found" };
+    }
+    if (response.status === 409) {
+      return { detail: "This measurement can hold at most five photos" };
+    }
+    if (response.status === 413) {
+      return { detail: "A photo exceeds the 15 MiB limit" };
+    }
+    if (response.status === 415) {
+      return { detail: "One of the selected files is not a supported image" };
+    }
+    if (response.status === 503) {
+      return { detail: "Private photo storage is unavailable" };
+    }
+    return { detail: safeErrorDetail(result, response.status, "Unable to upload photos") };
+  }
+  if (!isBodyProgressPhotoPage(result)) {
+    throw new Error("Invalid progress photos response");
+  }
+  return result;
+}
+
+export type ReorderProgressPhotosResult = BodyProgressPhotoPage | { detail: string };
+
+export async function reorderProgressPhotos(
+  measurementDate: string,
+  photoIds: string[],
+): Promise<ReorderProgressPhotosResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/body-weight-measurements/${encodeURIComponent(measurementDate)}/photos/order`,
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photo_ids: photoIds }),
+    },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return { detail: "Body weight measurement not found" };
+    }
+    if (response.status === 409) {
+      return { detail: "The photo order is out of date" };
+    }
+    if (response.status === 422) {
+      return { detail: "The photo order is invalid" };
+    }
+    return { detail: safeErrorDetail(result, response.status, "Unable to save order") };
+  }
+  if (!isBodyProgressPhotoPage(result)) {
+    throw new Error("Invalid progress photos response");
+  }
+  return result;
+}
+
+export async function deleteProgressPhoto(photoId: string): Promise<{ detail: string } | null> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/body-progress-photos/${encodeURIComponent(photoId)}`,
+    { method: "DELETE", credentials: "include" },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 204) {
+    return null;
+  }
+  if (response.status === 404) {
+    return { detail: "Photo not found" };
+  }
+  return { detail: "Unable to delete photo" };
+}
+
+export function photoContentUrl(contentPath: string): string {
+  return `${API_BASE_URL}${contentPath}`;
 }

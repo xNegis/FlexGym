@@ -469,3 +469,39 @@ current body weight after re-onboarding. General profile editing no longer accep
 
 F22 covers capture and factual history only: no charts, period ranges, deltas, targets, composition,
 photographs, or positive/negative interpretation. Those belong to F22.1 and F23.
+
+---
+
+## DEC-026 — Body-progress photos use private S3 objects behind authenticated application access
+
+**Status:** Accepted
+
+F22.1 associates zero to five ordered private photographs with an existing F22 body-weight
+measurement. Views such as front, side, and back are optional guidance rather than required labels
+or a fixed photographic protocol. Same-date measurement replacement retains photos, measurement
+deletion removes them, and profile-only deletion retains the owned measurement history and photos.
+
+Normalized image bytes live in a private S3 bucket; the relational database stores only
+ownership-scoped metadata and an opaque object key. Browser clients never receive AWS credentials,
+bucket URLs, object keys, or direct S3 access. The backend validates ownership and proxies both
+upload and viewing so format/count/size validation, metadata removal, and access control remain one
+application responsibility. Public URLs, FTP, local filesystem storage, and database blobs are not
+accepted storage models.
+
+Accepted mobile photo inputs are normalized to bounded sRGB JPEG after applying orientation and
+discarding the original file and its source metadata. The deployed AWS identity is restricted to
+the configured application prefix. Because SQLite and S3 do not share transactions, deletion
+revokes application access and durably retains cleanup work before idempotent object deletion is
+attempted; storage failure must not make a deleted photo accessible again or lose the key required
+for retry.
+
+Within the application prefix, keys are grouped as
+`users/{opaque_user_storage_namespace}/measurements/{measurement_date}/{photo_uuid}.jpg`. The stable
+user namespace is random, server-owned, and distinct from database IDs and personal identifiers;
+the measurement date is immutable under F22. This hierarchy improves bounded operational browsing
+and account/date cleanup, but it is not an application query index. Normal reads resolve ordered
+photo metadata through SQLite and fetch S3 objects by exact persisted key rather than scanning or
+listing the bucket.
+
+F22.1 is factual capture and browsing only. It adds no automatic comparison, composition inference,
+appearance judgement, sharing, AI use, or body-weight chart behaviour.

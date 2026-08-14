@@ -17,6 +17,8 @@ from app.db import get_session
 from app.models import FitnessProfile, User
 from app.services import body_weight_service
 from app.services.fitness_profile_service import get_fitness_profile
+from app.storage import get_object_store
+from app.storage.base import ObjectStore
 
 router = APIRouter(tags=["body-weight"])
 
@@ -194,10 +196,11 @@ def delete_measurement(
     measurement_date: datetime.date,
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
+    store: ObjectStore = Depends(get_object_store),
 ) -> Response:
     _require_profile(session, user.id)
 
-    deleted = body_weight_service.delete_measurement(session, user.id, measurement_date)
+    deleted = body_weight_service.delete_measurement(session, store, user.id, measurement_date)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

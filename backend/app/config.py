@@ -43,6 +43,9 @@ class Config:
         self.database_url = _get_value("DATABASE_URL", defaults)
         self.allowed_origins = _parse_allowed_origins(_get_value("ALLOWED_ORIGINS", defaults))
         self.jwt_secret = _get_value("JWT_SECRET", defaults)
+        self.s3_region = os.getenv("S3_REGION") or defaults.get("S3_REGION")
+        self.s3_bucket = os.getenv("S3_BUCKET") or defaults.get("S3_BUCKET")
+        self.s3_prefix = os.getenv("S3_PREFIX") or defaults.get("S3_PREFIX") or "body-progress"
         if self.app_env != "development" and self.jwt_secret == _DEV_JWT_SECRET:
             raise ConfigurationError(
                 "JWT_SECRET must not use the development default in non-development environments"

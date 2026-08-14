@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Scale } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Camera, Scale } from "lucide-react";
 import {
   deleteBodyWeightMeasurement,
   fetchBodyWeightMeasurements,
@@ -72,6 +73,7 @@ const PROGRESS_NAV_ITEMS = (active: string) => [
 
 export default function BodyWeightScreen() {
   const { logout } = useAuth();
+  const navigate = useNavigate();
 
   const today = localToday();
 
@@ -368,6 +370,11 @@ export default function BodyWeightScreen() {
                       <span className={styles.cardTitle}>{formatKg(item.weight_kg)}</span>
                     </div>
                     {item.note && <div className={styles.textCompactMuted}>{item.note}</div>}
+                    {item.photo_count > 0 && (
+                      <span className={styles.textCaptionSubtle}>
+                        {item.photo_count} photo{item.photo_count === 1 ? "" : "s"}
+                      </span>
+                    )}
                     {editingDate === item.measurement_date ? (
                       <form onSubmit={handleEditSave} noValidate className={styles.stack3}>
                         {editError && <Alert variant="error">{editError}</Alert>}
@@ -425,6 +432,16 @@ export default function BodyWeightScreen() {
                       </form>
                     ) : (
                       <div className={styles.rowWrap2}>
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          onClick={() =>
+                            navigate(`/progress/body-weight/${item.measurement_date}/photos`)
+                          }
+                        >
+                          <Camera size={16} aria-hidden="true" />
+                          {item.photo_count === 0 ? "Add photos" : "Manage photos"}
+                        </Button>
                         <Button variant="secondary" size="small" onClick={() => beginEdit(item)}>
                           Edit
                         </Button>
@@ -483,7 +500,11 @@ export default function BodyWeightScreen() {
         <p>
           Delete the measurement of {deleteTarget ? formatKg(deleteTarget.weight_kg) : ""} recorded
           on {deleteTarget ? formatLocalDate(deleteTarget.measurement_date) : ""}? This will be
-          permanently removed.
+          permanently removed
+          {deleteTarget && deleteTarget.photo_count > 0
+            ? `, along with its ${deleteTarget.photo_count} photo${deleteTarget.photo_count === 1 ? "" : "s"}`
+            : ""}
+          .
         </p>
         {deleteError && <Alert variant="error">{deleteError}</Alert>}
       </Dialog>

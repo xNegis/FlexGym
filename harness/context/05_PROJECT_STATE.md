@@ -121,9 +121,26 @@ same-day measurement and no historical date is invented for pre-F22 profiles. F2
 (`f22_body_weight`); fresh and F17-head upgrade paths, an authenticated API flow against a migrated
 database, and the configured local database at repository head are all verified.
 
-Phase 3 — Progress & Analytics is in progress. F20, F20.1, F21, and F22 are implemented and validated. The
-remaining roadmap sequence is F22.1 — Body Progress Photos, F23 — Body Weight Progress, and F24 —
-Progress Dashboard.
+F22.1 — Body Progress Photos is implemented. Owned body-weight measurements expose zero to five
+ordered private photos at `/progress/body-weight/{date}/photos` through a `photo_count` on every
+history item and a secondary Add/Manage photos action. The screen offers explicit native
+`Take a photo` and `Choose from device` paths, a removable/reorderable in-memory draft, and confirmed
+`Upload photos`; stored photos are browsed one at a time with previous/next and thumbnail controls,
+reordered atomically through Move previous/Move next, and deleted through confirmation. Uploads proxy
+through the authenticated backend to private S3 object storage, where accepted JPEG/PNG/WebP/HEIC/HEIF
+inputs are normalized to bounded metadata-free sRGB JPEGs and keyed by an opaque server-owned user
+namespace plus immutable measurement date; viewing streams through an ownership-scoped endpoint with
+private no-store caching. Deletion revokes access atomically and records durable object-cleanup work
+retried on startup and later mutations. Backend tests, storage-adapter and image-processing tests,
+fresh and F22-head migration gates, an authenticated API flow against a migrated database, and
+backend/frontend static checks pass. The configured local database is at repository head
+(`f22_1_body_progress_photos`). Two completion steps remain pending: the separately invoked AWS smoke
+validation (runtime credentials are not present in the repository) and the product-owner manual UI
+validation including a physical-phone native-capture session.
+
+Phase 3 — Progress & Analytics is in progress. F20, F20.1, F21, F22, and F22.1 are implemented and
+validated (F22.1 pending AWS smoke and manual UI validation). The remaining roadmap sequence is F23 —
+Body Weight Progress and F24 — Progress Dashboard.
 
 ## Completed Features
 
@@ -150,6 +167,7 @@ Progress Dashboard.
 * F20.1 — Exercise Progress Refinement
 * F21 — Workout Statistics and Activity Trends
 * F22 — Body Weight Tracking
+* F22.1 — Body Progress Photos
 
 ## Skipped Features
 
@@ -158,9 +176,10 @@ Progress Dashboard.
 
 ## Next Feature
 
-Define F22.1 — Body Progress Photos collaboratively before implementation. It has roadmap-level
-scope only and requires an implementation-ready feature specification. F23 — Body Weight Progress
-follows it in the roadmap.
+Implement F23 — Body Weight Progress. It visualizes the measurements introduced by F22 with the shared
+`1M`, `3M`, `6M`, `1Y`, and `All` range selector, a clearly labelled deterministic trend, and period
+first/latest measurements and their absolute kilogram difference. F24 — Progress Dashboard follows it
+in the roadmap.
 
 ## Existing Feature Specifications
 
@@ -188,6 +207,7 @@ follows it in the roadmap.
 * `harness/features/20_1_exercise_progress_refinement.md` (completed)
 * `harness/features/21_workout_statistics_activity_trends.md` (completed)
 * `harness/features/22_body_weight_tracking.md` (completed)
+* `harness/features/22_1_body_progress_photos.md` (implemented; AWS smoke and manual UI validation pending)
 
 ## Current Technology
 
@@ -204,7 +224,7 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (354 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
+pytest (411 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
 completion gate for current MVP features under DEC-019
 
 Code Quality:
@@ -227,7 +247,8 @@ Per-feature AI implementation costs and models are recorded in
 
 ## Open Questions
 
-F22.1 — Body Progress Photos requires joint product discussion and an implementation-ready
-specification before implementation. F22 is complete with the one-measurement-per-local-date model,
-latest date as current profile weight, profile-edit removal of weight, and an undated fallback only
-for profiles created before F22.
+F22.1 is implemented. Its remaining completion steps are operational rather than product-scope
+questions: run the separately invoked AWS smoke validation with runtime credentials (never committed)
+against a dedicated validation sub-prefix, and perform the product-owner manual UI validation,
+including a physical-phone native-camera capture session. F23 — Body Weight Progress has no blocking
+product question and is the next feature to specify in detail.

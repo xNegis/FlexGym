@@ -1,4 +1,5 @@
 import datetime
+import uuid
 
 from sqlalchemy import (
     JSON,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     String,
     UniqueConstraint,
+    Uuid,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -25,6 +27,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    photo_storage_namespace: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, unique=True, nullable=True
+    )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.datetime.utcnow
     )
@@ -620,10 +625,61 @@ class BodyWeightMeasurement(Base):
         onupdate=datetime.datetime.utcnow,
     )
 
+    photos: Mapped[list["BodyProgressPhoto"]] = relationship(
+        "BodyProgressPhoto",
+        back_populates="measurement",
+        cascade="all, delete-orphan",
+        order_by="BodyProgressPhoto.display_order",
+    )
+
     __table_args__ = (
         UniqueConstraint(
             "user_id", "measurement_date", name="uq_body_weight_measurement_user_date"
         ),
+    )
+
+
+class BodyProgressPhoto(Base):
+    __tablename__ = "body_progress_photos"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    measurement_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("body_weight_measurements.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    measurement: Mapped["BodyWeightMeasurement"] = relationship(
+        "BodyWeightMeasurement", back_populates="photos"
+    )
+    object_key: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    width: Mapped[int] = mapped_column(Integer, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "measurement_id", "display_order", name="uq_body_progress_photo_measurement_order"
+        ),
+        CheckConstraint(
+            "display_order >= 0 AND display_order <= 9",
+            name="ck_body_progress_photos_display_order",
+        ),
+    )
+
+
+class PhotoDeletion(Base):
+    __tablename__ = "photo_deletions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    object_key: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
     )
 
 

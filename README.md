@@ -64,6 +64,15 @@ The deployment file is ignored by Git. Start or update the complete application 
 bash scripts/deploy.sh
 ```
 
+When running the Compose stack on a development PC rather than the public server, use the local
+HTTP configuration:
+
+```bash
+bash scripts/deploy.sh --local
+```
+
+The local mode serves `http://localhost`; production deployment continues to require HTTPS.
+
 Alternatively, pass a specific environment file:
 
 ```bash

@@ -12,7 +12,9 @@ import re
 from sqlalchemy.orm import Session
 
 from app.config import get_config
-from app.models import BodyWeightMeasurement
+from app.models import BodyWeightMeasurement, PhotoDeletion
+from app.services import photo_service
+from app.storage.base import ObjectStore
 
 _CURSOR_VERSION = 1
 _CURSOR_MAX_LENGTH = 512
@@ -79,6 +81,7 @@ def measurement_payload(measurement: BodyWeightMeasurement) -> dict[str, object]
         "measurement_date": measurement.measurement_date.isoformat(),
         "weight_kg": float(measurement.weight_kg),
         "note": measurement.note,
+        "photo_count": len(measurement.photos),
         "created_at": measurement.created_at.isoformat(),
         "updated_at": measurement.updated_at.isoformat(),
     }
@@ -164,7 +167,12 @@ def upsert_measurement(
     return measurement, True
 
 
-def delete_measurement(session: Session, user_id: int, measurement_date: datetime.date) -> bool:
+def delete_measurement(
+    session: Session,
+    store: ObjectStore,
+    user_id: int,
+    measurement_date: datetime.date,
+) -> bool:
     measurement = (
         session.query(BodyWeightMeasurement)
         .filter(
@@ -175,6 +183,12 @@ def delete_measurement(session: Session, user_id: int, measurement_date: datetim
     )
     if measurement is None:
         return False
+
+    photo_keys = [photo.object_key for photo in measurement.photos]
     session.delete(measurement)
+    for key in photo_keys:
+        session.add(PhotoDeletion(object_key=key))
     session.commit()
+
+    photo_service.attempt_delete_objects(session, store, photo_keys)
     return True
