@@ -2888,10 +2888,6 @@ function isWorkoutStatistics(value: unknown): value is WorkoutStatistics {
     }
   }
 
-  if (summary.terminal_workout_count === 0 && (weeks.length > 0 || days.length > 0)) {
-    return false;
-  }
-
   return true;
 }
 
