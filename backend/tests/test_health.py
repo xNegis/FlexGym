@@ -16,6 +16,25 @@ def test_config_uses_safe_development_defaults(monkeypatch: pytest.MonkeyPatch) 
     assert config.app_env == "development"
     assert config.database_url == "sqlite:///../data/db/flexgym.db"
     assert config.allowed_origins == ["http://localhost:5173"]
+    assert config.body_progress_photo_global_limit == 10_000
+
+
+def test_config_accepts_positive_global_photo_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BODY_PROGRESS_PHOTO_GLOBAL_LIMIT", "250")
+    monkeypatch.setattr(config_module, "_load_local_settings", lambda: {})
+
+    assert Config().body_progress_photo_global_limit == 250
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "many"])
+def test_config_rejects_invalid_global_photo_limit(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    monkeypatch.setenv("BODY_PROGRESS_PHOTO_GLOBAL_LIMIT", value)
+    monkeypatch.setattr(config_module, "_load_local_settings", lambda: {})
+
+    with pytest.raises(ConfigurationError, match="must be a positive integer"):
+        Config()
 
 
 def test_production_requires_explicit_database_configuration(

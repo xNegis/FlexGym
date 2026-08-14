@@ -505,3 +505,10 @@ listing the bucket.
 
 F22.1 is factual capture and browsing only. It adds no automatic comparison, composition inference,
 appearance judgement, sharing, AI use, or body-weight chart behaviour.
+
+The installation also enforces a configurable global retained-object ceiling, defaulting to 10,000.
+The ceiling counts active photo metadata plus durable pending-deletion records so failed physical S3
+cleanup cannot be bypassed by repeatedly uploading and deleting. Upload capacity checks are
+serialized through database state and reserve the complete incoming batch before object writes.
+Successful physical deletion removes its durable record and frees capacity; merely revoking user
+access does not. This is an operational cost-control boundary rather than a per-user entitlement.

@@ -84,6 +84,11 @@ waits for the backend healthcheck, and verifies the backend and frontend endpoin
 `VITE_API_BASE_URL` value is a frontend build-time setting, so changing it requires rebuilding the
 frontend image.
 
+Body-progress photo storage accepts at most 10,000 retained objects per installation by default.
+Set `BODY_PROGRESS_PHOTO_GLOBAL_LIMIT` to a positive integer in the deployment `.env` to choose a
+different ceiling. Active photos and objects still pending physical S3 deletion both consume this
+capacity; a successfully deleted S3 object frees its slot.
+
 ## Running Tests
 
 ### Backend tests

@@ -26,6 +26,7 @@ Optionally, for private body-progress photo storage:
   S3_REGION
   S3_BUCKET
   S3_PREFIX
+  BODY_PROGRESS_PHOTO_GLOBAL_LIMIT (defaults to 10000)
   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN
 
 If --env-file is omitted, .env is used when it exists. Otherwise,

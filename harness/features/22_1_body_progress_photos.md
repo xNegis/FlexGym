@@ -97,6 +97,14 @@ Introduce `BodyProgressPhoto` with an opaque UUID identifier, parent `measuremen
 
 Enforce unique `(measurement_id, display_order)` and at most five supported photos per measurement. The service validates the count transactionally; concurrent writes may not exceed it. All stored photo content is normalized JPEG.
 
+Enforce an installation-wide retained-object ceiling configured by
+`BODY_PROGRESS_PHOTO_GLOBAL_LIMIT`, defaulting to `10000`. The count includes active
+`BodyProgressPhoto` rows and durable `PhotoDeletion` rows because both may still represent billable
+S3 objects. A successful physical S3 deletion frees capacity; a user-visible deletion whose cleanup
+is still pending does not. Serialize the definitive capacity check across backend processes and
+reserve the complete accepted batch before writing any object. Invalid, zero, or negative configured
+values fail application configuration rather than silently disabling the ceiling.
+
 Introduce the minimum durable deletion record required to retain an object key after user-visible metadata is removed. It records no image bytes or user-supplied text. S3 `DeleteObject` is idempotent, successful cleanup removes the deletion record, and pending cleanup is retried during supported startup/deployment cleanup and subsequent photo mutations. Cleanup failure is logged without credentials or sensitive object content.
 
 The migration adds photo metadata, constraints/indexes, and deletion-retry persistence only. It does not create objects, backfill measurements, or invent photos.
@@ -111,7 +119,7 @@ Return the owned measurement summary, ordered photo metadata, count, and remaini
 
 ### `POST /api/body-weight-measurements/{measurement_date}/photos`
 
-Accept one to five repeated `photos` multipart fields, bounded by the measurement's remaining capacity. Return `201` with the complete ordered photo collection after every file is normalized, stored, and confirmed. Return `409` when the count would exceed five, `413` when the request or a file exceeds its byte limit, `415` for unsupported or falsely declared image content, `422` for malformed/unsafe image data or unexpected fields, and `503` when private storage is unavailable. Failures leave the existing collection usable and do not expose a partial batch.
+Accept one to five repeated `photos` multipart fields, bounded by the measurement's remaining capacity and the installation-wide retained-object ceiling. Return `201` with the complete ordered photo collection after every file is normalized, stored, and confirmed. Return `409` when the measurement count would exceed five or the global ceiling would be exceeded, `413` when the request or a file exceeds its byte limit, `415` for unsupported or falsely declared image content, `422` for malformed/unsafe image data or unexpected fields, and `503` when private storage or quota coordination is unavailable. Failures leave the existing collection usable and do not expose a partial batch.
 
 ### `PUT /api/body-weight-measurements/{measurement_date}/photos/order`
 
@@ -149,6 +157,7 @@ Validate loading, empty, one photo, five photos/capacity, Add photos action shee
 
 * Photos are optional sensitive facts associated with exactly one dated body-weight measurement.
 * One measurement retains zero to five photos in one explicit display order.
+* One installation retains no more active-plus-pending-deletion photo objects than its configured global ceiling.
 * Recommended front, side, and back views are guidance only and are not labels or validation rules.
 * Same-date weight/note replacement retains photos; measurement deletion removes them; profile-only deletion retains them.
 * The normalized image is the only retained object. Originals and source metadata are discarded.
@@ -157,7 +166,7 @@ Validate loading, empty, one photo, five photos/capacity, Add photos action shee
 
 ## Validation
 
-Each input file is at most 15 MiB before decoding. A batch contains one to five files and may not bring the stored total above five. Accepted content must decode as JPEG, PNG, WebP, HEIC, or HEIF and must contain a valid primary raster image. Reject zero-sized files, unsupported formats, corrupt/truncated data, images exceeding 40 megapixels, dimensions below 1 pixel, and decompression-bomb conditions. Declared MIME type and extension are hints only.
+Each input file is at most 15 MiB before decoding. A batch contains one to five files and may not bring the measurement total above five or the installation retained-object count above the configured global ceiling. Accepted content must decode as JPEG, PNG, WebP, HEIC, or HEIF and must contain a valid primary raster image. Reject zero-sized files, unsupported formats, corrupt/truncated data, images exceeding 40 megapixels, dimensions below 1 pixel, and decompression-bomb conditions. Declared MIME type and extension are hints only.
 
 After normalization, verify JPEG decoding, positive stored dimensions no larger than 2,560 pixels on either edge, and absence of source EXIF/XMP/IPTC metadata. Backend validation remains authoritative.
 
@@ -174,6 +183,7 @@ Validate the configured AWS integration separately with the restricted applicati
 * [ ] S3 keys are grouped by opaque user namespace and immutable measurement date while normal reads remain database-indexed exact-key access rather than bucket scans.
 * [ ] Viewing requires an authenticated ownership check and uses private proxy streaming.
 * [ ] Upload batches are all-or-nothing from the user's perspective and existing photos remain usable after failure.
+* [ ] The configurable global retained-object ceiling defaults to 10,000, cannot be bypassed by pending deletions, and rejects the complete batch before S3 writes.
 * [ ] Photo, measurement, and profile deletion follow their distinct lifecycle rules and failed object cleanup remains durably retryable.
 * [ ] The deployed IAM identity can operate only beneath the configured photo prefix and the bucket remains private.
 * [ ] No orientation requirement, automatic comparison, body analysis, chart, sharing, AI use, or interpretation is introduced.

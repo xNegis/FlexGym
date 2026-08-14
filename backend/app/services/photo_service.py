@@ -12,12 +12,18 @@ from __future__ import annotations
 import datetime
 import uuid
 
-from sqlalchemy import func
+from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_config
-from app.models import BodyProgressPhoto, BodyWeightMeasurement, PhotoDeletion, User
+from app.models import (
+    BodyProgressPhoto,
+    BodyWeightMeasurement,
+    PhotoDeletion,
+    PhotoStorageQuotaLock,
+    User,
+)
 from app.services.image_processing import NormalizedImage, normalize_image
 from app.storage.base import ObjectNotFoundError, ObjectStore, StorageUnavailableError
 
@@ -38,6 +44,10 @@ class PhotoNotFoundError(PhotoServiceError):
 
 
 class PhotoLimitExceededError(PhotoServiceError):
+    pass
+
+
+class GlobalPhotoLimitExceededError(PhotoServiceError):
     pass
 
 
@@ -130,9 +140,17 @@ def upload_photos(
     if existing_count + len(raw_files) > MAX_PHOTOS_PER_MEASUREMENT:
         raise PhotoLimitExceededError("A measurement can retain at most five photos")
 
+    if (
+        _retained_object_count(session) + len(raw_files)
+        > get_config().body_progress_photo_global_limit
+    ):
+        raise GlobalPhotoLimitExceededError("The global photo limit has been reached")
+
     normalized: list[NormalizedImage] = []
     for raw in raw_files:
         normalized.append(normalize_image(raw))
+
+    _lock_and_assert_global_capacity(session, len(normalized))
 
     user = session.get(User, user_id)
     if user is None:
@@ -191,6 +209,29 @@ def _count_photos(session: Session, measurement_id: int) -> int:
         .scalar()
         or 0
     )
+
+
+def _retained_object_count(session: Session) -> int:
+    active = session.query(func.count(BodyProgressPhoto.id)).scalar() or 0
+    pending_deletion = session.query(func.count(PhotoDeletion.id)).scalar() or 0
+    return active + pending_deletion
+
+
+def _lock_and_assert_global_capacity(session: Session, incoming_count: int) -> None:
+    """Serialize upload capacity checks across application processes."""
+    session.execute(
+        update(PhotoStorageQuotaLock)
+        .where(PhotoStorageQuotaLock.id == 1)
+        .values(revision=PhotoStorageQuotaLock.revision + 1)
+    )
+    if session.get(PhotoStorageQuotaLock, 1) is None:
+        session.rollback()
+        raise StorageUnavailableError("Photo quota state is unavailable")
+
+    limit = get_config().body_progress_photo_global_limit
+    if _retained_object_count(session) + incoming_count > limit:
+        session.rollback()
+        raise GlobalPhotoLimitExceededError("The global photo limit has been reached")
 
 
 def _compensate(session: Session, store: ObjectStore, keys: list[str]) -> None:

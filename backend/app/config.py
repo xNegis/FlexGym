@@ -32,6 +32,16 @@ def _parse_allowed_origins(raw: str) -> list[str]:
     return origins
 
 
+def _parse_positive_int(key: str, raw: str) -> int:
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ConfigurationError(f"{key} must be a positive integer") from None
+    if value <= 0:
+        raise ConfigurationError(f"{key} must be a positive integer")
+    return value
+
+
 class Config:
     def __init__(self) -> None:
         defaults = _load_local_settings()
@@ -46,6 +56,12 @@ class Config:
         self.s3_region = os.getenv("S3_REGION") or defaults.get("S3_REGION")
         self.s3_bucket = os.getenv("S3_BUCKET") or defaults.get("S3_BUCKET")
         self.s3_prefix = os.getenv("S3_PREFIX") or defaults.get("S3_PREFIX") or "body-progress"
+        self.body_progress_photo_global_limit = _parse_positive_int(
+            "BODY_PROGRESS_PHOTO_GLOBAL_LIMIT",
+            os.getenv("BODY_PROGRESS_PHOTO_GLOBAL_LIMIT")
+            or defaults.get("BODY_PROGRESS_PHOTO_GLOBAL_LIMIT")
+            or "10000",
+        )
         if self.app_env != "development" and self.jwt_secret == _DEV_JWT_SECRET:
             raise ConfigurationError(
                 "JWT_SECRET must not use the development default in non-development environments"

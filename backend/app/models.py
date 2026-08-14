@@ -683,6 +683,18 @@ class PhotoDeletion(Base):
     )
 
 
+class PhotoStorageQuotaLock(Base):
+    __tablename__ = "photo_storage_quota_lock"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_photo_storage_quota_lock_singleton"),
+        CheckConstraint("revision >= 0", name="ck_photo_storage_quota_lock_revision_nonnegative"),
+    )
+
+
 class ActiveWorkout(Base):
     __tablename__ = "active_workouts"
 

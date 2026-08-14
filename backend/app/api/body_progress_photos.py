@@ -22,6 +22,7 @@ from app.services.image_processing import (
     UnsupportedImageError,
 )
 from app.services.photo_service import (
+    GlobalPhotoLimitExceededError,
     InvalidPhotoOrderError,
     MeasurementNotFoundError,
     PhotoLimitExceededError,
@@ -136,6 +137,11 @@ async def upload_photos(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="A measurement can retain at most five photos",
+        ) from None
+    except GlobalPhotoLimitExceededError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The installation-wide photo limit has been reached",
         ) from None
     except ImageTooLargeError:
         raise HTTPException(

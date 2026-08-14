@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import reset_config
 from app.db import get_session
 from app.main import app
-from app.models import Base
+from app.models import Base, PhotoStorageQuotaLock
 from app.storage import FakeObjectStore, get_object_store
 
 
@@ -29,6 +29,9 @@ def test_db_url(tmp_path: str) -> str:
 def test_engine(test_db_url: str) -> Generator[Engine, None, None]:
     engine = create_engine(test_db_url, connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(PhotoStorageQuotaLock(id=1, revision=0))
+        session.commit()
     yield engine
     engine.dispose()
 

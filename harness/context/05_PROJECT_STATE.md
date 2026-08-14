@@ -131,10 +131,13 @@ through the authenticated backend to private S3 object storage, where accepted J
 inputs are normalized to bounded metadata-free sRGB JPEGs and keyed by an opaque server-owned user
 namespace plus immutable measurement date; viewing streams through an ownership-scoped endpoint with
 private no-store caching. Deletion revokes access atomically and records durable object-cleanup work
-retried on startup and later mutations. Backend tests, storage-adapter and image-processing tests,
+retried on startup and later mutations. Uploads are also bounded by the configurable installation-wide
+`BODY_PROGRESS_PHOTO_GLOBAL_LIMIT` (10,000 by default), counting active photos and objects pending
+physical deletion. Backend tests, storage-adapter and image-processing tests,
 fresh and F22-head migration gates, an authenticated API flow against a migrated database, and
-backend/frontend static checks pass. The configured local database is at repository head
-(`f22_1_body_progress_photos`). Two completion steps remain pending: the separately invoked AWS smoke
+backend/frontend static checks pass. Repository migration head is `f22_1_global_photo_limit`; the
+configured local database remains at `f22_1_photo_order_fix` until the next supported deployment.
+Two completion steps remain pending: the separately invoked AWS smoke
 validation (runtime credentials are not present in the repository) and the product-owner manual UI
 validation including a physical-phone native-capture session.
 

@@ -22,7 +22,8 @@ from app.storage import FakeObjectStore, get_object_store
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 F221_REVISION = "f22_1_body_progress_photos"
-LATEST_REVISION = "f22_1_photo_order_fix"
+LATEST_REVISION = "f22_1_global_photo_limit"
+PREVIOUS_HEAD = "f22_1_photo_order_fix"
 PREVIOUS_REVISION = "f22_body_weight"
 
 
@@ -728,6 +729,107 @@ def test_reorder_stale_returns_409(client: TestClient) -> None:
     assert response.status_code == 409
 
 
+def test_upload_global_capacity_returns_409(
+    client: TestClient, fake_store: FakeObjectStore, monkeypatch
+) -> None:
+    monkeypatch.setenv("BODY_PROGRESS_PHOTO_GLOBAL_LIMIT", "2")
+    from app.config import reset_config
+
+    reset_config()
+    token, _user_id = _register(client)
+    _create_profile(client, token)
+    _create_measurement(client, token, measurement_date="2026-08-11")
+    other_token, _other_user_id = _register(client, "global-limit-other@example.com")
+    _create_profile(client, other_token)
+    _create_measurement(client, other_token, measurement_date="2026-08-12")
+
+    status_code, _data = _upload(
+        client,
+        token,
+        "2026-08-11",
+        [
+            ("photos", ("a.jpg", _jpeg(), "image/jpeg")),
+            ("photos", ("b.jpg", _jpeg(), "image/jpeg")),
+        ],
+    )
+    assert status_code == 201
+    put_count = len(fake_store.put_keys)
+
+    response = client.post(
+        "/api/body-weight-measurements/2026-08-12/photos",
+        files=[("photos", ("c.jpg", _jpeg(), "image/jpeg"))],
+        cookies={"auth_token": other_token},
+    )
+    assert response.status_code == 409
+    assert response.json() == {"detail": "The installation-wide photo limit has been reached"}
+    assert len(fake_store.put_keys) == put_count
+
+
+def test_pending_deletion_still_consumes_global_capacity(
+    client: TestClient, fake_store: FakeObjectStore, monkeypatch
+) -> None:
+    monkeypatch.setenv("BODY_PROGRESS_PHOTO_GLOBAL_LIMIT", "1")
+    from app.config import reset_config
+
+    reset_config()
+    token, _user_id = _register(client)
+    _create_profile(client, token)
+    _create_measurement(client, token, measurement_date="2026-08-11")
+    _create_measurement(client, token, measurement_date="2026-08-12")
+    _, uploaded = _upload(
+        client,
+        token,
+        "2026-08-11",
+        [("photos", ("a.jpg", _jpeg(), "image/jpeg"))],
+    )
+
+    fake_store.fail_delete = True
+    deleted = client.delete(
+        f"/api/body-progress-photos/{uploaded['photos'][0]['id']}",
+        cookies={"auth_token": token},
+    )
+    assert deleted.status_code == 204
+
+    response = client.post(
+        "/api/body-weight-measurements/2026-08-12/photos",
+        files=[("photos", ("b.jpg", _jpeg(), "image/jpeg"))],
+        cookies={"auth_token": token},
+    )
+    assert response.status_code == 409
+
+
+def test_confirmed_object_deletion_frees_global_capacity(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setenv("BODY_PROGRESS_PHOTO_GLOBAL_LIMIT", "1")
+    from app.config import reset_config
+
+    reset_config()
+    token, _user_id = _register(client)
+    _create_profile(client, token)
+    _create_measurement(client, token, measurement_date="2026-08-11")
+    _create_measurement(client, token, measurement_date="2026-08-12")
+    _, uploaded = _upload(
+        client,
+        token,
+        "2026-08-11",
+        [("photos", ("a.jpg", _jpeg(), "image/jpeg"))],
+    )
+
+    deleted = client.delete(
+        f"/api/body-progress-photos/{uploaded['photos'][0]['id']}",
+        cookies={"auth_token": token},
+    )
+    assert deleted.status_code == 204
+
+    status_code, replacement = _upload(
+        client,
+        token,
+        "2026-08-12",
+        [("photos", ("b.jpg", _jpeg(), "image/jpeg"))],
+    )
+    assert status_code == 201
+    assert replacement["photo_count"] == 1
+
+
 def test_reorder_unknown_field_returns_422(client: TestClient) -> None:
     token, _user_id = _register(client)
     _create_profile(client, token)
@@ -1022,3 +1124,19 @@ def test_photo_order_fix_migration_repairs_existing_gap(tmp_path: Path) -> None:
         assert conn.execute(text("PRAGMA integrity_check")).scalar_one() == "ok"
     assert LATEST_REVISION in _run_alembic(database_url, "current").stdout
     upgraded.dispose()
+
+
+def test_global_photo_limit_migration_upgrades_previous_head(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{(tmp_path / 'global_photo_limit.db').as_posix()}"
+    _run_alembic(database_url, "upgrade", PREVIOUS_HEAD)
+    _run_alembic(database_url, "upgrade", "head")
+
+    engine = create_engine(database_url)
+    schema = inspect(engine)
+    assert "photo_storage_quota_lock" in schema.get_table_names()
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT id, revision FROM photo_storage_quota_lock")).one()
+        assert row == (1, 0)
+        assert conn.execute(text("PRAGMA integrity_check")).scalar_one() == "ok"
+    assert LATEST_REVISION in _run_alembic(database_url, "current").stdout
+    engine.dispose()
