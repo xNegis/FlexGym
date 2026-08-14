@@ -14,6 +14,14 @@ import Alert from "../ui/Alert";
 import styles from "./Screen.module.css";
 import Section from "../ui/Section";
 
+function localToday(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function OnboardingScreen() {
   const { setProfile, logout } = useAuth();
   const navigate = useNavigate();
@@ -55,6 +63,7 @@ export default function OnboardingScreen() {
         biological_sex: biologicalSex,
         height_cm: parseFloat(heightCm),
         weight_kg: parseFloat(weightKg),
+        current_local_date: localToday(),
         training_experience: trainingExperience,
         primary_goal: primaryGoal,
         training_days_per_week: parseInt(trainingDaysPerWeek, 10),

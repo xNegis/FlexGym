@@ -29,6 +29,20 @@ _VALID_PROFILE = {
     "preferred_workout_duration_minutes": 60,
     "training_environment": "full_gym",
     "physical_limitations": "Previous left shoulder irritation",
+    "current_local_date": "2026-08-14",
+}
+
+_VALID_UPDATE = {
+    "date_of_birth": "1990-06-15",
+    "biological_sex": "male",
+    "height_cm": 178.5,
+    "body_fat_percentage": 17.5,
+    "training_experience": "intermediate",
+    "primary_goal": "build_muscle",
+    "training_days_per_week": 4,
+    "preferred_workout_duration_minutes": 60,
+    "training_environment": "full_gym",
+    "physical_limitations": "Previous left shoulder irritation",
 }
 
 
@@ -64,6 +78,7 @@ def test_create_and_retrieve_profile(client: TestClient) -> None:
     assert data["training_days_per_week"] == 4
     assert data["preferred_workout_duration_minutes"] == 60
     assert data["physical_limitations"] == "Previous left shoulder irritation"
+    assert data["current_weight_measurement_date"] == "2026-08-14"
     assert isinstance(data["id"], int)
     assert "created_at" in data
     assert "updated_at" in data
@@ -144,9 +159,8 @@ def test_update_and_retrieve_profile(client: TestClient) -> None:
     original = _create_profile(client, token)
 
     updated_payload = {
-        **_VALID_PROFILE,
+        **_VALID_UPDATE,
         "height_cm": 180.0,
-        "weight_kg": 79.5,
         "body_fat_percentage": 15.0,
         "primary_goal": "lose_fat",
         "physical_limitations": None,
@@ -165,10 +179,11 @@ def test_update_and_retrieve_profile(client: TestClient) -> None:
     assert data["updated_at"] != original["updated_at"]
 
     assert data["height_cm"] == 180.0
-    assert data["weight_kg"] == 79.5
+    assert data["weight_kg"] == 81.2
     assert data["body_fat_percentage"] == 15.0
     assert data["primary_goal"] == "lose_fat"
     assert data["physical_limitations"] is None
+    assert data["current_weight_measurement_date"] == "2026-08-14"
 
     retrieved = client.get(
         "/api/fitness-profile",
@@ -184,7 +199,7 @@ def test_invalid_update_preserves_original(client: TestClient) -> None:
 
     response = client.put(
         "/api/fitness-profile",
-        json={**_VALID_PROFILE, "height_cm": 999},
+        json={**_VALID_UPDATE, "height_cm": 999},
         cookies={"auth_token": token},
     )
     assert response.status_code == 422
@@ -228,7 +243,7 @@ def test_update_requires_explicit_optional_fields(client: TestClient) -> None:
     token, _user_id = _register(client)
     _create_profile(client, token)
 
-    payload = {**_VALID_PROFILE}
+    payload = {**_VALID_UPDATE}
     del payload["body_fat_percentage"]
     response = client.put(
         "/api/fitness-profile",
@@ -238,12 +253,31 @@ def test_update_requires_explicit_optional_fields(client: TestClient) -> None:
     assert response.status_code == 422
 
 
+def test_update_rejects_weight_and_current_local_date(client: TestClient) -> None:
+    token, _user_id = _register(client)
+    _create_profile(client, token)
+
+    with_weight = client.put(
+        "/api/fitness-profile",
+        json={**_VALID_UPDATE, "weight_kg": 79.5},
+        cookies={"auth_token": token},
+    )
+    assert with_weight.status_code == 422
+
+    with_current_local_date = client.put(
+        "/api/fitness-profile",
+        json={**_VALID_UPDATE, "current_local_date": "2026-08-14"},
+        cookies={"auth_token": token},
+    )
+    assert with_current_local_date.status_code == 422
+
+
 def test_update_missing_profile(client: TestClient) -> None:
     token, _user_id = _register(client)
 
     response = client.put(
         "/api/fitness-profile",
-        json=_VALID_PROFILE,
+        json=_VALID_UPDATE,
         cookies={"auth_token": token},
     )
     assert response.status_code == 404
@@ -262,5 +296,5 @@ def test_delete_missing_profile(client: TestClient) -> None:
 
 
 def test_unauthenticated_update_and_delete(client: TestClient) -> None:
-    assert client.put("/api/fitness-profile", json=_VALID_PROFILE).status_code == 401
+    assert client.put("/api/fitness-profile", json=_VALID_UPDATE).status_code == 401
     assert client.delete("/api/fitness-profile").status_code == 401

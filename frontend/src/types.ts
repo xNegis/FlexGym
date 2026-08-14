@@ -21,6 +21,7 @@ interface FitnessProfile {
   preferred_workout_duration_minutes: number;
   training_environment: string;
   physical_limitations: string | null;
+  current_weight_measurement_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -416,11 +417,43 @@ interface WorkoutStatistics {
   skip_reasons: WorkoutStatisticsSkipReason[];
 }
 
+interface BodyWeightMeasurement {
+  measurement_date: string;
+  weight_kg: number;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface BodyWeightCurrentWeight {
+  weight_kg: number;
+  source: BodyWeightSource;
+  measurement_date: string | null;
+}
+
+type BodyWeightSource = "measurement" | "profile_fallback";
+
+interface BodyWeightPage {
+  current_weight: BodyWeightCurrentWeight;
+  items: BodyWeightMeasurement[];
+  next_cursor: string | null;
+}
+
+interface BodyWeightSaveResult {
+  item: BodyWeightMeasurement;
+  current_weight: BodyWeightCurrentWeight;
+}
+
 export {
   type ActiveRoutine,
   type ActiveWorkoutConflict,
   type ActiveWorkoutSummary,
   type AuthScreen,
+  type BodyWeightCurrentWeight,
+  type BodyWeightMeasurement,
+  type BodyWeightPage,
+  type BodyWeightSaveResult,
+  type BodyWeightSource,
   type ConfiguredExercise,
   type ConfiguredSet,
   type ConfiguredSetTempo,

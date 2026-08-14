@@ -444,3 +444,28 @@ Recorded duration is the non-negative elapsed interval between the server-owned 
 terminal timestamp. It is not time under tension, active lifting time, rest time, or a quality
 assessment. F21 contains factual counts and temporal organization only; it introduces no targets,
 streaks, volume, adherence, trend judgement, recommendation, or score.
+
+---
+
+## DEC-025 — Body weight is a dated measurement history, not a mutable profile field
+
+**Status:** Accepted
+
+F22 replaces the mutable profile `weight_kg` snapshot with user-owned, dated body-weight
+measurements. There is exactly one measurement per local date; a later save for an existing date
+replaces that date's weight and note atomically and never creates a second same-day row. The
+measurement date is immutable after creation.
+
+Current body weight is resolved at read time from the measurement with the latest measurement date,
+falling back to the persisted `FitnessProfile.weight_kg` only when no measurements remain. The
+profile value is therefore an undated fallback exclusively for profiles created before F22;
+migration does not invent a historical measurement date. New onboarding creates the entered weight
+as the first measurement on the client-supplied current local date, atomically with the profile.
+
+Measurements belong to the user directly, not to the routine, workout, or mutable profile record.
+Deleting the fitness profile does not delete measurements, so a retained history again determines
+current body weight after re-onboarding. General profile editing no longer accepts or submits
+`weight_kg`; body weight is managed through the Body weight history instead.
+
+F22 covers capture and factual history only: no charts, period ranges, deltas, targets, composition,
+photographs, or positive/negative interpretation. Those belong to F22.1 and F23.

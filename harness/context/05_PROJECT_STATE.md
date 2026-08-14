@@ -111,8 +111,18 @@ completed and cancelled stay separate and no adherence, volume, target, or trend
 Backend tests and backend/frontend static checks pass. F21 adds no migration; the configured local
 database remains at repository head.
 
-Phase 3 — Progress & Analytics is in progress. F20, F20.1, and F21 are implemented and validated. The
-remaining roadmap sequence is F22 — Body Weight Tracking, F23 — Body Weight Progress, and F24 —
+F22 — Body Weight Tracking is implemented and validated. Users record dated body-weight measurements
+(one per local date) at `/progress/body-weight` through the shared Progress navigation, replacing an
+existing date's weight and note on a later save, correcting weight/note, and confirmed-deleting
+entries, with newest-first cursor pagination and a `Load more` control. Profile shows `Current body
+weight` resolved from the latest measurement (or the undated pre-F22 fallback) and links to Body
+weight; general profile editing no longer submits weight. Onboarding atomically creates the initial
+same-day measurement and no historical date is invented for pre-F22 profiles. F22 adds a migration
+(`f22_body_weight`); fresh and F17-head upgrade paths, an authenticated API flow against a migrated
+database, and the configured local database at repository head are all verified.
+
+Phase 3 — Progress & Analytics is in progress. F20, F20.1, F21, and F22 are implemented and validated. The
+remaining roadmap sequence is F22.1 — Body Progress Photos, F23 — Body Weight Progress, and F24 —
 Progress Dashboard.
 
 ## Completed Features
@@ -139,6 +149,7 @@ Progress Dashboard.
 * F20 — Progress Area and Exercise Performance History
 * F20.1 — Exercise Progress Refinement
 * F21 — Workout Statistics and Activity Trends
+* F22 — Body Weight Tracking
 
 ## Skipped Features
 
@@ -147,8 +158,9 @@ Progress Dashboard.
 
 ## Next Feature
 
-Implement F22 — Body Weight Tracking. F22 has roadmap-level scope and still requires product
-discussion and an implementation-ready feature specification.
+Define F22.1 — Body Progress Photos collaboratively before implementation. It has roadmap-level
+scope only and requires an implementation-ready feature specification. F23 — Body Weight Progress
+follows it in the roadmap.
 
 ## Existing Feature Specifications
 
@@ -175,6 +187,7 @@ discussion and an implementation-ready feature specification.
 * `harness/features/20_progress_exercise_history.md` (completed)
 * `harness/features/20_1_exercise_progress_refinement.md` (completed)
 * `harness/features/21_workout_statistics_activity_trends.md` (completed)
+* `harness/features/22_body_weight_tracking.md` (completed)
 
 ## Current Technology
 
@@ -191,7 +204,7 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (336 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
+pytest (354 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
 completion gate for current MVP features under DEC-019
 
 Code Quality:
@@ -214,6 +227,7 @@ Per-feature AI implementation costs and models are recorded in
 
 ## Open Questions
 
-F22 — Body Weight Tracking has roadmap-level scope and requires product discussion and an
-implementation-ready feature specification, including a single canonical relationship between body
-weight measurement history and the existing profile `weight_kg` value.
+F22.1 — Body Progress Photos requires joint product discussion and an implementation-ready
+specification before implementation. F22 is complete with the one-measurement-per-local-date model,
+latest date as current profile weight, profile-edit removal of weight, and an undated fallback only
+for profiles created before F22.

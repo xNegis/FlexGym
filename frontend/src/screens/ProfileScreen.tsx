@@ -16,6 +16,15 @@ function optionalValue(value: string | number | null): string {
   return String(value);
 }
 
+function formatLocalDate(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default function ProfileScreen() {
   const { profile, user, clearProfile } = useAuth();
   const navigate = useNavigate();
@@ -70,7 +79,14 @@ export default function ProfileScreen() {
               { label: "Date of birth", value: profile.date_of_birth },
               { label: "Biological sex", value: labelFor(profile.biological_sex) },
               { label: "Height", value: `${profile.height_cm} cm` },
-              { label: "Body weight", value: `${profile.weight_kg} kg` },
+              {
+                label: "Current body weight",
+                value: `${profile.weight_kg} kg${
+                  profile.current_weight_measurement_date
+                    ? ` · Recorded on ${formatLocalDate(profile.current_weight_measurement_date)}`
+                    : ""
+                }`,
+              },
               {
                 label: "Body fat percentage",
                 value:
@@ -80,6 +96,15 @@ export default function ProfileScreen() {
               },
             ]}
           />
+          <div className={styles.mt3}>
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={() => navigate("/progress/body-weight")}
+            >
+              Record body weight
+            </Button>
+          </div>
         </Section>
 
         <Section title="Training">

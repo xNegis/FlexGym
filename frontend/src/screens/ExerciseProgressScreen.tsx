@@ -69,6 +69,12 @@ export default function ExerciseProgressScreen() {
                 to: "/progress/statistics",
                 active: false,
               },
+              {
+                value: "body-weight",
+                label: "Body weight",
+                to: "/progress/body-weight",
+                active: false,
+              },
             ]}
           />
         </div>

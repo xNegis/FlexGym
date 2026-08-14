@@ -22,7 +22,6 @@ function toFormState(profile: FitnessProfile) {
     dateOfBirth: profile.date_of_birth,
     biologicalSex: profile.biological_sex,
     heightCm: String(profile.height_cm),
-    weightKg: String(profile.weight_kg),
     bodyFatPercentage:
       profile.body_fat_percentage != null ? String(profile.body_fat_percentage) : "",
     trainingExperience: profile.training_experience,
@@ -46,7 +45,6 @@ export default function ProfileEditScreen() {
     form.dateOfBirth.trim().length > 0 &&
     form.biologicalSex !== "" &&
     form.heightCm.trim().length > 0 &&
-    form.weightKg.trim().length > 0 &&
     form.trainingExperience !== "" &&
     form.primaryGoal !== "" &&
     form.trainingDaysPerWeek.trim().length > 0 &&
@@ -64,7 +62,6 @@ export default function ProfileEditScreen() {
         date_of_birth: form.dateOfBirth,
         biological_sex: form.biologicalSex,
         height_cm: parseFloat(form.heightCm),
-        weight_kg: parseFloat(form.weightKg),
         training_experience: form.trainingExperience,
         primary_goal: form.primaryGoal,
         training_days_per_week: parseInt(form.trainingDaysPerWeek, 10),
@@ -103,6 +100,9 @@ export default function ProfileEditScreen() {
           {error && <Alert variant="error">{error}</Alert>}
 
           <Section title="Body">
+            <p className={`${styles.textCompactMuted} ${styles.mb3}`}>
+              Body weight is managed in Progress. Record a measurement under Progress → Body weight.
+            </p>
             <div className={styles.stack4}>
               <Field htmlFor="edit-dob" label="Date of birth" required>
                 <TextInput
@@ -139,20 +139,6 @@ export default function ProfileEditScreen() {
                   max={250}
                   value={form.heightCm}
                   onChange={(e) => setForm((f) => ({ ...f, heightCm: e.target.value }))}
-                  required
-                  disabled={pending}
-                />
-              </Field>
-              <Field htmlFor="edit-weight" label="Body weight (kg)" required>
-                <TextInput
-                  id="edit-weight"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.1"
-                  min={20}
-                  max={500}
-                  value={form.weightKg}
-                  onChange={(e) => setForm((f) => ({ ...f, weightKg: e.target.value }))}
                   required
                   disabled={pending}
                 />

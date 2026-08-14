@@ -599,6 +599,34 @@ class WorkoutEvent(Base):
     )
 
 
+class BodyWeightMeasurement(Base):
+    __tablename__ = "body_weight_measurements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    user: Mapped["User"] = relationship("User")
+    measurement_date: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    weight_kg: Mapped[float] = mapped_column(Numeric(5, 1), nullable=False)
+    note: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "measurement_date", name="uq_body_weight_measurement_user_date"
+        ),
+    )
+
+
 class ActiveWorkout(Base):
     __tablename__ = "active_workouts"
 

@@ -139,6 +139,7 @@ Current intended sequence:
 * F20.1 — Exercise Progress Refinement
 * F21 — Workout Statistics and Activity Trends
 * F22 — Body Weight Tracking
+* F22.1 — Body Progress Photos
 * F23 — Body Weight Progress
 * F24 — Progress Dashboard
 
@@ -211,27 +212,58 @@ recommendations, or AI interpretation.
 
 F22 introduces user-owned body-weight measurements as historical facts. The user can record a
 weight in kilograms for a local measurement date, attach an optional note, browse the chronological
-history, edit an incorrect entry, and delete an entry through explicit confirmation. Multiple
-measurements are preserved rather than overwriting history.
+history, replace an incorrect weight or note for that date, and delete an entry through explicit
+confirmation. There is exactly one measurement per local date: saving again for a date replaces its
+weight and note.
 
-The feature must define one canonical relationship between measurement history and the existing
-profile `weight_kg` value so the product cannot expose contradictory concepts of current weight. A
-migration must not invent a historical measurement date when the application does not know when an
-existing profile value was measured.
+Measurement history is free-standing: it is not assigned to a routine, workout, or training phase.
+The current body weight shown by Profile must resolve from the most recent measurement when one
+exists, otherwise from the existing profile value. The profile's onboarding value remains the
+undated fallback for users whose profile predates F22; migration must not invent a historical
+measurement date when the application does not know when that value was measured. New onboarding
+records the entered weight as the first measurement on the user's current local date. Body weight
+is subsequently managed through this history rather than general Profile editing.
 
 F22 covers capture and factual history only. It does not add charts, trends, target weight,
 composition measurements, photographs, or positive/negative interpretation.
 
+### F22.1 — Body Progress Photos
+
+F22.1 optionally associates private body-progress photos with the measurements introduced by F22.
+Each measurement can retain zero to five user-selected photos in their chosen display order. The
+capture flow recommends three views — front, side, and back — but never requires those views,
+orientation labels, or a fixed photographic protocol. Users can browse each measurement's photos,
+view one at a time at a useful size, and deliberately remove a photo; deleting a measurement also
+removes its associated photos.
+
+Images are sensitive user-owned facts. They are stored outside the relational database in private
+object storage, with only ownership-scoped metadata and an opaque object key persisted in the
+database. FTP, public object URLs, and database blobs are not acceptable storage models. Access
+must remain authenticated and short-lived or proxy-protected; uploaded files require bounded
+format, size, and count validation, and image metadata that can expose location or device details
+must not be retained unnecessarily.
+
+F22.1 adds capture, private storage, and factual browsing only. It does not infer body composition,
+compare images automatically, score appearance, expose sharing/social features, use images for AI,
+or turn F23's body-weight chart into a photo-analysis feature.
+
 ### F23 — Body Weight Progress
 
-F23 visualizes the measurements introduced by F22. It adds a body-weight chart using the shared
-`1M`, `3M`, `6M`, `1Y`, and `All` ranges, shows the first and latest measurement in the selected
-period and their absolute kilogram difference, and exposes notes associated with plotted facts.
+F23 visualizes the measurements introduced by F22. It owns the body-weight chart and the shared
+`1M`, `3M`, `6M`, `1Y`, and `All` range selector that deliberately remain outside F22. The chart
+uses F22's single effective measurement per local date, shows the first and latest measurement in
+the selected period and their absolute kilogram difference, and exposes notes associated with
+plotted facts. The pre-F22 undated profile fallback is current-weight context only and is never
+invented as a chart point.
 
 It also adds a clearly labelled deterministic trend, preferably a time-based seven-day moving
 average rather than an average of the last seven entries, so irregular measurement frequency does
-not silently change the meaning. Its specification must define same-day measurements, gaps, single
-measurements, empty periods, boundary dates, and how raw and smoothed series coexist.
+not silently change the meaning. Its specification must define replacement of a daily measurement,
+gaps, single measurements, empty periods, boundary dates, and how raw and smoothed series coexist.
+
+F23 remains a factual visualization of body-weight history. It neither duplicates F22's capture,
+editing, deletion, and paginated textual history nor displays or analyses the private photos planned
+for F22.1.
 
 F23 describes direction and magnitude but does not decide whether gaining or losing weight is good,
 claim goal fulfilment, infer causation from training, forecast future weight, or recommend changes.

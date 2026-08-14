@@ -368,6 +368,12 @@ export default function StatisticsScreen() {
     { value: "workouts", label: "Workouts", to: "/progress/workouts", active: false },
     { value: "exercises", label: "Exercises", to: "/progress/exercises", active: false },
     { value: "statistics", label: "Statistics", to: "/progress/statistics", active: true },
+    {
+      value: "body-weight",
+      label: "Body weight",
+      to: "/progress/body-weight",
+      active: false,
+    },
   ];
 
   const periodNavItems = PERIOD_VALUES.map((value) => ({

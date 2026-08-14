@@ -2,6 +2,10 @@ import type {
   ActiveRoutine,
   ActiveWorkoutConflict,
   ActiveWorkoutSummary,
+  BodyWeightCurrentWeight,
+  BodyWeightMeasurement,
+  BodyWeightPage,
+  BodyWeightSaveResult,
   ConfiguredExercise,
   ConfiguredSet,
   ConfiguredSetTempo,
@@ -196,6 +200,8 @@ function isFitnessProfile(value: unknown): value is FitnessProfile {
     typeof v.preferred_workout_duration_minutes === "number" &&
     typeof v.training_environment === "string" &&
     (v.physical_limitations === null || typeof v.physical_limitations === "string") &&
+    (v.current_weight_measurement_date === null ||
+      typeof v.current_weight_measurement_date === "string") &&
     typeof v.created_at === "string" &&
     typeof v.updated_at === "string"
   );
@@ -2909,4 +2915,147 @@ export async function fetchWorkoutStatistics(
     throw new Error("Invalid workout statistics response");
   }
   return data;
+}
+
+// ────────────────── body weight (F22) ──────────────────
+
+function isBodyWeightMeasurement(value: unknown): value is BodyWeightMeasurement {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.measurement_date === "string" &&
+    isValidCalendarDate(v.measurement_date) &&
+    typeof v.weight_kg === "number" &&
+    Number.isFinite(v.weight_kg) &&
+    v.weight_kg >= 20 &&
+    v.weight_kg <= 500 &&
+    (v.note === null || (typeof v.note === "string" && v.note.length <= 1000)) &&
+    typeof v.created_at === "string" &&
+    isValidTimestamp(v.created_at) &&
+    typeof v.updated_at === "string" &&
+    isValidTimestamp(v.updated_at)
+  );
+}
+
+function isBodyWeightCurrentWeight(value: unknown): value is BodyWeightCurrentWeight {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const isMeasurement =
+    v.source === "measurement" &&
+    typeof v.measurement_date === "string" &&
+    isValidCalendarDate(v.measurement_date);
+  const isProfileFallback = v.source === "profile_fallback" && v.measurement_date === null;
+  return (
+    typeof v.weight_kg === "number" &&
+    Number.isFinite(v.weight_kg) &&
+    v.weight_kg >= 20 &&
+    v.weight_kg <= 500 &&
+    (isMeasurement || isProfileFallback)
+  );
+}
+
+function isBodyWeightPage(value: unknown): value is BodyWeightPage {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (!isBodyWeightCurrentWeight(v.current_weight)) return false;
+  if (!Array.isArray(v.items) || !v.items.every(isBodyWeightMeasurement)) return false;
+  const items = v.items as BodyWeightMeasurement[];
+  if (new Set(items.map((item) => item.measurement_date)).size !== items.length) return false;
+  for (let index = 1; index < items.length; index += 1) {
+    if (items[index - 1].measurement_date <= items[index].measurement_date) return false;
+  }
+  return (
+    v.next_cursor === null ||
+    (typeof v.next_cursor === "string" &&
+      v.next_cursor.length > 0 &&
+      v.next_cursor.length <= 512 &&
+      /^[A-Za-z0-9_-]+={0,2}$/.test(v.next_cursor))
+  );
+}
+
+function isBodyWeightSaveResult(value: unknown): value is BodyWeightSaveResult {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return isBodyWeightMeasurement(v.item) && isBodyWeightCurrentWeight(v.current_weight);
+}
+
+export interface BodyWeightListParams {
+  cursor?: string;
+  limit?: number;
+}
+
+export async function fetchBodyWeightMeasurements(
+  params: BodyWeightListParams = {},
+): Promise<BodyWeightPage> {
+  const url = new URL(`${API_BASE_URL}/api/body-weight-measurements`, window.location.origin);
+  if (params.cursor) url.searchParams.set("cursor", params.cursor);
+  if (params.limit) url.searchParams.set("limit", String(params.limit));
+
+  const response = await fetch(url.toString(), { credentials: "include" });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load body weight history");
+  }
+  const data: unknown = await response.json();
+  if (!isBodyWeightPage(data)) {
+    throw new Error("Invalid body weight response");
+  }
+  return data;
+}
+
+export type BodyWeightSaveOutcome =
+  { created: boolean; result: BodyWeightSaveResult } | { detail: string };
+
+export async function saveBodyWeightMeasurement(
+  measurementDate: string,
+  currentLocalDate: string,
+  weightKg: number,
+  note: string | null,
+): Promise<BodyWeightSaveOutcome> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/body-weight-measurements/${encodeURIComponent(measurementDate)}`,
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        current_local_date: currentLocalDate,
+        weight_kg: weightKg,
+        note,
+      }),
+    },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  const result: unknown = await responseJson(response);
+  if (response.status !== 200 && response.status !== 201) {
+    return { detail: safeErrorDetail(result, response.status, "Unable to save measurement") };
+  }
+  if (!isBodyWeightSaveResult(result)) {
+    throw new Error("Invalid body weight response");
+  }
+  return { created: response.status === 201, result };
+}
+
+export async function deleteBodyWeightMeasurement(
+  measurementDate: string,
+): Promise<{ detail: string } | null> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/body-weight-measurements/${encodeURIComponent(measurementDate)}`,
+    { method: "DELETE", credentials: "include" },
+  );
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 204) {
+    return null;
+  }
+  const result: unknown = await responseJson(response);
+  if (response.status === 404) {
+    return { detail: "Body weight measurement not found" };
+  }
+  return { detail: safeErrorDetail(result, response.status, "Unable to delete measurement") };
 }

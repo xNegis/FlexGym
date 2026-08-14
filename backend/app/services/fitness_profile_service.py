@@ -7,7 +7,7 @@ import datetime
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import FitnessProfile
+from app.models import BodyWeightMeasurement, FitnessProfile
 
 
 class ProfileAlreadyExistsError(Exception):
@@ -43,6 +43,7 @@ def create_fitness_profile(
     preferred_workout_duration_minutes: int,
     training_environment: str,
     physical_limitations: str | None,
+    current_local_date: datetime.date,
 ) -> FitnessProfile:
     existing = get_fitness_profile(session, user_id)
     if existing is not None:
@@ -63,6 +64,28 @@ def create_fitness_profile(
         physical_limitations=physical_limitations,
     )
     session.add(profile)
+    session.flush()
+
+    existing_measurement = (
+        session.query(BodyWeightMeasurement)
+        .filter(
+            BodyWeightMeasurement.user_id == user_id,
+            BodyWeightMeasurement.measurement_date == current_local_date,
+        )
+        .first()
+    )
+    if existing_measurement is not None:
+        existing_measurement.weight_kg = weight_kg
+        existing_measurement.note = None
+    else:
+        session.add(
+            BodyWeightMeasurement(
+                user_id=user_id,
+                measurement_date=current_local_date,
+                weight_kg=weight_kg,
+                note=None,
+            )
+        )
     try:
         session.commit()
     except IntegrityError as exc:
@@ -78,7 +101,6 @@ def update_fitness_profile(
     date_of_birth: datetime.date,
     biological_sex: str,
     height_cm: float,
-    weight_kg: float,
     body_fat_percentage: float | None,
     training_experience: str,
     primary_goal: str,
@@ -92,7 +114,6 @@ def update_fitness_profile(
     profile.date_of_birth = date_of_birth
     profile.biological_sex = biological_sex
     profile.height_cm = height_cm
-    profile.weight_kg = weight_kg
     profile.body_fat_percentage = body_fat_percentage
     profile.training_experience = training_experience
     profile.primary_goal = primary_goal

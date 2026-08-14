@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from app.auth.cookies import clear_auth_cookie
 from app.auth.dependencies import get_current_user
 from app.db import get_session
-from app.models import User
+from app.models import FitnessProfile, User
+from app.services import body_weight_service
 from app.services.fitness_profile_service import (
     ProfileAlreadyExistsError,
     ProfileNotFoundError,
@@ -33,11 +34,10 @@ PRIMARY_GOAL_VALUES = {"build_muscle", "lose_fat", "increase_strength", "general
 TRAINING_ENVIRONMENT_VALUES = {"full_gym", "home_gym", "minimal_equipment", "bodyweight_only"}
 
 
-class FitnessProfileRequest(BaseModel):
+class FitnessProfileBase(BaseModel):
     date_of_birth: datetime.date
     biological_sex: str
     height_cm: float
-    weight_kg: float
     body_fat_percentage: float | None = None
     training_experience: str
     primary_goal: str
@@ -50,7 +50,6 @@ class FitnessProfileRequest(BaseModel):
 
     @field_validator(
         "height_cm",
-        "weight_kg",
         "body_fat_percentage",
         "training_days_per_week",
         "preferred_workout_duration_minutes",
@@ -90,16 +89,6 @@ class FitnessProfileRequest(BaseModel):
         rounded = round(v, 1)
         if abs(v - rounded) > 1e-9:
             raise ValueError("height_cm may contain at most one decimal place")
-        return rounded
-
-    @field_validator("weight_kg")
-    @classmethod
-    def validate_weight_kg(cls, v: float) -> float:
-        if v < 20 or v > 500:
-            raise ValueError("weight_kg must be between 20 and 500")
-        rounded = round(v, 1)
-        if abs(v - rounded) > 1e-9:
-            raise ValueError("weight_kg may contain at most one decimal place")
         return rounded
 
     @field_validator("body_fat_percentage")
@@ -169,7 +158,29 @@ class FitnessProfileRequest(BaseModel):
         return trimmed
 
 
-class FitnessProfileUpdate(FitnessProfileRequest):
+class FitnessProfileCreateRequest(FitnessProfileBase):
+    weight_kg: float
+    current_local_date: datetime.date
+
+    @field_validator("weight_kg", mode="before")
+    @classmethod
+    def reject_boolean_weight(cls, v: object) -> object:
+        if isinstance(v, bool):
+            raise ValueError("weight_kg must not be a boolean")
+        return v
+
+    @field_validator("weight_kg")
+    @classmethod
+    def validate_weight_kg(cls, v: float) -> float:
+        if v < 20 or v > 500:
+            raise ValueError("weight_kg must be between 20 and 500")
+        rounded = round(v, 1)
+        if abs(v - rounded) > 1e-9:
+            raise ValueError("weight_kg may contain at most one decimal place")
+        return rounded
+
+
+class FitnessProfileUpdateRequest(FitnessProfileBase):
     body_fat_percentage: float | None
     physical_limitations: str | None
 
@@ -187,17 +198,23 @@ class FitnessProfileOut(BaseModel):
     preferred_workout_duration_minutes: int
     training_environment: str
     physical_limitations: str | None
+    current_weight_measurement_date: datetime.date | None = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
     model_config = {"from_attributes": True}
 
 
-def _profile_out(profile: object) -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=FitnessProfileOut.model_validate(profile).model_dump(mode="json"),
+def _profile_payload(profile: FitnessProfile, session: Session) -> dict[str, object]:
+    resolved_kg, resolved_date = body_weight_service.resolve_current_weight(
+        session, profile.user_id, float(profile.weight_kg)
     )
+    payload = FitnessProfileOut.model_validate(profile).model_dump(mode="json")
+    payload["weight_kg"] = resolved_kg
+    payload["current_weight_measurement_date"] = (
+        resolved_date.isoformat() if resolved_date is not None else None
+    )
+    return payload
 
 
 @router.get("/fitness-profile")
@@ -211,12 +228,12 @@ def get_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"detail": "Fitness profile not found"},
         )
-    return _profile_out(profile)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=_profile_payload(profile, session))
 
 
 @router.post("/fitness-profile")
 def create_profile(
-    body: FitnessProfileRequest,
+    body: FitnessProfileCreateRequest,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
@@ -235,6 +252,7 @@ def create_profile(
             preferred_workout_duration_minutes=body.preferred_workout_duration_minutes,
             training_environment=body.training_environment,
             physical_limitations=body.physical_limitations,
+            current_local_date=body.current_local_date,
         )
     except ProfileAlreadyExistsError as exc:
         return JSONResponse(
@@ -243,13 +261,13 @@ def create_profile(
         )
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
-        content=FitnessProfileOut.model_validate(profile).model_dump(mode="json"),
+        content=_profile_payload(profile, session),
     )
 
 
 @router.put("/fitness-profile")
 def update_profile(
-    body: FitnessProfileUpdate,
+    body: FitnessProfileUpdateRequest,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
@@ -260,7 +278,6 @@ def update_profile(
             date_of_birth=body.date_of_birth,
             biological_sex=body.biological_sex,
             height_cm=body.height_cm,
-            weight_kg=body.weight_kg,
             body_fat_percentage=body.body_fat_percentage,
             training_experience=body.training_experience,
             primary_goal=body.primary_goal,
@@ -274,7 +291,7 @@ def update_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"detail": str(exc)},
         )
-    return _profile_out(profile)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=_profile_payload(profile, session))
 
 
 @router.delete("/fitness-profile")
