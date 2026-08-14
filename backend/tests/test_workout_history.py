@@ -331,6 +331,29 @@ def test_history_cancelled_unresolved_projection(client: TestClient) -> None:
     assert item["total_set_count"] == 3
 
 
+def test_history_exercise_skip_does_not_count_completed_sets_as_skipped(client: TestClient) -> None:
+    token, _ = _register(client)
+    _, day_id = _ready_plan(client, token, set_count=3)
+    workout_id = _start(client, token, day_id).json()["id"]
+    _start_exercise(client, token, workout_id, 1)
+    _complete(client, token, workout_id, 1, 1)
+    assert (
+        client.post(
+            f"/api/workouts/{workout_id}/exercises/1/skip",
+            json={},
+            headers=_headers(token),
+        ).status_code
+        == 200
+    )
+    _cancel(client, token, workout_id)
+
+    item = _history(client, token, "?status=cancelled").json()["items"][0]
+    assert item["completed_set_count"] == 1
+    assert item["skipped_set_count"] == 2
+    assert item["unresolved_set_count"] == 0
+    assert item["completed_set_count"] + item["skipped_set_count"] == item["total_set_count"]
+
+
 def test_history_invalid_and_repeated_parameters(client: TestClient) -> None:
     token, _ = _register(client)
 

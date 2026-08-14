@@ -1711,6 +1711,11 @@ def _history_counts(session: Session, workout_ids: list[int]) -> dict[int, dict[
 
     active_ids = _active_exception_ids(session, workout_ids)
     if active_ids:
+        performed_exists = exists(
+            select(PerformedSet.id).where(
+                PerformedSet.workout_planned_set_id == WorkoutPlannedSet.id,
+            )
+        )
         set_exists = exists(
             select(WorkoutException.id).where(
                 WorkoutException.scope == "set",
@@ -1734,6 +1739,7 @@ def _history_counts(session: Session, workout_ids: list[int]) -> dict[int, dict[
             .filter(
                 WorkoutExercise.workout_session_id.in_(workout_ids),
                 or_(set_exists, exercise_exists),
+                ~performed_exists,
             )
             .group_by(WorkoutExercise.workout_session_id)
             .all()
