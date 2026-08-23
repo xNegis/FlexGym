@@ -357,6 +357,12 @@ clear groups is preferable to decorative steps that can lose data.
 * `Divider` — separation only when spacing is insufficient.
 * `Disclosure` — advanced or secondary content that can be expanded safely.
 
+When two or more Progress domains visualize factual values over time, they reuse one shared
+time-series chart implementation for responsive axes, line and point geometry, adjusted value
+extent, one-point behaviour, keyboard/touch selection, and semantic styles. Domain wrappers supply
+units, accessible names, and factual detail content. A feature must not copy the chart SVG or CSS to
+create a visually equivalent domain chart.
+
 Cards must not contain nested cards by default. A clickable card has one primary navigation target;
 secondary actions inside it require careful event and focus handling and should usually move to the
 detail screen.

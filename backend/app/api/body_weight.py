@@ -23,6 +23,32 @@ from app.storage.base import ObjectStore
 router = APIRouter(tags=["body-weight"])
 
 LIMIT_RE = re.compile(r"^[1-9][0-9]*$")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+PERIOD_VALUES = {"1m", "3m", "6m", "1y", "all"}
+
+
+def _parse_period(value: str | None) -> str:
+    if value not in PERIOD_VALUES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "period must be one of 1m, 3m, 6m, 1y, all"}],
+        )
+    return value
+
+
+def _parse_local_date(value: str | None) -> datetime.date:
+    if value is None or not DATE_RE.fullmatch(value):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "local_date must be a real YYYY-MM-DD date"}],
+        )
+    try:
+        return datetime.date.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "local_date must be a real YYYY-MM-DD date"}],
+        ) from None
 
 
 class BodyWeightUpsertRequest(BaseModel):
@@ -131,8 +157,8 @@ def list_measurements(
     user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    _require_subset(request, {"cursor", "limit"})
-    _reject_repeats(request, ("cursor", "limit"))
+    _require_subset(request, {"cursor", "limit", "period", "local_date"})
+    _reject_repeats(request, ("cursor", "limit", "period", "local_date"))
 
     cursor = request.query_params.get("cursor")
     if cursor is not None and cursor == "":
@@ -144,8 +170,24 @@ def list_measurements(
     limit = _parse_limit(request.query_params.get("limit"))
     _require_profile(session, user.id)
 
+    period_raw = request.query_params.get("period")
+    local_date_raw = request.query_params.get("local_date")
+
+    period: str | None = None
+    local_date: datetime.date | None = None
+    if period_raw is not None or local_date_raw is not None:
+        if period_raw is None or local_date_raw is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=[{"msg": "period and local_date must be provided together"}],
+            )
+        period = _parse_period(period_raw)
+        local_date = _parse_local_date(local_date_raw)
+
     try:
-        items, next_cursor = body_weight_service.list_measurements(session, user.id, cursor, limit)
+        items, next_cursor = body_weight_service.list_measurements(
+            session, user.id, cursor, limit, period, local_date
+        )
     except body_weight_service.BodyWeightError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -157,6 +199,22 @@ def list_measurements(
         "items": items,
         "next_cursor": next_cursor,
     }
+
+
+@router.get("/progress/body-weight")
+def get_body_weight_chart(
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    _require_subset(request, {"period", "local_date"})
+    _reject_repeats(request, ("period", "local_date"))
+
+    period = _parse_period(request.query_params.get("period"))
+    local_date = _parse_local_date(request.query_params.get("local_date"))
+    _require_profile(session, user.id)
+
+    return body_weight_service.get_body_weight_chart(session, user.id, period, local_date)
 
 
 @router.put("/body-weight-measurements/{measurement_date}")

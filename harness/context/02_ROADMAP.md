@@ -251,22 +251,24 @@ or turn F23's body-weight chart into a photo-analysis feature.
 
 F23 visualizes the measurements introduced by F22. It owns the body-weight chart and the shared
 `1M`, `3M`, `6M`, `1Y`, and `All` range selector that deliberately remain outside F22. The chart
-uses F22's single effective measurement per local date, shows the first and latest measurement in
-the selected period and their absolute kilogram difference, and exposes notes associated with
-plotted facts. The pre-F22 undated profile fallback is current-weight context only and is never
-invented as a chart point.
+uses F22's single effective measurement per local date, exposes notes associated with plotted
+facts, and shows the signed kilogram difference between the two most recent measurements in the
+selected period. The selected range also filters F22's existing textual history. The pre-F22
+undated profile fallback is current-weight context only and is never invented as a chart point.
 
-It also adds a clearly labelled deterministic trend, preferably a time-based seven-day moving
-average rather than an average of the last seven entries, so irregular measurement frequency does
-not silently change the meaning. Its specification must define replacement of a daily measurement,
-gaps, single measurements, empty periods, boundary dates, and how raw and smoothed series coexist.
+Its specification must define replacement of a daily measurement, gaps, single measurements,
+empty periods, and boundary dates. F23 deliberately presents only the raw recorded measurements;
+smoothed series, moving averages, and other calculated trends are deferred until they provide a
+clear product benefit.
 
 F23 remains a factual visualization of body-weight history. It neither duplicates F22's capture,
 editing, deletion, and paginated textual history nor displays or analyses the private photos planned
 for F22.1.
 
-F23 describes direction and magnitude but does not decide whether gaining or losing weight is good,
-claim goal fulfilment, infer causation from training, forecast future weight, or recommend changes.
+F23 exposes the factual difference between the latest measurement and its immediate predecessor in
+the selected period, but does not label that difference as a trend, decide whether gaining or
+losing weight is good, claim goal fulfilment, infer causation from training, forecast future weight,
+or recommend changes.
 
 ### F24 — Progress Dashboard
 

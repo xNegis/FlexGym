@@ -121,7 +121,8 @@ same-day measurement and no historical date is invented for pre-F22 profiles. F2
 (`f22_body_weight`); fresh and F17-head upgrade paths, an authenticated API flow against a migrated
 database, and the configured local database at repository head are all verified.
 
-F22.1 — Body Progress Photos is implemented. Owned body-weight measurements expose zero to five
+F22.1 — Body Progress Photos is implemented and validated. Owned body-weight measurements expose
+zero to five
 ordered private photos at `/progress/body-weight/{date}/photos` through a `photo_count` on every
 history item and a secondary Add/Manage photos action. The screen offers explicit native
 `Take a photo` and `Choose from device` paths, a removable/reorderable in-memory draft, and confirmed
@@ -135,15 +136,26 @@ retried on startup and later mutations. Uploads are also bounded by the configur
 `BODY_PROGRESS_PHOTO_GLOBAL_LIMIT` (10,000 by default), counting active photos and objects pending
 physical deletion. Backend tests, storage-adapter and image-processing tests,
 fresh and F22-head migration gates, an authenticated API flow against a migrated database, and
-backend/frontend static checks pass. Repository migration head is `f22_1_global_photo_limit`; the
-configured local database remains at `f22_1_photo_order_fix` until the next supported deployment.
-Two completion steps remain pending: the separately invoked AWS smoke
-validation (runtime credentials are not present in the repository) and the product-owner manual UI
-validation including a physical-phone native-capture session.
+backend/frontend static checks pass. Repository migration head and the configured local database
+are both `f22_1_global_photo_limit`. The product owner confirmed the separately invoked AWS
+integration and physical-phone native-capture/UI validation on 2026-08-15.
+
+F23 — Body Weight Progress is implemented but not yet validated. The body-weight screen now owns a
+route-backed `1M`, `3M`, `6M`, `1Y`, and `All` period selector (3M default), a complete oldest-first
+raw-measurement chart, a neutral `Change since previous measurement` signed comparison with the
+previous date, and period-filtered newest-first paginated history. Current body weight remains a
+global fact and the undated pre-F22 profile fallback is never charted or compared. Measurement
+capture and edit move into a responsive focused dialog with a post-save `Add photos` / `Manage
+photos` action into the existing F22.1 flow. The exercise chart was extracted into a shared
+`TimeSeriesChart` now composed by both exercise progress and body weight without exercise-chart
+regression. Backend tests and frontend type/lint/format/build checks pass. F23 adds no migration;
+the configured local database and repository head are both `f22_1_global_photo_limit`. Focused
+manual UI validation remains pending and has not been performed, so F23 is not yet closed as
+validated.
 
 Phase 3 — Progress & Analytics is in progress. F20, F20.1, F21, F22, and F22.1 are implemented and
-validated (F22.1 pending AWS smoke and manual UI validation). The remaining roadmap sequence is F23 —
-Body Weight Progress and F24 — Progress Dashboard.
+validated; F23 is implemented with focused manual UI validation pending. The remaining roadmap
+sequence is F24 — Progress Dashboard.
 
 ## Completed Features
 
@@ -179,10 +191,12 @@ Body Weight Progress and F24 — Progress Dashboard.
 
 ## Next Feature
 
-Implement F23 — Body Weight Progress. It visualizes the measurements introduced by F22 with the shared
-`1M`, `3M`, `6M`, `1Y`, and `All` range selector, a clearly labelled deterministic trend, and period
-first/latest measurements and their absolute kilogram difference. F24 — Progress Dashboard follows it
-in the roadmap.
+Implement F24 — Progress Dashboard. It makes `/progress` a factual summary of the implemented
+Progress perspectives rather than a new analytics source, composing recent workouts, workout and
+performed-set activity for the selected period, weekly consistency context, the latest body-weight
+measurement and factual period change, recently trained exercises, and direct routes to Workouts,
+Exercises, Statistics, and Body Weight. It does not rank exercises, identify stagnation, create a
+progress score, or surface warnings and recommendations.
 
 ## Existing Feature Specifications
 
@@ -210,7 +224,8 @@ in the roadmap.
 * `harness/features/20_1_exercise_progress_refinement.md` (completed)
 * `harness/features/21_workout_statistics_activity_trends.md` (completed)
 * `harness/features/22_body_weight_tracking.md` (completed)
-* `harness/features/22_1_body_progress_photos.md` (implemented; AWS smoke and manual UI validation pending)
+* `harness/features/22_1_body_progress_photos.md` (completed)
+* `harness/features/23_body_weight_progress.md` (implemented; focused manual UI validation pending)
 
 ## Current Technology
 
@@ -250,8 +265,5 @@ Per-feature AI implementation costs and models are recorded in
 
 ## Open Questions
 
-F22.1 is implemented. Its remaining completion steps are operational rather than product-scope
-questions: run the separately invoked AWS smoke validation with runtime credentials (never committed)
-against a dedicated validation sub-prefix, and perform the product-owner manual UI validation,
-including a physical-phone native-camera capture session. F23 — Body Weight Progress has no blocking
-product question and is the next feature to specify in detail.
+F24 — Progress Dashboard is the next feature and has no blocking product question. Its specification
+has not yet been written.

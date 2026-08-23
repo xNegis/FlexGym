@@ -512,3 +512,31 @@ cleanup cannot be bypassed by repeatedly uploading and deleting. Upload capacity
 serialized through database state and reserve the complete incoming batch before object writes.
 Successful physical deletion removes its durable record and frees capacity; merely revoking user
 access does not. This is an operational cost-control boundary rather than a per-user entitlement.
+
+---
+
+## DEC-027 — Body-weight progress uses raw measurements and the most recent comparison
+
+**Status:** Accepted
+
+F23 presents body-weight evolution from F22's dated measurement facts through the shared rolling
+`1M`, `3M`, `6M`, `1Y`, and `All` periods, with `3M` as the default. One selected period controls
+the complete oldest-first chart, its factual comparison, and the existing newest-first paginated
+history. The chart begins at the oldest actual measurement in the range rather than reserving empty
+space back to the theoretical lower boundary.
+
+The comparison is the signed kilogram difference between the latest measurement and its immediate
+predecessor inside the selected period. It is unavailable when fewer than two measurements exist.
+It is not a first-to-latest summary, average, percentage, trend, score, or judgement. Positive and
+negative values receive neutral presentation because their desirability depends on goals and
+context that F23 does not interpret.
+
+The chart contains only raw dated measurements. It adds no moving average, smoothing,
+interpolation, forecast, or invented value. The undated pre-F22 profile fallback remains global
+current-weight context and is never charted or compared.
+
+Body-weight and exercise progress share one domain-neutral time-series plotting and interaction
+implementation while retaining domain-specific point details. Measurement capture becomes a
+deliberate responsive dialog rather than a permanently visible form. Optional photos remain a
+separate F22.1 flow reached after the measurement is successfully saved; no combined
+measurement-and-object-storage transaction is introduced.

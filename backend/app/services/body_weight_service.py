@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import get_config
 from app.models import BodyWeightMeasurement, PhotoDeletion
 from app.services import photo_service
+from app.services.progress_service import resolve_period
 from app.storage.base import ObjectStore
 
 _CURSOR_VERSION = 1
@@ -28,14 +29,13 @@ class BodyWeightError(Exception):
     pass
 
 
-def _encode_cursor(user_id: int, through_date: datetime.date) -> str:
-    payload = {"v": _CURSOR_VERSION, "u": user_id, "d": through_date.isoformat()}
+def _sign_and_encode(payload: dict[str, object]) -> str:
     raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     signature = hmac.new(get_config().jwt_secret.encode("utf-8"), raw, hashlib.sha256).digest()
     return base64.urlsafe_b64encode(raw + signature).decode("ascii").rstrip("=")
 
 
-def _decode_cursor(token: str, user_id: int) -> datetime.date:
+def _verify_and_decode(token: str) -> dict[str, object]:
     if not token or len(token) > _CURSOR_MAX_LENGTH:
         raise BodyWeightError("Invalid cursor")
     if not _CURSOR_RE.fullmatch(token):
@@ -56,10 +56,12 @@ def _decode_cursor(token: str, user_id: int) -> datetime.date:
         payload = json.loads(raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
         raise BodyWeightError("Invalid cursor") from None
-    if not isinstance(payload, dict) or set(payload.keys()) != {"v", "u", "d"}:
+    if not isinstance(payload, dict) or payload.get("v") != _CURSOR_VERSION:
         raise BodyWeightError("Invalid cursor")
-    if payload.get("v") != _CURSOR_VERSION:
-        raise BodyWeightError("Invalid cursor")
+    return payload
+
+
+def _require_payload_user(payload: dict[str, object], user_id: int) -> None:
     cursor_user_id = payload.get("u")
     if (
         isinstance(cursor_user_id, bool)
@@ -67,13 +69,45 @@ def _decode_cursor(token: str, user_id: int) -> datetime.date:
         or cursor_user_id != user_id
     ):
         raise BodyWeightError("Invalid cursor")
-    date_token = payload.get("d")
+
+
+def _parse_payload_date(payload: dict[str, object], key: str) -> datetime.date:
+    date_token = payload.get(key)
     if not isinstance(date_token, str) or not date_token:
         raise BodyWeightError("Invalid cursor")
     try:
         return datetime.date.fromisoformat(date_token)
     except ValueError:
         raise BodyWeightError("Invalid cursor") from None
+
+
+def _encode_cursor(
+    user_id: int, boundary_date: datetime.date, period: str | None, local_date: datetime.date | None
+) -> str:
+    payload: dict[str, object] = {
+        "v": _CURSOR_VERSION,
+        "u": user_id,
+        "b": boundary_date.isoformat(),
+    }
+    if period is not None and local_date is not None:
+        payload["p"] = period
+        payload["d"] = local_date.isoformat()
+    return _sign_and_encode(payload)
+
+
+def _decode_cursor(
+    token: str, user_id: int, period: str | None, local_date: datetime.date | None
+) -> datetime.date:
+    payload = _verify_and_decode(token)
+    _require_payload_user(payload, user_id)
+    if period is not None and local_date is not None:
+        if set(payload.keys()) != {"v", "u", "b", "p", "d"}:
+            raise BodyWeightError("Invalid cursor")
+        if payload.get("p") != period or payload.get("d") != local_date.isoformat():
+            raise BodyWeightError("Invalid cursor")
+    elif set(payload.keys()) != {"v", "u", "b"}:
+        raise BodyWeightError("Invalid cursor")
+    return _parse_payload_date(payload, "b")
 
 
 def measurement_payload(measurement: BodyWeightMeasurement) -> dict[str, object]:
@@ -105,13 +139,80 @@ def resolve_current_weight(
     return float(fallback_weight_kg), None
 
 
-def list_measurements(
-    session: Session, user_id: int, cursor: str | None, limit: int
-) -> tuple[list[dict[str, object]], str | None]:
+def _measurement_chart_item(measurement: BodyWeightMeasurement) -> dict[str, object]:
+    return {
+        "measurement_date": measurement.measurement_date.isoformat(),
+        "weight_kg": float(measurement.weight_kg),
+        "note": measurement.note,
+    }
+
+
+def get_body_weight_chart(
+    session: Session,
+    user_id: int,
+    period: str,
+    local_date: datetime.date,
+) -> dict[str, object]:
+    from_date, through_date = resolve_period(period, local_date)
+
     query = session.query(BodyWeightMeasurement).filter(BodyWeightMeasurement.user_id == user_id)
+    if from_date is not None:
+        query = query.filter(BodyWeightMeasurement.measurement_date >= from_date)
+    query = query.filter(BodyWeightMeasurement.measurement_date <= through_date)
+
+    measurements = query.order_by(
+        BodyWeightMeasurement.measurement_date.asc(), BodyWeightMeasurement.id.asc()
+    ).all()
+
+    items = [_measurement_chart_item(measurement) for measurement in measurements]
+
+    summary: dict[str, object] = {"latest": None, "previous": None, "change_kg": None}
+    if len(measurements) >= 1:
+        latest = measurements[-1]
+        summary["latest"] = {
+            "measurement_date": latest.measurement_date.isoformat(),
+            "weight_kg": float(latest.weight_kg),
+        }
+    if len(measurements) >= 2:
+        latest = measurements[-1]
+        previous = measurements[-2]
+        summary["previous"] = {
+            "measurement_date": previous.measurement_date.isoformat(),
+            "weight_kg": float(previous.weight_kg),
+        }
+        summary["change_kg"] = round(float(latest.weight_kg) - float(previous.weight_kg), 1)
+
+    return {
+        "period": period,
+        "range_start": from_date.isoformat() if from_date is not None else None,
+        "range_end": through_date.isoformat(),
+        "items": items,
+        "summary": summary,
+    }
+
+
+def list_measurements(
+    session: Session,
+    user_id: int,
+    cursor: str | None,
+    limit: int,
+    period: str | None = None,
+    local_date: datetime.date | None = None,
+) -> tuple[list[dict[str, object]], str | None]:
+    from_date: datetime.date | None = None
+    through_date: datetime.date | None = None
+    if period is not None and local_date is not None:
+        from_date, through_date = resolve_period(period, local_date)
+
+    query = session.query(BodyWeightMeasurement).filter(BodyWeightMeasurement.user_id == user_id)
+    if from_date is not None:
+        query = query.filter(BodyWeightMeasurement.measurement_date >= from_date)
+    if through_date is not None:
+        query = query.filter(BodyWeightMeasurement.measurement_date <= through_date)
+
     if cursor is not None:
-        through_date = _decode_cursor(cursor, user_id)
-        query = query.filter(BodyWeightMeasurement.measurement_date < through_date)
+        boundary = _decode_cursor(cursor, user_id, period, local_date)
+        query = query.filter(BodyWeightMeasurement.measurement_date < boundary)
 
     rows = (
         query.order_by(
@@ -126,7 +227,7 @@ def list_measurements(
 
     next_cursor: str | None = None
     if has_more:
-        next_cursor = _encode_cursor(user_id, page_rows[-1].measurement_date)
+        next_cursor = _encode_cursor(user_id, page_rows[-1].measurement_date, period, local_date)
 
     items = [measurement_payload(measurement) for measurement in page_rows]
     return items, next_cursor

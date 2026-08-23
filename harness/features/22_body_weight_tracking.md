@@ -10,7 +10,7 @@ F03/F04 collect `weight_kg` in the fitness profile, where it is currently a muta
 
 New onboarding already asks for height and weight. On successful profile creation, F22 records that entered weight as the user's first measurement for their supplied current local date. Profiles that already exist when F22 is deployed have no known measurement date, so migration retains their stored profile value only as an undated fallback and must not create a fictional historical row.
 
-F22.1 owns body-progress photos. F23 owns body-weight charts, shared period selection, changes, and any deterministic trend presentation.
+F22.1 owns body-progress photos. F23 owns body-weight charts, shared period selection, and factual period changes.
 
 ## User Experience
 
@@ -129,7 +129,7 @@ Per DEC-019, F22 adds no automated browser coverage. Frontend format, lint, and 
 ## Out of Scope
 
 * F22.1 body-progress photos, uploads, FTP, object storage, image viewing, and analysis.
-* F23 chart, ranges, period deltas, smoothing, trends, forecasts, and targets.
+* F23 chart, ranges, and period deltas; smoothing, trends, forecasts, and targets.
 * Body-fat/composition tracking, BMI, medical advice, routine/workout relation, nutrition correlation, export, sharing, reminders, signals, coaching, or AI.
 
 ## Dependencies

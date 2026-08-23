@@ -202,7 +202,7 @@ Manual gallery validation runs on desktop and mobile. Native capture validation 
 ## Out of Scope
 
 * Automatic before/after comparison, side-by-side comparison, overlays, alignment, computer vision, body-fat/composition inference, appearance scores, progress judgements, or medical meaning.
-* F23 body-weight charts, ranges, deltas, smoothing, trends, targets, or photo presentation inside charts.
+* F23 body-weight charts, ranges, and deltas; smoothing, trends, targets, or photo presentation inside charts.
 * Required front/side/back labels, pose guidance enforcement, camera overlays, reminders, annotations, captions, editing, filters, cropping controls, or original-file download.
 * Public URLs, direct browser-to-S3 upload, FTP, database blobs, local filesystem storage, sharing, export, social features, AI access, or third-party media processing.
 * Video, GIF animation, RAW camera formats, AVIF, PDFs, or more than five photos per measurement.

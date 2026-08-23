@@ -445,6 +445,31 @@ interface BodyWeightSaveResult {
   current_weight: BodyWeightCurrentWeight;
 }
 
+interface BodyWeightChartItem {
+  measurement_date: string;
+  weight_kg: number;
+  note: string | null;
+}
+
+interface BodyWeightChartSummaryPoint {
+  measurement_date: string;
+  weight_kg: number;
+}
+
+interface BodyWeightChartSummary {
+  latest: BodyWeightChartSummaryPoint | null;
+  previous: BodyWeightChartSummaryPoint | null;
+  change_kg: number | null;
+}
+
+interface BodyWeightChartPage {
+  period: ProgressPeriod;
+  range_start: string | null;
+  range_end: string;
+  items: BodyWeightChartItem[];
+  summary: BodyWeightChartSummary;
+}
+
 interface BodyProgressPhoto {
   id: string;
   display_order: number;
@@ -474,6 +499,10 @@ export {
   type BodyProgressPhoto,
   type BodyProgressPhotoPage,
   type BodyWeightCurrentWeight,
+  type BodyWeightChartItem,
+  type BodyWeightChartPage,
+  type BodyWeightChartSummary,
+  type BodyWeightChartSummaryPoint,
   type BodyWeightMeasurement,
   type BodyWeightPage,
   type BodyWeightSaveResult,

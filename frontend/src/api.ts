@@ -5,6 +5,9 @@ import type {
   BodyProgressPhoto,
   BodyProgressPhotoPage,
   BodyWeightCurrentWeight,
+  BodyWeightChartItem,
+  BodyWeightChartPage,
+  BodyWeightChartSummary,
   BodyWeightMeasurement,
   BodyWeightPage,
   BodyWeightSaveResult,
@@ -2981,9 +2984,159 @@ function isBodyWeightSaveResult(value: unknown): value is BodyWeightSaveResult {
   return isBodyWeightMeasurement(v.item) && isBodyWeightCurrentWeight(v.current_weight);
 }
 
+function hasAtMostOneDecimalPlace(value: number): boolean {
+  return Math.abs(value * 10 - Math.round(value * 10)) < 1e-9;
+}
+
+function isBodyWeightChartItem(value: unknown): value is BodyWeightChartItem {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.measurement_date === "string" &&
+    isValidCalendarDate(v.measurement_date) &&
+    typeof v.weight_kg === "number" &&
+    Number.isFinite(v.weight_kg) &&
+    v.weight_kg >= 20 &&
+    v.weight_kg <= 500 &&
+    hasAtMostOneDecimalPlace(v.weight_kg) &&
+    (v.note === null || (typeof v.note === "string" && v.note.length <= 1000))
+  );
+}
+
+function isBodyWeightChartSummaryPoint(value: unknown): value is {
+  measurement_date: string;
+  weight_kg: number;
+} {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.measurement_date === "string" &&
+    isValidCalendarDate(v.measurement_date) &&
+    typeof v.weight_kg === "number" &&
+    Number.isFinite(v.weight_kg) &&
+    v.weight_kg >= 20 &&
+    v.weight_kg <= 500 &&
+    hasAtMostOneDecimalPlace(v.weight_kg)
+  );
+}
+
+function isBodyWeightChartSummary(value: unknown): value is BodyWeightChartSummary {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (!("latest" in v) || !("previous" in v) || !("change_kg" in v)) return false;
+  const latestOk = v.latest === null || isBodyWeightChartSummaryPoint(v.latest);
+  const previousOk = v.previous === null || isBodyWeightChartSummaryPoint(v.previous);
+  const changeOk =
+    v.change_kg === null || (typeof v.change_kg === "number" && Number.isFinite(v.change_kg));
+  return latestOk && previousOk && changeOk;
+}
+
+function isBodyWeightChartPage(
+  value: unknown,
+  period: ProgressPeriod,
+  localDate: string,
+): value is BodyWeightChartPage {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (v.period !== period || !PROGRESS_PERIODS.has(v.period as ProgressPeriod)) return false;
+  if (v.range_end !== localDate) return false;
+
+  const monthOffsets: Partial<Record<ProgressPeriod, number>> = {
+    "1m": -1,
+    "3m": -3,
+    "6m": -6,
+    "1y": -12,
+  };
+  const expectedFrom =
+    period === "all" ? null : shiftProgressMonths(localDate, monthOffsets[period] as number);
+  if (v.range_start !== expectedFrom) return false;
+
+  if (!isBodyWeightChartSummary(v.summary)) return false;
+  if (!Array.isArray(v.items) || !v.items.every(isBodyWeightChartItem)) return false;
+
+  const items = v.items as BodyWeightChartItem[];
+  if (new Set(items.map((item) => item.measurement_date)).size !== items.length) return false;
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    if (item.measurement_date > localDate) return false;
+    if (expectedFrom !== null && item.measurement_date < expectedFrom) return false;
+    if (index > 0 && items[index - 1].measurement_date >= item.measurement_date) return false;
+  }
+
+  const summary = v.summary as BodyWeightChartSummary;
+  if (items.length === 0) {
+    return summary.latest === null && summary.previous === null && summary.change_kg === null;
+  }
+
+  const latest = items[items.length - 1];
+  if (
+    summary.latest === null ||
+    summary.latest.measurement_date !== latest.measurement_date ||
+    Math.abs(summary.latest.weight_kg - latest.weight_kg) > 1e-6
+  ) {
+    return false;
+  }
+  if (items.length === 1) {
+    return summary.previous === null && summary.change_kg === null;
+  }
+
+  const previous = items[items.length - 2];
+  if (
+    summary.previous === null ||
+    summary.previous.measurement_date !== previous.measurement_date ||
+    Math.abs(summary.previous.weight_kg - previous.weight_kg) > 1e-6
+  ) {
+    return false;
+  }
+  if (summary.change_kg === null) return false;
+  const expectedChange = Math.round((latest.weight_kg - previous.weight_kg) * 10) / 10;
+  return Math.abs(summary.change_kg - expectedChange) <= 1e-6;
+}
+
 export interface BodyWeightListParams {
   cursor?: string;
   limit?: number;
+  period?: ProgressPeriod;
+  localDate?: string;
+}
+
+function isInsideBodyWeightRange(
+  measurementDate: string,
+  period: ProgressPeriod,
+  localDate: string,
+): boolean {
+  if (measurementDate > localDate) return false;
+  if (period === "all") return true;
+  const monthOffsets: Partial<Record<ProgressPeriod, number>> = {
+    "1m": -1,
+    "3m": -3,
+    "6m": -6,
+    "1y": -12,
+  };
+  const from = shiftProgressMonths(localDate, monthOffsets[period] as number);
+  return measurementDate >= from;
+}
+
+export async function fetchBodyWeightChart(
+  period: ProgressPeriod,
+  localDate: string,
+): Promise<BodyWeightChartPage> {
+  const url = new URL(`${API_BASE_URL}/api/progress/body-weight`, window.location.origin);
+  url.searchParams.set("period", period);
+  url.searchParams.set("local_date", localDate);
+
+  const response = await fetch(url.toString(), { credentials: "include" });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load body weight chart");
+  }
+  const data: unknown = await response.json();
+  if (!isBodyWeightChartPage(data, period, localDate)) {
+    throw new Error("Invalid body weight chart response");
+  }
+  return data;
 }
 
 export async function fetchBodyWeightMeasurements(
@@ -2992,6 +3145,8 @@ export async function fetchBodyWeightMeasurements(
   const url = new URL(`${API_BASE_URL}/api/body-weight-measurements`, window.location.origin);
   if (params.cursor) url.searchParams.set("cursor", params.cursor);
   if (params.limit) url.searchParams.set("limit", String(params.limit));
+  if (params.period) url.searchParams.set("period", params.period);
+  if (params.localDate) url.searchParams.set("local_date", params.localDate);
 
   const response = await fetch(url.toString(), { credentials: "include" });
   if (response.status === 401) {
@@ -3003,6 +3158,13 @@ export async function fetchBodyWeightMeasurements(
   const data: unknown = await response.json();
   if (!isBodyWeightPage(data)) {
     throw new Error("Invalid body weight response");
+  }
+  if (params.period && params.localDate) {
+    for (const item of data.items) {
+      if (!isInsideBodyWeightRange(item.measurement_date, params.period, params.localDate)) {
+        throw new Error("Invalid body weight response");
+      }
+    }
   }
   return data;
 }
