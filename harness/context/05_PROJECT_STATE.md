@@ -140,7 +140,7 @@ backend/frontend static checks pass. Repository migration head and the configure
 are both `f22_1_global_photo_limit`. The product owner confirmed the separately invoked AWS
 integration and physical-phone native-capture/UI validation on 2026-08-15.
 
-F23 — Body Weight Progress is implemented but not yet validated. The body-weight screen now owns a
+F23 — Body Weight Progress is implemented and validated. The body-weight screen now owns a
 route-backed `1M`, `3M`, `6M`, `1Y`, and `All` period selector (3M default), a complete oldest-first
 raw-measurement chart, a neutral `Change since previous measurement` signed comparison with the
 previous date, and period-filtered newest-first paginated history. Current body weight remains a
@@ -149,13 +149,11 @@ capture and edit move into a responsive focused dialog with a post-save `Add pho
 photos` action into the existing F22.1 flow. The exercise chart was extracted into a shared
 `TimeSeriesChart` now composed by both exercise progress and body weight without exercise-chart
 regression. Backend tests and frontend type/lint/format/build checks pass. F23 adds no migration;
-the configured local database and repository head are both `f22_1_global_photo_limit`. Focused
-manual UI validation remains pending and has not been performed, so F23 is not yet closed as
-validated.
+the configured local database and repository head are both `f22_1_global_photo_limit`. The product
+owner confirmed the deployed UI on 2026-08-23 after the successful Lightsail deployment.
 
-Phase 3 — Progress & Analytics is in progress. F20, F20.1, F21, F22, and F22.1 are implemented and
-validated; F23 is implemented with focused manual UI validation pending. The remaining roadmap
-sequence is F24 — Progress Dashboard.
+Phase 3 — Progress & Analytics is in progress. F20, F20.1, F21, F22, F22.1, and F23 are implemented
+and validated. The remaining roadmap sequence is F24 — Progress Dashboard.
 
 ## Completed Features
 
@@ -183,6 +181,7 @@ sequence is F24 — Progress Dashboard.
 * F21 — Workout Statistics and Activity Trends
 * F22 — Body Weight Tracking
 * F22.1 — Body Progress Photos
+* F23 — Body Weight Progress
 
 ## Skipped Features
 
@@ -225,7 +224,7 @@ progress score, or surface warnings and recommendations.
 * `harness/features/21_workout_statistics_activity_trends.md` (completed)
 * `harness/features/22_body_weight_tracking.md` (completed)
 * `harness/features/22_1_body_progress_photos.md` (completed)
-* `harness/features/23_body_weight_progress.md` (implemented; focused manual UI validation pending)
+* `harness/features/23_body_weight_progress.md` (completed)
 
 ## Current Technology
 

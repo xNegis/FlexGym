@@ -1,7 +1,7 @@
 # F23 — Body Weight Progress
 
-**Status:** Implemented. Backend tests and backend/frontend static checks pass; focused manual UI
-validation remains pending product-owner review.
+**Status:** Completed. Backend tests and backend/frontend static checks pass; the product owner
+confirmed the deployed UI on 2026-08-23.
 
 ## Objective
 
