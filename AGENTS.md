@@ -55,6 +55,24 @@ Development is iterative and feature-driven.
 
 Features should be relatively small and independently understandable.
 
+### Collaborative grooming gate
+
+Every feature must be groomed collaboratively by the product owner and ChatGPT/Codex. Product
+scope, user experience, business rules, priorities, and feature boundaries are decisions for the
+product owner to make through that discussion; Codex contributes technical context, alternatives,
+tradeoffs, risks, and questions.
+
+Codex must not independently declare a feature groomed, write or finalize its implementation-ready
+specification, record its product decisions as accepted, or update project state to imply that
+grooming is complete. This applies even when the roadmap appears clear or project documentation says
+there is no blocking product question.
+
+Before or during grooming, Codex may inspect the source of truth and implementation and prepare
+clearly labelled questions, options, and recommendations. These remain proposals until discussed
+with and explicitly confirmed by the product owner. Only after the product owner confirms that the
+feature decisions are settled and asks to produce or finalize the specification may Codex write the
+feature file and record the grooming as complete.
+
 When implementing a feature:
 
 1. Read the feature specification completely.

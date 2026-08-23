@@ -540,3 +540,22 @@ implementation while retaining domain-specific point details. Measurement captur
 deliberate responsive dialog rather than a permanently visible form. Optional photos remain a
 separate F22.1 flow reached after the measurement is successfully saved; no combined
 measurement-and-object-storage transaction is introduced.
+
+---
+
+## DEC-028 — Defer the Progress Dashboard until an overview need is validated
+
+**Status:** Accepted
+
+F24 remains on the roadmap but is intentionally deferred after collaborative grooming. The
+implemented Workouts, Exercises, Statistics, Body Weight, and body-progress-photo flows already let
+the user inspect every factual Phase 3 domain through a purpose-specific view. A dashboard at this
+point would primarily compress those existing views without adding a new user capability or a
+validated recurring decision workflow.
+
+Phase 3 is therefore complete without implementing F24. This is a scope decision, not a claim that
+the dashboard is permanently unnecessary or completed. F24 should be reconsidered when actual use
+shows repeated cross-perspective navigation, a recurring cross-domain review need, discoverability
+problems, explicit demand for an overview, or when later deterministic signals require a summary
+surface. Its future content must be groomed collaboratively from that evidence rather than inferred
+from the deferred roadmap description.

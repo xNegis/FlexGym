@@ -152,8 +152,10 @@ regression. Backend tests and frontend type/lint/format/build checks pass. F23 a
 the configured local database and repository head are both `f22_1_global_photo_limit`. The product
 owner confirmed the deployed UI on 2026-08-23 after the successful Lightsail deployment.
 
-Phase 3 — Progress & Analytics is in progress. F20, F20.1, F21, F22, F22.1, and F23 are implemented
-and validated. The remaining roadmap sequence is F24 — Progress Dashboard.
+Phase 3 — Progress & Analytics is completed. F20, F20.1, F21, F22, F22.1, and F23 are implemented
+and validated. F24 — Progress Dashboard remains on the roadmap but was intentionally deferred after
+collaborative grooming because the dedicated Progress perspectives already satisfy the current
+concrete user needs and an additional compressed overview has no validated recurring workflow yet.
 
 ## Completed Features
 
@@ -187,15 +189,13 @@ and validated. The remaining roadmap sequence is F24 — Progress Dashboard.
 
 * F06 — Custom Exercises
 * F16 — Discomfort and Pain Reporting (omitted from the current MVP)
+* F24 — Progress Dashboard (deferred; retained on the roadmap pending evidence of an overview need)
 
 ## Next Feature
 
-Implement F24 — Progress Dashboard. It makes `/progress` a factual summary of the implemented
-Progress perspectives rather than a new analytics source, composing recent workouts, workout and
-performed-set activity for the selected period, weekly consistency context, the latest body-weight
-measurement and factual period change, recently trained exercises, and direct routes to Workouts,
-Exercises, Statistics, and Body Weight. It does not rank exercises, identify stagnation, create a
-progress score, or surface warnings and recommendations.
+Begin collaborative grooming for Phase 4 — Adaptation Engine V1. The first Phase 4 feature and its
+boundaries have not yet been decided. Do not infer a detailed feature specification from the
+roadmap's list of potential signals.
 
 ## Existing Feature Specifications
 
@@ -264,5 +264,5 @@ Per-feature AI implementation costs and models are recorded in
 
 ## Open Questions
 
-F24 — Progress Dashboard is the next feature and has no blocking product question. Its specification
-has not yet been written.
+The first Phase 4 feature, its user-facing workflow, and its initial deterministic signal have not
+yet been selected. They require collaborative grooming before a specification is written.

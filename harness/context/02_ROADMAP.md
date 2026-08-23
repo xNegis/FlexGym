@@ -141,7 +141,7 @@ Current intended sequence:
 * F22 — Body Weight Tracking
 * F22.1 — Body Progress Photos
 * F23 — Body Weight Progress
-* F24 — Progress Dashboard
+* F24 — Progress Dashboard (deferred after grooming; retained for later validation)
 
 ### F20 — Progress Area and Exercise Performance History
 
@@ -282,9 +282,20 @@ The first dashboard does not rank exercises by improvement, identify stagnation,
 progress score, or surface warnings and recommendations. Those concepts are derived signals and
 belong in Phase 4 unless a later feature first defines transparent deterministic rules for them.
 
-Completion of Phase 3 should let the user inspect exercise performance, overall training activity,
-and body-weight evolution while preserving a clear boundary between what happened and what the
-application thinks should happen next.
+F24 is intentionally deferred rather than removed from the roadmap. At the end of the current MVP
+Phase 3, users can already answer the concrete Progress questions through the dedicated Workouts,
+Exercises, Statistics, and Body Weight perspectives. A dashboard would currently compress those
+same views without adding a new user capability, decision, or validated recurring review workflow.
+Its implementation cost and additional information hierarchy are therefore not justified yet.
+
+Reconsider F24 when product use shows that people repeatedly combine several Progress perspectives,
+need a recurring cross-domain review, struggle to find the relevant view, explicitly request an
+overview, or when later deterministic signals need an appropriate summary surface. Deferral does
+not define its future contents in advance.
+
+Phase 3 is complete without F24: users can inspect exercise performance, overall training activity,
+body-weight evolution, and private progress photos while preserving a clear boundary between what
+happened and what the application thinks should happen next.
 
 ---
 
