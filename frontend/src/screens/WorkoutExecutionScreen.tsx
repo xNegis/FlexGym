@@ -50,6 +50,7 @@ import {
   sameRestKey,
 } from "../components/restCue";
 import { playRestCue, prepareRestAudio } from "../components/restAudio";
+import { useWorkoutWakeLock } from "../components/workoutWakeLock";
 import styles from "./Screen.module.css";
 
 function focusFirstAdjustError(errors: SetAdjustmentFieldErrors): void {
@@ -227,6 +228,8 @@ export default function WorkoutExecutionScreen() {
     }
     return () => setWorkoutNavStatus(null);
   }, [workout, setWorkoutNavStatus]);
+
+  useWorkoutWakeLock(workout?.status === "in_progress");
 
   useEffect(() => {
     if (!workout) return;

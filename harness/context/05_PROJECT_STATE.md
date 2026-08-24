@@ -7,9 +7,9 @@
 Phase 0 — Foundation, Phase 1 — Training Planning, Phase 2 — Workout Tracking, and Phase 3 —
 Progress & Analytics are completed successfully.
 
-Phase 3.5 — Real-world Training Refinement is active. F25 and F26 are implemented and automatically
-validated, with product-owner mobile/device validation pending; later real-gym observations remain
-in collaborative grooming.
+Phase 3.5 — Real-world Training Refinement is active. F25, F26, and F26.1 are implemented and
+automatically validated, with product-owner mobile/device validation pending; later real-gym
+observations remain in collaborative grooming.
 
 ## Current Status
 
@@ -165,7 +165,9 @@ Phase 3.5 — Real-world Training Refinement has begun. The product owner is col
 from direct use of the deployed application during real gym sessions. F25 — Performed Set Adjustment
 Reliability is implemented and automatically validated; product-owner mobile validation remains
 pending. F26 — Rest Countdown Focus and Audio Cue is implemented and automatically validated;
-product-owner manual device/browser validation remains pending. Phase 4 —
+product-owner manual device/browser validation remains pending. F26.1 — Active Workout Screen Wake
+Lock is implemented and automatically validated; physical iPhone/Safari validation remains pending.
+Phase 4 —
 Adaptation Engine V1 is postponed until the selected real-world refinements have been addressed.
 
 The first production workout produced two work areas. Performed-set adjustment reliability is now
@@ -174,8 +176,9 @@ workout. The affected historical facts were repaired with explicit product-owner
 pre-change backup, guarded transactional writes, and successful integrity and application
 Progress-projection verification; F25 addresses the underlying frontend defects. The between-set
 rest feedback has now been split at its feature boundary: F26 owns the dominant countdown and
-one-time best-effort sound cue, while configurable same-exercise automatic start remains a separate
-F27 candidate under grooming. The evidence and remaining F27 questions are recorded in
+one-time best-effort sound cue; F26.1 keeps the visible active workout from auto-locking on supported
+browsers; and configurable same-exercise automatic start remains a separate F27 candidate under
+grooming. The evidence and remaining F27 questions are recorded in
 `harness/context/02_ROADMAP.md`.
 
 ## Completed Features
@@ -215,11 +218,11 @@ F27 candidate under grooming. The evidence and remaining F27 questions are recor
 ## Next Feature
 
 Finish the product-owner manual device/browser validation of F26 — Rest Countdown Focus and Audio
-Cue (implemented and automatically validated; see
-`harness/features/26_rest_countdown_focus_and_audio_cue.md`). Also finish the independent corrective
-and focused manual UI validation of F25 — Performed Set Adjustment Reliability. Do not mark either
-feature completed until its manual validation passes. F26 adds no migration and must not absorb the
-separate configurable automatic-start candidate.
+Cue and F26.1 — Active Workout Screen Wake Lock (implemented and automatically validated; see their
+feature specifications). Also finish the independent corrective and focused manual UI validation of
+F25 — Performed Set Adjustment Reliability. Do not mark these features completed until their manual
+validation passes. F26/F26.1 add no migration and must not absorb the separate configurable
+automatic-start candidate.
 
 ## Existing Feature Specifications
 
@@ -253,6 +256,8 @@ separate configurable automatic-start candidate.
   validation pending)
 * `harness/features/26_rest_countdown_focus_and_audio_cue.md` (implemented; product-owner manual
   device/browser validation pending)
+* `harness/features/26_1_active_workout_screen_wake_lock.md` (implemented; product-owner physical
+  iPhone/Safari validation pending)
 
 ## Current Technology
 
@@ -295,10 +300,12 @@ Per-feature AI implementation costs and models are recorded in
 F25's product contract is settled and its implementation remains under final validation. F26's
 dominant rest composition, cue character, one-time crossing semantics, zero/null/early-start rules,
 best-effort background boundary, and non-automatic scope are settled in its implementation-ready
-specification. For the F27 automatic-start candidate, configuration placement, default, allowed
-delay range, explanation/confirmation, concurrency and retry policy, background limitations, and the
-explicit replacement of F14.2's manual-only start rule remain open. The phase's broader completion
-boundary is undecided.
+specification. F26.1's visible active-workout wake-lock scope, release/reacquisition behaviour, and
+failure isolation are settled and implemented, with physical-device validation pending. For the F27
+automatic-start candidate, configuration placement, default, allowed delay range,
+explanation/confirmation, concurrency and retry policy, background limitations, and the explicit
+replacement of F14.2's manual-only start rule remain open. The phase's broader completion boundary is
+undecided.
 
 The first Phase 4 feature, its user-facing workflow, and its initial deterministic signal also remain
 undecided until Phase 3.5 is ready to close.

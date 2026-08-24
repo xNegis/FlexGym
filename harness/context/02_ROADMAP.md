@@ -368,6 +368,17 @@ API, migration, exercise-transition cue, or automatic workflow advance.
 
 The complete contract is in `harness/features/26_rest_countdown_focus_and_audio_cue.md`.
 
+#### F26.1 — Active Workout Screen Wake Lock
+
+Physical iPhone/Safari validation established that F26's visible countdown and best-effort cue can
+also be lost when normal device auto-lock suspends the page. F26.1 keeps the display awake while a
+validated in-progress workout overview or exercise-execution route remains visible, reacquires the
+revocable browser lock after visibility recovery, and releases it on terminal state or navigation.
+
+The capability is feature-detected and failure-isolated. It adds no UI setting, persistence, API,
+migration, background execution, silent-mode override, or native-alarm guarantee. The complete
+contract is in `harness/features/26_1_active_workout_screen_wake_lock.md`.
+
 #### F27 candidate — Configurable Automatic Same-exercise Set Start
 
 The same gym session also exposed one avoidable interaction after rest: returning to the phone to

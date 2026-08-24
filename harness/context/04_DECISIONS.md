@@ -626,3 +626,21 @@ reliability. F26 adds no settings, mute, volume, sound test, vibration, notifica
 service worker, native packaging, persistence, API, or migration. The cue never calls `Start set`,
 and F14.2's manual set-start rule remains authoritative until a separate automatic-start feature
 explicitly supersedes it.
+
+---
+
+## DEC-032 — Visible active workouts request a revocable screen wake lock
+
+**Status:** Accepted
+
+F26.1 requests the browser-native screen wake lock while a validated `in_progress` workout overview
+or exercise-execution route remains visible. This directly addresses physical iPhone/Safari use in
+which automatic display lock may suspend both the rest countdown and its best-effort cue.
+
+Wake lock is ephemeral presentation state, not a workout fact, permission guarantee, or background
+execution mechanism. It is released when the workout becomes terminal or its eligible screen is
+left, and requested again after a visible return when the platform revoked it. Unsupported, denied,
+revoked, and late-resolving requests remain isolated from workout state and user-facing errors.
+
+F26.1 does not override iOS silent mode or request an exclusive media session. Preserving other
+music playback remains more important for the web MVP than forcing F26 audio through silent mode.

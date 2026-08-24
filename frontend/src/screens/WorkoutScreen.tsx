@@ -21,6 +21,7 @@ import { LoadingState } from "../ui/LoadingState";
 import EmptyState from "../ui/EmptyState";
 import Dialog from "../ui/Dialog";
 import Section from "../ui/Section";
+import { useWorkoutWakeLock } from "../components/workoutWakeLock";
 import styles from "./Screen.module.css";
 
 function weekdayLabel(weekPosition: number): string {
@@ -160,6 +161,8 @@ export default function WorkoutScreen() {
     }
     return () => setWorkoutNavStatus(null);
   }, [workout, setWorkoutNavStatus]);
+
+  useWorkoutWakeLock(workout?.status === "in_progress");
 
   const handleDiscard = async () => {
     if (!workout) return;
