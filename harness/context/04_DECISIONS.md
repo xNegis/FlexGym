@@ -559,3 +559,70 @@ shows repeated cross-perspective navigation, a recurring cross-domain review nee
 problems, explicit demand for an overview, or when later deterministic signals require a summary
 surface. Its future content must be groomed collaboratively from that evidence rather than inferred
 from the deferred roadmap description.
+
+---
+
+## DEC-029 — Refine the product through real gym use before adaptation
+
+**Status:** Accepted
+
+FlexGym will introduce Phase 3.5 — Real-world Training Refinement between the completed factual
+Progress phase and Phase 4's deterministic adaptation work. Direct experience using the deployed
+application during real gym sessions is now the immediate source of product evidence.
+
+Phase 3.5 covers bounded defects, interaction friction, unclear live state, and missing corrective
+capabilities demonstrated by that use. Feedback items are observations, not automatically accepted
+solutions or implementation-ready features. Each item must be understood, prioritized, and groomed
+collaboratively; related observations may then become one or more independently specified features.
+
+This phase does not weaken the separation between facts, derived signals, and AI interpretation, and
+it does not authorize adaptation behaviour implicitly. Phase 4 retains its name and scope and begins
+only after the product owner and Codex agree that the selected real-world refinements have been
+handled sufficiently to move forward.
+
+---
+
+## DEC-030 — Adjusted set values remain scoped drafts until set completion
+
+**Status:** Accepted
+
+F25 retains F14.2's distinction between an unconfirmed adjustment and performed work. Applying an
+adjustment to an incomplete set creates frontend draft state for one exact workout, exercise
+position, and set position. `Start set` neither persists nor discards it. `Next set` or
+`Finish exercise` validates and atomically persists it as the confirmed `PerformedSet`. Editing an
+already completed set remains an immediate confirmed update.
+
+The live numeric-entry boundary accepts comma and point decimal separators and normalizes them to
+locale-neutral JSON numbers. Invalid non-empty input is rejected visibly and can never become null
+through JavaScript non-finite-number serialization. Blank optional weight and RIR deliberately mean
+null; explicit zero remains distinct from absence under the existing performed-fact contract.
+
+The draft survives server responses while its exact set remains current, including the transition
+from awaiting start to in progress, and is cleared when that set is completed, skipped, no longer
+current, or the execution screen is left. It is not persisted across a full refresh. This bounded
+client draft avoids creating a premature performed fact or a backend draft entity while correcting
+the real-gym reliability failure.
+
+---
+
+## DEC-031 — Rest completion uses one best-effort web cue without advancing the workout
+
+**Status:** Accepted
+
+F26 makes the between-set countdown the dominant awaiting-set element and emits one short, warm,
+descending two-note cue when an armed planned-rest interval reaches zero. The timer simultaneously
+changes to the existing warning-treated overtime representation with visible `Rest complete` status.
+Audio supplements rather than replaces the visual, icon, and accessible completion state.
+
+One cue is attempted for a mounted positive interval when it first crosses zero, even if browser
+scheduling reports that crossing late after backgrounding. A newly created zero-second rest cues
+immediately after the user-initiated set-completion transition. A fresh mount or refresh that first
+discovers an already-expired interval reconstructs overtime without stale catch-up audio. Null rest
+does not cue, and starting the set early cancels pending playback.
+
+This remains a bounded web capability. Operating-system suspension, browser policy, system volume,
+output routing, and silent mode may prevent or delay playback; FlexGym does not claim native-alarm
+reliability. F26 adds no settings, mute, volume, sound test, vibration, notification, wake lock,
+service worker, native packaging, persistence, API, or migration. The cue never calls `Start set`,
+and F14.2's manual set-start rule remains authoritative until a separate automatic-start feature
+explicitly supersedes it.

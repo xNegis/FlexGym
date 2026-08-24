@@ -299,6 +299,94 @@ happened and what the application thinks should happen next.
 
 ---
 
+## Phase 3.5 — Real-world Training Refinement
+
+Goal: refine the implemented product from direct use during real gym sessions before introducing
+automated adaptation.
+
+This phase is driven by concrete observations from the product owner's own training. It may include:
+
+* Defects or reliability problems exposed by real workout conditions.
+* Friction, unnecessary interaction, or unclear state in time-sensitive workout flows.
+* Missing corrective capabilities required to record what actually happened.
+* Focused refinements to planning, execution, history, or progress when real use demonstrates the
+  need.
+
+Each observation must be captured and discussed before it becomes a feature. Related observations
+may be grouped, but every resulting feature must remain bounded, receive collaborative product
+grooming, and be specified and validated through the normal feature workflow. Priority should
+reflect impact during actual use rather than the order in which feedback is reported.
+
+Phase 3.5 is not a general backlog bucket and does not silently introduce deterministic coaching,
+automatic routine changes, AI interpretation, or other Phase 4 and later behaviour. Its purpose is
+to make the existing factual planning, tracking, and progress experience dependable and comfortable
+in practice. The feature sequence and completion boundary will be decided collaboratively from the
+collected evidence; no Phase 3.5 feature is defined merely by creating this roadmap section.
+
+### Phase 3.5 feature sequence and current evidence
+
+#### F25 — Performed Set Adjustment Reliability
+
+The first production workout exposed silent loss of performed weights entered through the live set
+adjustment flow. A read-only production audit found completed `PerformedSet` rows with null weight
+despite repeated adjustment actions. The current frontend can convert locale-formatted decimals such
+as `2,5` to `NaN`, serialize that value as JSON `null`, and submit it as an indistinguishable optional
+weight. It also lacks complete finite-number validation, can clear a prepared adjustment across a
+set-start response, and can hide an entered draft weight when the workout snapshot had no planned
+weight.
+
+The affected historical workout was repaired separately from product implementation after explicit
+product-owner confirmation, using a pre-change SQLite backup, exact null-row guards, one transaction,
+and post-change integrity and Progress-projection checks. That operational repair does not resolve
+the application defects.
+
+F25 is the first Phase 3.5 feature and is groomed and implementation-ready. It introduces one strict
+locale-safe numeric-entry boundary, accepts comma and point decimal separators, rejects invalid
+non-empty values instead of silently converting them to null, scopes drafts to an exact workout set,
+preserves them across same-set lifecycle and server responses, and makes adjusted values visible
+even when the plan had no weight. Confirmed persistence remains owned by `Next set` or
+`Finish exercise`; completed-set correction remains immediate.
+
+F25 adds no migration or persisted draft. Full-refresh draft persistence, automatic value
+carry-forward, historical editing, and Progress inference remain out of scope. The complete contract
+is in `harness/features/25_performed_set_adjustment_reliability.md`.
+
+#### F26 — Rest Countdown Focus and Audio Cue
+
+The first physical-gym session reported that the between-set rest flow requires too much visual
+monitoring. F26 is groomed and implementation-ready as the bounded visual/audio response to that
+evidence. It makes the countdown a dominant 208–288 CSS-pixel composition, moves competing detail
+below the explicit set-start action, and emits one short warm descending cue when an armed set-rest
+interval reaches zero.
+
+The cue is best-effort under web and operating-system scheduling. It is attempted once for a mounted
+interval that crosses zero, including a delayed background observation, but is not emitted as stale
+catch-up audio on a fresh already-expired mount. Zero rest cues immediately after the user-initiated
+completion transition; null rest does not. Early manual start cancels the cue. F26 adds no sound
+settings, test control, vibration, notifications, wake lock, native infrastructure, persistence,
+API, migration, exercise-transition cue, or automatic workflow advance.
+
+The complete contract is in `harness/features/26_rest_countdown_focus_and_audio_cue.md`.
+
+#### F27 candidate — Configurable Automatic Same-exercise Set Start
+
+The same gym session also exposed one avoidable interaction after rest: returning to the phone to
+press `Start set N`. The accepted direction is a persisted user-selected post-rest delay where `0`
+retains explicit manual start and a positive value pre-authorizes FlexGym to start the next set of
+the same exercise after the rest cue and configured delay.
+
+Automatic start would never cross between exercises or complete a set. Manual early start would
+cancel the pending automatic action; skip or cancellation would also cancel it. The configured
+automatic boundary would become the server-observed set start even if the user physically begins
+later, and that consequence must be explained before enabling it.
+
+This remains discovery evidence rather than a groomed feature. Configuration placement, default,
+allowed delay range, confirmation/explanation, concurrency behaviour, retry policy, background
+limitations, and the explicit supersession of F14.2's manual-only rule still require collaborative
+product decisions.
+
+---
+
 ## Phase 4 — Adaptation Engine V1
 
 Goal: derive useful deterministic signals from user behaviour.

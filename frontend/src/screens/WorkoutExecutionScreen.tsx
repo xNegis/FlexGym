@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Check, Clock3, ClockAlert, Edit3, Info, SkipForward, Undo2, X } from "lucide-react";
 import {
@@ -43,6 +43,13 @@ import {
   type SetAdjustmentDraft,
   type SetAdjustmentFieldErrors,
 } from "../components/setAdjustment";
+import {
+  computeRestObservation,
+  EMPTY_REST_CUE_STORE,
+  restCueReducer,
+  sameRestKey,
+} from "../components/restCue";
+import { playRestCue, prepareRestAudio } from "../components/restAudio";
 import styles from "./Screen.module.css";
 
 function focusFirstAdjustError(errors: SetAdjustmentFieldErrors): void {
@@ -104,29 +111,6 @@ function formatTimer(seconds: number, overtime: boolean): string {
   return `${prefix}${m}:${String(s).padStart(2, "0")}`;
 }
 
-function computeSetRestTimer(
-  exercise: WorkoutExerciseSnapshot | undefined,
-  currentSet: WorkoutPlannedSetSnapshot | null | undefined,
-  serverNow: string,
-  clientReceivedAt: number,
-): { seconds: number; overtime: boolean } | null {
-  if (!exercise || !currentSet) return null;
-  const serverTime = new Date(serverNow).getTime();
-  const estimatedServerNow = serverTime + (Date.now() - clientReceivedAt);
-  const previousSet = exercise.planned_sets[currentSet.position - 2];
-  if (!previousSet?.performance || previousSet.rest_after_set_seconds == null) return null;
-
-  const target =
-    new Date(previousSet.performance.completed_at).getTime() +
-    previousSet.rest_after_set_seconds * 1000;
-  const remaining = Math.ceil((target - estimatedServerNow) / 1000);
-  if (remaining > 0) return { seconds: remaining, overtime: false };
-  return {
-    seconds: Math.max(0, Math.floor((estimatedServerNow - target) / 1000)),
-    overtime: true,
-  };
-}
-
 function computeTransitionTimer(
   exercise: WorkoutExerciseSnapshot | undefined,
   serverNow: string,
@@ -176,6 +160,11 @@ export default function WorkoutExecutionScreen() {
   const [serverReceivedAt, setServerReceivedAt] = useState(() => Date.now());
   const [adjustDraft, setAdjustDraft] = useState<SetAdjustmentDraft | null>(null);
 
+  const workoutRef = useRef<WorkoutSession | null>(null);
+  const restViaTransitionRef = useRef(false);
+  const lastPlayedCueNonceRef = useRef(0);
+  const [restCue, dispatchRestCue] = useReducer(restCueReducer, EMPTY_REST_CUE_STORE);
+
   const [skipDialogOpen, setSkipDialogOpen] = useState<"set" | "exercise" | null>(null);
   const [skipReason, setSkipReason] = useState("");
   const [skipNote, setSkipNote] = useState("");
@@ -208,6 +197,8 @@ export default function WorkoutExecutionScreen() {
         setNotFound(true);
         setWorkout(null);
       } else {
+        workoutRef.current = result;
+        restViaTransitionRef.current = false;
         setWorkout(result);
         setServerReceivedAt(Date.now());
       }
@@ -246,6 +237,17 @@ export default function WorkoutExecutionScreen() {
   }, [workout]);
 
   const applyWorkout = useCallback((updated: WorkoutSession) => {
+    const prev = workoutRef.current;
+    const viaTransition =
+      prev !== null &&
+      prev.status === "in_progress" &&
+      prev.current_exercise_position != null &&
+      prev.current_set_phase === "set_in_progress" &&
+      updated.current_exercise_position === prev.current_exercise_position &&
+      updated.current_set_phase === "awaiting_set_start" &&
+      updated.current_set_position === (prev.current_set_position ?? 0) + 1;
+    restViaTransitionRef.current = viaTransition;
+    workoutRef.current = updated;
     setWorkout(updated);
     setServerReceivedAt(Date.now());
     setSaving(false);
@@ -333,6 +335,7 @@ export default function WorkoutExecutionScreen() {
 
   const handleStartSet = useCallback(async () => {
     if (!workout || !currentSet) return;
+    prepareRestAudio();
     setSaving(true);
     setSaveError(null);
     try {
@@ -356,6 +359,7 @@ export default function WorkoutExecutionScreen() {
   const handleRecordSet = useCallback(
     async (setPosition: number) => {
       if (!workout || !exercise) return;
+      prepareRestAudio();
       const hasDraft = draftMatchesSet(adjustDraft, workout.id, exercisePosition, setPosition);
       setSaving(true);
       setSaveError(null);
@@ -612,10 +616,25 @@ export default function WorkoutExecutionScreen() {
 
   const isExerciseSkipped = exercise?.exception?.scope === "exercise";
 
-  const restTimer = useMemo(() => {
+  const restObservation = useMemo(() => {
     if (!workout || !isAwaitingStart) return null;
-    return computeSetRestTimer(exercise, currentSet, workout.server_now, serverReceivedAt);
-  }, [workout, exercise, currentSet, isAwaitingStart, serverReceivedAt, timerTick]);
+    return computeRestObservation(
+      workout.id,
+      exercisePosition,
+      exercise,
+      currentSet,
+      workout.server_now,
+      serverReceivedAt,
+    );
+  }, [
+    workout,
+    exercise,
+    currentSet,
+    isAwaitingStart,
+    exercisePosition,
+    serverReceivedAt,
+    timerTick,
+  ]);
 
   const transitionTimer = useMemo(() => {
     if (!workout) return null;
@@ -633,6 +652,29 @@ export default function WorkoutExecutionScreen() {
     workout?.transition_to_exercise_position === exercisePosition + 1;
 
   const isCancelled = workout?.status === "cancelled";
+
+  useEffect(() => {
+    if (!workout || !isAwaitingStart || !restObservation) {
+      restViaTransitionRef.current = false;
+      dispatchRestCue({ type: "reset" });
+      return;
+    }
+    const viaTransition = restViaTransitionRef.current;
+    restViaTransitionRef.current = false;
+    dispatchRestCue({
+      type: "observe",
+      key: restObservation.key,
+      remainingMs: restObservation.remaining_ms,
+      viaTransition,
+    });
+  }, [workout, isAwaitingStart, restObservation]);
+
+  useEffect(() => {
+    if (restCue.cueNonce === 0) return;
+    if (lastPlayedCueNonceRef.current === restCue.cueNonce) return;
+    lastPlayedCueNonceRef.current = restCue.cueNonce;
+    playRestCue();
+  }, [restCue.cueNonce]);
 
   if (loading) {
     return (
@@ -885,30 +927,53 @@ export default function WorkoutExecutionScreen() {
                     )}
                   </div>
 
-                  {isAwaitingStart && restTimer && (
+                  {!isExerciseSkipped && currentSet && (
                     <div className={styles.centered}>
-                      <div
-                        className={`${styles.timerCircle} ${restTimer.overtime ? styles.timerOvertime : ""}`}
-                        role="timer"
-                        aria-label={
-                          restTimer.overtime
-                            ? `${formatTimer(restTimer.seconds, true)} beyond planned set rest.`
-                            : `${formatTimer(restTimer.seconds, false)} of planned set rest remaining.`
-                        }
-                      >
-                        {restTimer.overtime ? (
-                          <ClockAlert size={18} aria-hidden="true" />
-                        ) : (
-                          <Clock3 size={18} aria-hidden="true" />
-                        )}
-                        <span className={styles.timerText}>
-                          {formatTimer(restTimer.seconds, restTimer.overtime)}
-                        </span>
-                      </div>
-                      <div className={`${styles.textCompactMuted} ${styles.mt1}`}>
-                        {restTimer.overtime ? "Overtime" : "Rest"}
+                      <div className={styles.textCompactMuted}>
+                        Set {currentSet.position} of {plannedSets.length}
                       </div>
                     </div>
+                  )}
+
+                  {isAwaitingStart && restObservation && (
+                    <div className={`${styles.stack2} ${styles.centered}`}>
+                      <div
+                        className={`${styles.timerCircle} ${styles.restCountdown} ${restObservation.overtime ? styles.timerOvertime : ""}`}
+                        role="timer"
+                        aria-label={
+                          restObservation.overtime
+                            ? `Rest complete. ${formatTimer(restObservation.seconds, true)} beyond planned set rest.`
+                            : `${formatTimer(restObservation.seconds, false)} of planned set rest remaining.`
+                        }
+                      >
+                        {restObservation.overtime ? (
+                          <ClockAlert size={28} aria-hidden="true" />
+                        ) : (
+                          <Clock3 size={28} aria-hidden="true" />
+                        )}
+                        <span className={`${styles.timerText} ${styles.restCountdownText}`}>
+                          {formatTimer(restObservation.seconds, restObservation.overtime)}
+                        </span>
+                      </div>
+                      <div className={styles.restStatus}>
+                        {restObservation.overtime ? "Rest complete" : "Rest"}
+                      </div>
+                      <span className={styles.visuallyHidden} role="status">
+                        {sameRestKey(restCue.cuedKey, restObservation.key) ? "Rest complete" : ""}
+                      </span>
+                    </div>
+                  )}
+
+                  {!isExerciseSkipped && isAwaitingStart && currentSet && (
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      className={styles.actionButton}
+                      onClick={handleStartSet}
+                      disabled={saving || isCancelled}
+                    >
+                      {saving ? "Starting..." : `Start set ${currentSet.position}`}
+                    </Button>
                   )}
 
                   {isExerciseSkipped && (
@@ -937,11 +1002,6 @@ export default function WorkoutExecutionScreen() {
 
                   {!isExerciseSkipped && currentSet && (
                     <>
-                      <div className={styles.centered}>
-                        <div className={styles.textCompactMuted}>
-                          Set {currentSet.position} of {plannedSets.length}
-                        </div>
-                      </div>
                       <div className={`${styles.stack1} ${styles.centered}`}>
                         <div className={styles.timerCircle}>
                           <span className={styles.timerTextLarge}>
@@ -1025,15 +1085,6 @@ export default function WorkoutExecutionScreen() {
 
                   {!isExerciseSkipped && isAwaitingStart && currentSet && (
                     <div className={styles.stack2}>
-                      <Button
-                        variant="primary"
-                        fullWidth
-                        className={styles.actionButton}
-                        onClick={handleStartSet}
-                        disabled={saving || isCancelled}
-                      >
-                        {saving ? "Starting..." : `Start set ${currentSet.position}`}
-                      </Button>
                       <Button
                         variant="secondary"
                         fullWidth

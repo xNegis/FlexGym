@@ -412,6 +412,33 @@
   font-size: 1.5rem;
 }
 
+.restCountdown {
+  width: clamp(13rem, 62vw, 18rem);
+  height: clamp(13rem, 62vw, 18rem);
+}
+
+.restCountdownText {
+  font-size: clamp(3.25rem, 15vw, 5rem);
+}
+
+.restStatus {
+  color: var(--color-text);
+  font: var(--text-body);
+  font-weight: 500;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .actionButton {
   min-height: var(--touch-target-large);
   font-size: 1rem;

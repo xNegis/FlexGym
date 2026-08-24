@@ -4,8 +4,12 @@
 
 ## Current Phase
 
-Phase 0 — Foundation, Phase 1 — Training Planning, and Phase 2 — Workout Tracking are completed
-successfully.
+Phase 0 — Foundation, Phase 1 — Training Planning, Phase 2 — Workout Tracking, and Phase 3 —
+Progress & Analytics are completed successfully.
+
+Phase 3.5 — Real-world Training Refinement is active. F25 and F26 are implemented and automatically
+validated, with product-owner mobile/device validation pending; later real-gym observations remain
+in collaborative grooming.
 
 ## Current Status
 
@@ -157,6 +161,23 @@ and validated. F24 — Progress Dashboard remains on the roadmap but was intenti
 collaborative grooming because the dedicated Progress perspectives already satisfy the current
 concrete user needs and an additional compressed overview has no validated recurring workflow yet.
 
+Phase 3.5 — Real-world Training Refinement has begun. The product owner is collecting observations
+from direct use of the deployed application during real gym sessions. F25 — Performed Set Adjustment
+Reliability is implemented and automatically validated; product-owner mobile validation remains
+pending. F26 — Rest Countdown Focus and Audio Cue is implemented and automatically validated;
+product-owner manual device/browser validation remains pending. Phase 4 —
+Adaptation Engine V1 is postponed until the selected real-world refinements have been addressed.
+
+The first production workout produced two work areas. Performed-set adjustment reliability is now
+F25 after a production audit confirmed silently missing performed weights from an otherwise complete
+workout. The affected historical facts were repaired with explicit product-owner confirmation, a
+pre-change backup, guarded transactional writes, and successful integrity and application
+Progress-projection verification; F25 addresses the underlying frontend defects. The between-set
+rest feedback has now been split at its feature boundary: F26 owns the dominant countdown and
+one-time best-effort sound cue, while configurable same-exercise automatic start remains a separate
+F27 candidate under grooming. The evidence and remaining F27 questions are recorded in
+`harness/context/02_ROADMAP.md`.
+
 ## Completed Features
 
 * F01 — Project Infrastructure
@@ -193,9 +214,12 @@ concrete user needs and an additional compressed overview has no validated recur
 
 ## Next Feature
 
-Begin collaborative grooming for Phase 4 — Adaptation Engine V1. The first Phase 4 feature and its
-boundaries have not yet been decided. Do not infer a detailed feature specification from the
-roadmap's list of potential signals.
+Finish the product-owner manual device/browser validation of F26 — Rest Countdown Focus and Audio
+Cue (implemented and automatically validated; see
+`harness/features/26_rest_countdown_focus_and_audio_cue.md`). Also finish the independent corrective
+and focused manual UI validation of F25 — Performed Set Adjustment Reliability. Do not mark either
+feature completed until its manual validation passes. F26 adds no migration and must not absorb the
+separate configurable automatic-start candidate.
 
 ## Existing Feature Specifications
 
@@ -225,6 +249,10 @@ roadmap's list of potential signals.
 * `harness/features/22_body_weight_tracking.md` (completed)
 * `harness/features/22_1_body_progress_photos.md` (completed)
 * `harness/features/23_body_weight_progress.md` (completed)
+* `harness/features/25_performed_set_adjustment_reliability.md` (implemented; product-owner mobile
+  validation pending)
+* `harness/features/26_rest_countdown_focus_and_audio_cue.md` (implemented; product-owner manual
+  device/browser validation pending)
 
 ## Current Technology
 
@@ -264,5 +292,13 @@ Per-feature AI implementation costs and models are recorded in
 
 ## Open Questions
 
-The first Phase 4 feature, its user-facing workflow, and its initial deterministic signal have not
-yet been selected. They require collaborative grooming before a specification is written.
+F25's product contract is settled and its implementation remains under final validation. F26's
+dominant rest composition, cue character, one-time crossing semantics, zero/null/early-start rules,
+best-effort background boundary, and non-automatic scope are settled in its implementation-ready
+specification. For the F27 automatic-start candidate, configuration placement, default, allowed
+delay range, explanation/confirmation, concurrency and retry policy, background limitations, and the
+explicit replacement of F14.2's manual-only start rule remain open. The phase's broader completion
+boundary is undecided.
+
+The first Phase 4 feature, its user-facing workflow, and its initial deterministic signal also remain
+undecided until Phase 3.5 is ready to close.

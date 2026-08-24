@@ -10,7 +10,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "lint": "eslint src/",
     "typecheck": "tsc -b",
-    "test": "node --test src/components/setAdjustment.test.ts",
+    "test": "node --test src/components/setAdjustment.test.ts src/components/restCue.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
