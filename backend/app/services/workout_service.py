@@ -7,6 +7,7 @@ import datetime
 import hashlib
 import hmac
 import json
+import math
 import re
 from decimal import Decimal
 from typing import Any
@@ -1560,31 +1561,48 @@ def _exercise_is_complete(we: WorkoutExercise) -> bool:
     return all(ps.performed_set is not None for ps in we.planned_sets)
 
 
+def _has_at_most_two_decimal_places(value: float) -> bool:
+    """Validate decimal precision without binary floating-point multiplication artifacts."""
+    exponent = Decimal(str(value)).as_tuple().exponent
+    return isinstance(exponent, int) and exponent >= -2
+
+
 def _validate_performed_value(target_type: str, value: float) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ExecutionError("Invalid performed value")
     if target_type == "repetitions":
-        if not isinstance(value, (int, float)) or value != int(value) or value < 1 or value > 1000:
+        if value != int(value) or value < 1 or value > 1000:
             raise ExecutionError("Invalid performed repetitions")
     elif target_type == "duration_seconds":
-        if not isinstance(value, (int, float)) or value != int(value) or value < 1 or value > 86400:
+        if value != int(value) or value < 1 or value > 86400:
             raise ExecutionError("Invalid performed duration")
     elif target_type == "distance_meters":
         if value <= 0 or value > 100000:
             raise ExecutionError("Invalid performed distance")
-        if round(value * 100) != value * 100:
+        if not _has_at_most_two_decimal_places(value):
             raise ExecutionError("Distance must have at most 2 decimal places")
 
 
 def _validate_performed_weight(value: float | None) -> None:
     if value is not None:
+        if isinstance(value, bool) or not math.isfinite(value):
+            raise ExecutionError("Invalid performed weight")
         if value < 0 or value > 5000:
             raise ExecutionError("Invalid performed weight")
-        if round(value * 100) != value * 100:
+        if not _has_at_most_two_decimal_places(value):
             raise ExecutionError("Weight must have at most 2 decimal places")
 
 
 def _validate_performed_rir(value: int | None) -> None:
     if value is not None:
-        if not isinstance(value, (int, float)) or value != int(value) or value < 0 or value > 10:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or value != int(value)
+        ):
+            raise ExecutionError("Invalid performed RIR")
+        if value < 0 or value > 10:
             raise ExecutionError("Invalid performed RIR")
 
 

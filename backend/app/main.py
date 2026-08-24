@@ -1,9 +1,14 @@
 import logging
+import math
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.active_routine import router as active_routine_router
 from app.api.auth import router as auth_router
@@ -51,6 +56,28 @@ def _retry_pending_photo_deletions() -> None:
 
 
 app = FastAPI(title="FormCadence", version="0.1.0", lifespan=lifespan)
+
+
+def _sanitize_non_finite_validation_input(value: Any) -> Any:
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if isinstance(value, list):
+        return [_sanitize_non_finite_validation_input(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _sanitize_non_finite_validation_input(item) for key, item in value.items()}
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(
+    _request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    detail = _sanitize_non_finite_validation_input(jsonable_encoder(exc.errors()))
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": detail},
+    )
+
 
 app.add_middleware(
     CORSMiddleware,

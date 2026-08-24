@@ -45,6 +45,10 @@ import type {
   WorkoutStatisticsSummary,
   WorkoutStatisticsWeek,
 } from "./types";
+import {
+  validateAdjustedPerformance,
+  type SetAdjustmentTargetType,
+} from "./components/setAdjustment";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://192.168.1.134:8000";
 
@@ -2042,12 +2046,38 @@ export type SetPerformanceBody =
       performed_rir: number | null;
     };
 
+function assertValidAdjustedPerformance(
+  targetType: SetAdjustmentTargetType,
+  performedValue: number,
+  performedWeightKg: number | null,
+  performedRir: number | null,
+): void {
+  const errors = validateAdjustedPerformance(
+    targetType,
+    performedValue,
+    performedWeightKg,
+    performedRir,
+  );
+  if (Object.keys(errors).length > 0) {
+    throw new Error("Invalid adjusted set performance");
+  }
+}
+
 export async function recordSetPerformance(
   workoutId: number,
   exercisePosition: number,
   setPosition: number,
   body: SetPerformanceBody,
+  targetType: SetAdjustmentTargetType,
 ): Promise<SetPerformanceResult> {
+  if (body.entry_mode === "adjusted") {
+    assertValidAdjustedPerformance(
+      targetType,
+      body.performed_value,
+      body.performed_weight_kg,
+      body.performed_rir,
+    );
+  }
   const response = await fetch(
     `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/sets/${setPosition}/performance`,
     {
@@ -2071,10 +2101,12 @@ export async function updateSetPerformance(
   workoutId: number,
   exercisePosition: number,
   setPosition: number,
+  targetType: SetAdjustmentTargetType,
   performedValue: number,
   performedWeightKg: number | null,
   performedRir: number | null,
 ): Promise<SetPerformanceResult> {
+  assertValidAdjustedPerformance(targetType, performedValue, performedWeightKg, performedRir);
   const response = await fetch(
     `${API_BASE_URL}/api/workouts/${workoutId}/exercises/${exercisePosition}/sets/${setPosition}/performance`,
     {

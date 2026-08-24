@@ -112,6 +112,11 @@ def _execution_error_to_http(error: str) -> tuple[int, str]:
     }
     if error.startswith("Invalid performed"):
         return (422, error)
+    if error in (
+        "Weight must have at most 2 decimal places",
+        "Distance must have at most 2 decimal places",
+    ):
+        return (422, error)
     if error.startswith("A note is required"):
         return (422, error)
     if error.startswith("Note exceeds"):

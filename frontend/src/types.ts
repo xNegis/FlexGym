@@ -233,7 +233,7 @@ interface WorkoutExerciseSnapshot {
   source_exercise_id: number | null;
   exercise_slug: string;
   exercise_name: string;
-  target_type: string;
+  target_type: ConfiguredExercise["target_type"];
   rest_after_exercise_seconds: number | null;
   notes: string | null;
   planned_sets: WorkoutPlannedSetSnapshot[];

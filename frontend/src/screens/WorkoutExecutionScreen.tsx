@@ -35,7 +35,35 @@ import { LoadingState } from "../ui/LoadingState";
 import EmptyState from "../ui/EmptyState";
 import Dialog from "../ui/Dialog";
 import { Field, Select, TextArea, TextInput } from "../ui/Field";
+import {
+  draftMatchesSet,
+  parseAdjustment,
+  parseDisplayValue,
+  reconcileAdjustmentDraft,
+  type SetAdjustmentDraft,
+  type SetAdjustmentFieldErrors,
+} from "../components/setAdjustment";
 import styles from "./Screen.module.css";
+
+function focusFirstAdjustError(errors: SetAdjustmentFieldErrors): void {
+  const order: (keyof SetAdjustmentFieldErrors)[] = [
+    "performed_value",
+    "performed_weight_kg",
+    "performed_rir",
+  ];
+  for (const field of order) {
+    if (errors[field]) {
+      const id =
+        field === "performed_value"
+          ? "adjust-value"
+          : field === "performed_weight_kg"
+            ? "adjust-weight"
+            : "adjust-rir";
+      document.getElementById(id)?.focus();
+      return;
+    }
+  }
+}
 
 const SKIP_REASON_LABELS: Record<string, string> = {
   not_enough_time: "Not enough time",
@@ -140,16 +168,13 @@ export default function WorkoutExecutionScreen() {
   const [adjustWeight, setAdjustWeight] = useState("");
   const [adjustRir, setAdjustRir] = useState("");
   const [adjustError, setAdjustError] = useState<string | null>(null);
+  const [adjustFieldErrors, setAdjustFieldErrors] = useState<SetAdjustmentFieldErrors>({});
   const [adjusting, setAdjusting] = useState(false);
   const [instructionsOpen, setInstructionsOpen] = useState(false);
   const [transitionStarting, setTransitionStarting] = useState(false);
   const [timerTick, setTimerTick] = useState(0);
   const [serverReceivedAt, setServerReceivedAt] = useState(() => Date.now());
-  const [adjustDraft, setAdjustDraft] = useState<{
-    performed_value: string;
-    performed_weight_kg: string;
-    performed_rir: string;
-  } | null>(null);
+  const [adjustDraft, setAdjustDraft] = useState<SetAdjustmentDraft | null>(null);
 
   const [skipDialogOpen, setSkipDialogOpen] = useState<"set" | "exercise" | null>(null);
   const [skipReason, setSkipReason] = useState("");
@@ -227,10 +252,20 @@ export default function WorkoutExecutionScreen() {
     setSaveError(null);
     setAdjustSet(null);
     setAdjustError(null);
+    setAdjustFieldErrors({});
     setAdjusting(false);
     setStarting(false);
     setTransitionStarting(false);
-    setAdjustDraft(null);
+    setAdjustDraft((draft) =>
+      draft === null
+        ? null
+        : reconcileAdjustmentDraft(draft, {
+            workout_id: updated.id,
+            current_exercise_position: updated.current_exercise_position,
+            current_set_position: updated.current_set_position,
+            current_set_phase: updated.current_set_phase,
+          }),
+    );
     setSkipDialogOpen(null);
     setSkipReason("");
     setSkipNote("");
@@ -320,28 +355,44 @@ export default function WorkoutExecutionScreen() {
 
   const handleRecordSet = useCallback(
     async (setPosition: number) => {
-      if (!workout) return;
+      if (!workout || !exercise) return;
+      const hasDraft = draftMatchesSet(adjustDraft, workout.id, exercisePosition, setPosition);
       setSaving(true);
       setSaveError(null);
       try {
-        const entryMode = adjustDraft ? "adjusted" : "as_planned";
         let result: SetPerformanceResult;
-        if (entryMode === "as_planned") {
-          result = await recordSetPerformance(workout.id, exercisePosition, setPosition, {
-            entry_mode: "as_planned",
-          });
+        if (!hasDraft) {
+          result = await recordSetPerformance(
+            workout.id,
+            exercisePosition,
+            setPosition,
+            { entry_mode: "as_planned" },
+            exercise.target_type,
+          );
         } else {
-          const value = Number(adjustDraft!.performed_value);
-          const weight = adjustDraft!.performed_weight_kg.trim()
-            ? Number(adjustDraft!.performed_weight_kg)
-            : null;
-          const rir = adjustDraft!.performed_rir.trim() ? Number(adjustDraft!.performed_rir) : null;
-          result = await recordSetPerformance(workout.id, exercisePosition, setPosition, {
-            entry_mode: "adjusted",
-            performed_value: value,
-            performed_weight_kg: weight,
-            performed_rir: rir,
-          });
+          const parsed = parseAdjustment(
+            exercise.target_type,
+            adjustDraft!.performed_value,
+            adjustDraft!.performed_weight_kg,
+            adjustDraft!.performed_rir,
+          );
+          if (!parsed.ok) {
+            setSaving(false);
+            setSaveError("Entered values are invalid. Adjust the set again.");
+            return;
+          }
+          result = await recordSetPerformance(
+            workout.id,
+            exercisePosition,
+            setPosition,
+            {
+              entry_mode: "adjusted",
+              performed_value: parsed.value.performed_value,
+              performed_weight_kg: parsed.value.performed_weight_kg,
+              performed_rir: parsed.value.performed_rir,
+            },
+            exercise.target_type,
+          );
         }
         if ("notFound" in result) {
           setNotFound(true);
@@ -358,25 +409,30 @@ export default function WorkoutExecutionScreen() {
         handleApiError(err, "save set");
       }
     },
-    [workout, exercisePosition, adjustDraft, applyWorkout, handleApiError],
+    [workout, exercise, exercisePosition, adjustDraft, applyWorkout, handleApiError],
   );
 
   const handleUpdateSet = useCallback(
     async (setPosition: number) => {
-      if (!workout) return;
+      if (!workout || !exercise) return;
+      const parsed = parseAdjustment(exercise.target_type, adjustValue, adjustWeight, adjustRir);
+      if (!parsed.ok) {
+        setAdjustFieldErrors(parsed.errors);
+        focusFirstAdjustError(parsed.errors);
+        return;
+      }
       setAdjusting(true);
       setAdjustError(null);
+      setAdjustFieldErrors({});
       try {
-        const value = Number(adjustValue);
-        const weight = adjustWeight.trim() ? Number(adjustWeight) : null;
-        const rir = adjustRir.trim() ? Number(adjustRir) : null;
         const result = await updateSetPerformance(
           workout.id,
           exercisePosition,
           setPosition,
-          value,
-          weight,
-          rir,
+          exercise.target_type,
+          parsed.value.performed_value,
+          parsed.value.performed_weight_kg,
+          parsed.value.performed_rir,
         );
         if ("notFound" in result) {
           setNotFound(true);
@@ -393,19 +449,38 @@ export default function WorkoutExecutionScreen() {
         handleApiError(err, "update set");
       }
     },
-    [workout, exercisePosition, adjustValue, adjustWeight, adjustRir, applyWorkout, handleApiError],
+    [
+      workout,
+      exercise,
+      exercisePosition,
+      adjustValue,
+      adjustWeight,
+      adjustRir,
+      applyWorkout,
+      handleApiError,
+    ],
   );
 
   const handleApplyAdjustments = useCallback(() => {
-    if (!adjustSet) return;
+    if (!workout || !exercise || !adjustSet) return;
+    const parsed = parseAdjustment(exercise.target_type, adjustValue, adjustWeight, adjustRir);
+    if (!parsed.ok) {
+      setAdjustFieldErrors(parsed.errors);
+      focusFirstAdjustError(parsed.errors);
+      return;
+    }
     setAdjustDraft({
+      workout_id: workout.id,
+      exercise_position: exercisePosition,
+      set_position: adjustSet.position,
       performed_value: adjustValue,
       performed_weight_kg: adjustWeight,
       performed_rir: adjustRir,
     });
     setAdjustSet(null);
     setAdjustError(null);
-  }, [adjustSet, adjustValue, adjustWeight, adjustRir]);
+    setAdjustFieldErrors({});
+  }, [workout, exercise, exercisePosition, adjustSet, adjustValue, adjustWeight, adjustRir]);
 
   const handleMarkIncomplete = useCallback(
     async (setPosition: number) => {
@@ -613,9 +688,18 @@ export default function WorkoutExecutionScreen() {
 
   const plannedSets = exercise.planned_sets;
 
+  const currentDraft =
+    currentSet && draftMatchesSet(adjustDraft, workout.id, exercisePosition, currentSet.position)
+      ? adjustDraft
+      : null;
+  const draftValue = currentDraft ? parseDisplayValue(currentDraft.performed_value) : null;
+  const draftWeight = currentDraft ? parseDisplayValue(currentDraft.performed_weight_kg) : null;
+  const draftRir = currentDraft ? parseDisplayValue(currentDraft.performed_rir) : null;
+
   const openAdjust = (ps: WorkoutPlannedSetSnapshot) => {
     setAdjustSet(ps);
     setAdjustError(null);
+    setAdjustFieldErrors({});
     if (ps.performance) {
       setAdjustValue(String(ps.performance.performed_value));
       setAdjustWeight(
@@ -627,10 +711,13 @@ export default function WorkoutExecutionScreen() {
         ps.performance.performed_rir != null ? String(ps.performance.performed_rir) : "",
       );
     } else {
-      if (adjustDraft) {
-        setAdjustValue(adjustDraft.performed_value);
-        setAdjustWeight(adjustDraft.performed_weight_kg);
-        setAdjustRir(adjustDraft.performed_rir);
+      const matchingDraft = draftMatchesSet(adjustDraft, workout.id, exercisePosition, ps.position)
+        ? adjustDraft
+        : null;
+      if (matchingDraft) {
+        setAdjustValue(matchingDraft.performed_value);
+        setAdjustWeight(matchingDraft.performed_weight_kg);
+        setAdjustRir(matchingDraft.performed_rir);
       } else {
         setAdjustValue(String(ps.target_value));
         setAdjustWeight(ps.target_weight_kg != null ? String(ps.target_weight_kg) : "");
@@ -643,6 +730,7 @@ export default function WorkoutExecutionScreen() {
     if (!adjusting) {
       setAdjustSet(null);
       setAdjustError(null);
+      setAdjustFieldErrors({});
     }
   };
 
@@ -857,30 +945,36 @@ export default function WorkoutExecutionScreen() {
                       <div className={`${styles.stack1} ${styles.centered}`}>
                         <div className={styles.timerCircle}>
                           <span className={styles.timerTextLarge}>
-                            {adjustDraft
-                              ? targetLabel(
-                                  exercise.target_type,
-                                  Number(adjustDraft.performed_value) || currentSet.target_value,
-                                )
-                              : targetLabel(exercise.target_type, currentSet.target_value)}
+                            {targetLabel(
+                              exercise.target_type,
+                              draftValue ?? currentSet.target_value,
+                            )}
                           </span>
                         </div>
                       </div>
                       <div className={`${styles.stack2} ${styles.centered}`}>
-                        {currentSet.target_weight_kg != null && (
-                          <span className={styles.textCompactMuted}>
-                            {adjustDraft
-                              ? `${adjustDraft.performed_weight_kg || currentSet.target_weight_kg} kg`
-                              : `${currentSet.target_weight_kg} kg`}
-                          </span>
-                        )}
-                        {currentSet.target_rir != null && (
-                          <span className={styles.textCompactMuted}>
-                            RIR{" "}
-                            {adjustDraft
-                              ? adjustDraft.performed_rir || currentSet.target_rir
-                              : currentSet.target_rir}
-                          </span>
+                        {currentDraft ? (
+                          <>
+                            {draftWeight !== null && (
+                              <span className={styles.textCompactMuted}>@ {draftWeight} kg</span>
+                            )}
+                            {draftRir !== null && (
+                              <span className={styles.textCompactMuted}>RIR {draftRir}</span>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {currentSet.target_weight_kg != null && (
+                              <span className={styles.textCompactMuted}>
+                                @ {currentSet.target_weight_kg} kg
+                              </span>
+                            )}
+                            {currentSet.target_rir != null && (
+                              <span className={styles.textCompactMuted}>
+                                RIR {currentSet.target_rir}
+                              </span>
+                            )}
+                          </>
                         )}
                         {currentSet.tempo != null && (
                           <span className={styles.textCompactMuted}>
@@ -899,9 +993,9 @@ export default function WorkoutExecutionScreen() {
                           <span className={styles.textCompactMuted}>{currentSet.notes}</span>
                         )}
                       </div>
-                      {adjustDraft && (
+                      {currentDraft && (
                         <div className={`${styles.textCompactMuted} ${styles.centered}`}>
-                          Adjusted values will be applied on completion
+                          Adjustment applied · saved when you complete the set
                         </div>
                       )}
                     </>
@@ -1203,15 +1297,25 @@ export default function WorkoutExecutionScreen() {
       >
         <div className={styles.stack3}>
           {adjustError && <Alert variant="error">{adjustError}</Alert>}
-          <Field label="Performed" htmlFor="adjust-value">
+          <Field
+            label="Performed"
+            required
+            error={adjustFieldErrors.performed_value}
+            htmlFor="adjust-value"
+          >
             <TextInput
               id="adjust-value"
-              inputMode="numeric"
+              inputMode={exercise.target_type === "distance_meters" ? "decimal" : "numeric"}
               value={adjustValue}
               onChange={(e) => setAdjustValue(e.target.value)}
             />
           </Field>
-          <Field label="Weight (kg)" optional htmlFor="adjust-weight">
+          <Field
+            label="Weight (kg)"
+            optional
+            error={adjustFieldErrors.performed_weight_kg}
+            htmlFor="adjust-weight"
+          >
             <TextInput
               id="adjust-weight"
               inputMode="decimal"
@@ -1219,7 +1323,7 @@ export default function WorkoutExecutionScreen() {
               onChange={(e) => setAdjustWeight(e.target.value)}
             />
           </Field>
-          <Field label="RIR" optional htmlFor="adjust-rir">
+          <Field label="RIR" optional error={adjustFieldErrors.performed_rir} htmlFor="adjust-rir">
             <TextInput
               id="adjust-rir"
               inputMode="numeric"
