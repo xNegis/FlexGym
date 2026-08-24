@@ -421,7 +421,7 @@ def test_f13_migration_fresh_schema_and_safe_rerun(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f13_fresh.db').as_posix()}"
     _run_alembic(database_url, "upgrade", "head")
     _run_alembic(database_url, "upgrade", "head")
-    assert "f22_1_global_photo_limit" in _run_alembic(database_url, "current").stdout
+    assert "f27_auto_start" in _run_alembic(database_url, "current").stdout
 
     engine = create_engine(database_url)
     schema = inspect(engine)
@@ -1266,7 +1266,7 @@ def test_f14_2_migration_upgrade_and_legacy_timing(tmp_path: Path) -> None:
 def test_f14_2_migration_fresh_and_rerun(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f14_2_fresh.db').as_posix()}"
     _run_alembic(database_url, "upgrade", "head")
-    assert "f22_1_global_photo_limit" in _run_alembic(database_url, "current").stdout
+    assert "f27_auto_start" in _run_alembic(database_url, "current").stdout
     _run_alembic(database_url, "upgrade", "head")
 
     engine = create_engine(database_url)
@@ -1878,7 +1878,7 @@ def test_f15_migration_fresh_and_upgrade(tmp_path: Path) -> None:
     _run_alembic(database_url, "upgrade", "head")
     _run_alembic(database_url, "upgrade", "head")
 
-    assert "f22_1_global_photo_limit" in _run_alembic(database_url, "current").stdout
+    assert "f27_auto_start" in _run_alembic(database_url, "current").stdout
 
     engine = create_engine(database_url)
     schema = inspect(engine)
@@ -2277,7 +2277,7 @@ def test_complete_ownership_authentication_and_path(client: TestClient) -> None:
 def test_f17_migration_fresh_and_upgrade(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f17_fresh.db').as_posix()}"
     _run_alembic(database_url, "upgrade", "head")
-    assert "f22_1_global_photo_limit" in _run_alembic(database_url, "current").stdout
+    assert "f27_auto_start" in _run_alembic(database_url, "current").stdout
     _run_alembic(database_url, "upgrade", "head")
 
     engine = create_engine(database_url)

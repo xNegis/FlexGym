@@ -8,6 +8,10 @@ interface User {
   email: string;
 }
 
+interface WorkoutPreference {
+  automatic_set_start_delay_seconds: number;
+}
+
 interface FitnessProfile {
   id: number;
   date_of_birth: string;
@@ -189,6 +193,7 @@ interface PerformedSet {
   performed_rir: number | null;
   entry_mode: "as_planned" | "adjusted";
   set_started_at: string | null;
+  set_start_mode: "manual" | "automatic" | null;
   completed_at: string;
   observed_duration_seconds: number | null;
   updated_at: string;
@@ -263,6 +268,7 @@ interface WorkoutSession {
   selection_kind: string;
   status: string;
   started_at: string;
+  automatic_set_start_delay_seconds: number;
   cancelled_at: string | null;
   completed_at: string | null;
   duration_seconds: number | null;
@@ -277,6 +283,7 @@ interface WorkoutSession {
   current_set_position: number | null;
   current_set_phase: string | null;
   current_set_started_at: string | null;
+  current_set_start_mode: "manual" | "automatic" | null;
   transition_to_exercise_position: number | null;
   resume_url: string | null;
   events: WorkoutEvent[];
@@ -544,6 +551,7 @@ export {
   type WorkoutHistoryPage,
   type WorkoutHistoryStatus,
   type WorkoutPlannedSetSnapshot,
+  type WorkoutPreference,
   type WorkoutSession,
   type WorkoutStatistics,
   type WorkoutStatisticsActivityDay,

@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context";
-import { deleteFitnessProfile, logout as apiLogout } from "../api";
+import {
+  deleteFitnessProfile,
+  fetchWorkoutPreferences,
+  logout as apiLogout,
+  UnauthenticatedError,
+} from "../api";
 import { labelFor } from "../components/profileConstants";
 import Page from "../layouts/Page";
 import { AppHeader } from "../layouts/AppShell";
@@ -33,6 +38,32 @@ export default function ProfileScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
+  const [autoStartDelay, setAutoStartDelay] = useState<number | null>(null);
+  const [prefLoading, setPrefLoading] = useState(true);
+  const [prefError, setPrefError] = useState(false);
+
+  const loadPref = useCallback(async () => {
+    setPrefLoading(true);
+    setPrefError(false);
+    try {
+      const preference = await fetchWorkoutPreferences();
+      setAutoStartDelay(preference.automatic_set_start_delay_seconds);
+    } catch (err) {
+      if (err instanceof UnauthenticatedError) {
+        clearProfile();
+        navigate("/login", { replace: true });
+        return;
+      }
+      setPrefError(true);
+      setAutoStartDelay(null);
+    } finally {
+      setPrefLoading(false);
+    }
+  }, [clearProfile, navigate]);
+
+  useEffect(() => {
+    void loadPref();
+  }, [loadPref]);
 
   const handleLogout = async () => {
     setError(null);
@@ -128,6 +159,42 @@ export default function ProfileScreen() {
               { label: "Limitations", value: optionalValue(profile.physical_limitations) },
             ]}
           />
+        </Section>
+
+        <Section title="Workout settings">
+          {prefLoading ? (
+            <p className={styles.textCompactMuted}>Loading set start...</p>
+          ) : prefError ? (
+            <div className={styles.stack2}>
+              <Alert variant="error">Unable to load workout settings.</Alert>
+              <Button variant="secondary" size="small" onClick={() => void loadPref()}>
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <>
+              <KeyValueList
+                items={[
+                  {
+                    label: "Set start",
+                    value:
+                      autoStartDelay === 0
+                        ? "Manual"
+                        : `Automatic after ${autoStartDelay ?? 0} seconds`,
+                  },
+                ]}
+              />
+              <div className={styles.mt3}>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => navigate("/profile/workout-settings")}
+                >
+                  Manage workout settings
+                </Button>
+              </div>
+            </>
+          )}
         </Section>
 
         <Divider />

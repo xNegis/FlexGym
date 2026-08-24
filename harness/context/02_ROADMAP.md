@@ -379,22 +379,24 @@ The capability is feature-detected and failure-isolated. It adds no UI setting, 
 migration, background execution, silent-mode override, or native-alarm guarantee. The complete
 contract is in `harness/features/26_1_active_workout_screen_wake_lock.md`.
 
-#### F27 candidate — Configurable Automatic Same-exercise Set Start
+#### F27 — Configurable Automatic Same-exercise Set Start
 
-The same gym session also exposed one avoidable interaction after rest: returning to the phone to
-press `Start set N`. The accepted direction is a persisted user-selected post-rest delay where `0`
-retains explicit manual start and a positive value pre-authorizes FlexGym to start the next set of
-the same exercise after the rest cue and configured delay.
+F27 is collaboratively groomed and implementation-ready. A dedicated Profile > Workout settings
+flow persists a per-user delay selected from manual (`0`) or `5`, `10`, `15`, `20`, and `30`
+seconds. Each new workout snapshots the effective setting so later preference edits do not change an
+existing session.
 
-Automatic start would never cross between exercises or complete a set. Manual early start would
-cancel the pending automatic action; skip or cancellation would also cancel it. The configured
-automatic boundary would become the server-observed set start even if the user physically begins
-later, and that consequence must be explained before enabling it.
+For positive snapshots and non-null same-exercise rest, the F26 cue boundary begins the configured
+post-rest countdown. A visible mounted execution screen attempts automatic start once at the derived
+boundary while retaining manual early start. Zero rest begins the delay immediately; null rest,
+first-set starts, and cross-exercise starts remain manual. Hidden crossings and fresh already-expired
+mounts never catch up, and ambiguous outcomes reconcile once without an automatic mutation retry.
 
-This remains discovery evidence rather than a groomed feature. Configuration placement, default,
-allowed delay range, confirmation/explanation, concurrency behaviour, retry policy, background
-limitations, and the explicit supersession of F14.2's manual-only rule still require collaborative
-product decisions.
+The backend derives eligibility and the exact automatic timestamp, accepts only through a five-second
+freshness window, and records the distinct typed `set_auto_started` event so pre-authorized automatic
+starts remain distinguishable from manual `set_started` facts. Automatic start never records
+performance or completes work. The complete contract is in
+`harness/features/27_configurable_automatic_same_exercise_set_start.md`.
 
 ---
 

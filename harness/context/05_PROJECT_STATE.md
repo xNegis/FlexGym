@@ -7,9 +7,8 @@
 Phase 0 — Foundation, Phase 1 — Training Planning, Phase 2 — Workout Tracking, and Phase 3 —
 Progress & Analytics are completed successfully.
 
-Phase 3.5 — Real-world Training Refinement is active. F25, F26, and F26.1 are implemented and
-automatically validated, with product-owner mobile/device validation pending; later real-gym
-observations remain in collaborative grooming.
+Phase 3.5 — Real-world Training Refinement is active. F25, F26, F26.1, and F27 are implemented
+and automatically validated, with product-owner mobile/device validation pending.
 
 ## Current Status
 
@@ -167,6 +166,21 @@ Reliability is implemented and automatically validated; product-owner mobile val
 pending. F26 — Rest Countdown Focus and Audio Cue is implemented and automatically validated;
 product-owner manual device/browser validation remains pending. F26.1 — Active Workout Screen Wake
 Lock is implemented and automatically validated; physical iPhone/Safari validation remains pending.
+
+F27 — Configurable Automatic Same-exercise Set Start is implemented and automatically validated.
+Users persist a per-user workout preference (`0`, `5`, `10`, `15`, `20`, or `30` seconds) through a
+dedicated Profile `Workout settings` flow with a manual-to-positive consequence confirmation; each
+new workout snapshots the effective delay immutably. When a visible, mounted execution screen
+observes an armed positive-rest interval cross its server-derived automatic boundary, it dispatches
+the distinct `set_auto_started` event exactly once; manual start, hidden crossings, fresh
+already-expired mounts, and ambiguous outcomes reconcile through a single refresh without mutation
+retry. Start provenance is exposed as `manual`/`automatic`/`null` for both the current set and
+performed projections. The backend derives eligibility, freshness, and the exact boundary from
+owned persisted data and accepts a request only through five seconds after it. F27 adds a migration
+(`f27_auto_start`); fresh and previous-head upgrade paths, an authenticated API flow against a
+migrated database, and the configured local database at repository head are all verified.
+Product-owner manual UI validation remains pending.
+
 Phase 4 —
 Adaptation Engine V1 is postponed until the selected real-world refinements have been addressed.
 
@@ -177,9 +191,9 @@ pre-change backup, guarded transactional writes, and successful integrity and ap
 Progress-projection verification; F25 addresses the underlying frontend defects. The between-set
 rest feedback has now been split at its feature boundary: F26 owns the dominant countdown and
 one-time best-effort sound cue; F26.1 keeps the visible active workout from auto-locking on supported
-browsers; and configurable same-exercise automatic start remains a separate F27 candidate under
-grooming. The evidence and remaining F27 questions are recorded in
-`harness/context/02_ROADMAP.md`.
+browsers; and F27 separately owns configurable same-exercise automatic start. F27 is collaboratively
+groomed and implementation-ready; its complete contract is recorded in
+`harness/features/27_configurable_automatic_same_exercise_set_start.md`.
 
 ## Completed Features
 
@@ -220,9 +234,11 @@ grooming. The evidence and remaining F27 questions are recorded in
 Finish the product-owner manual device/browser validation of F26 — Rest Countdown Focus and Audio
 Cue and F26.1 — Active Workout Screen Wake Lock (implemented and automatically validated; see their
 feature specifications). Also finish the independent corrective and focused manual UI validation of
-F25 — Performed Set Adjustment Reliability. Do not mark these features completed until their manual
-validation passes. F26/F26.1 add no migration and must not absorb the separate configurable
-automatic-start candidate.
+F25 — Performed Set Adjustment Reliability, and the focused manual UI validation of F27 —
+Configurable Automatic Same-exercise Set Start at the required widths and accessibility conditions.
+Do not mark these features completed until their manual validation passes. F26/F26.1 add no
+migration; F27 adds `f27_auto_start` and must not absorb a separate configurable automatic start
+beyond its own specification.
 
 ## Existing Feature Specifications
 
@@ -258,6 +274,8 @@ automatic-start candidate.
   device/browser validation pending)
 * `harness/features/26_1_active_workout_screen_wake_lock.md` (implemented; product-owner physical
   iPhone/Safari validation pending)
+* `harness/features/27_configurable_automatic_same_exercise_set_start.md` (implemented;
+  product-owner manual UI validation pending)
 
 ## Current Technology
 
@@ -274,7 +292,7 @@ Authentication:
 Multiple accounts / unique normalized email / Argon2id / JWT cookie
 
 Testing:
-pytest (411 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
+pytest (472 backend tests) / existing F12 automated browser infrastructure retained but deferred as a
 completion gate for current MVP features under DEC-019
 
 Code Quality:
@@ -301,11 +319,11 @@ F25's product contract is settled and its implementation remains under final val
 dominant rest composition, cue character, one-time crossing semantics, zero/null/early-start rules,
 best-effort background boundary, and non-automatic scope are settled in its implementation-ready
 specification. F26.1's visible active-workout wake-lock scope, release/reacquisition behaviour, and
-failure isolation are settled and implemented, with physical-device validation pending. For the F27
-automatic-start candidate, configuration placement, default, allowed delay range,
-explanation/confirmation, concurrency and retry policy, background limitations, and the explicit
-replacement of F14.2's manual-only start rule remain open. The phase's broader completion boundary is
-undecided.
+failure isolation are settled and implemented, with physical-device validation pending. F27's
+per-user configuration, workout snapshot, allowed delays, confirmation, automatic lifecycle fact,
+concurrency/reconciliation, freshness, background limitations, and bounded replacement of F14.2's
+manual-only rule are settled in its implemented specification. The phase's broader
+completion boundary is undecided.
 
 The first Phase 4 feature, its user-facing workflow, and its initial deterministic signal also remain
 undecided until Phase 3.5 is ready to close.

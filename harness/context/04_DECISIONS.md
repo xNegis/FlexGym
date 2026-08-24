@@ -644,3 +644,28 @@ revoked, and late-resolving requests remain isolated from workout state and user
 
 F26.1 does not override iOS silent mode or request an exclusive media session. Preserving other
 music playback remains more important for the web MVP than forcing F26 audio through silent mode.
+
+---
+
+## DEC-033 — Automatic same-exercise set start is explicit, snapshotted, and auditable
+
+**Status:** Accepted
+
+F27 allows a user to persist a workout-level automatic-start preference through a dedicated Profile
+settings flow. Manual (`0`) remains the default; positive choices are exactly `5`, `10`, `15`, `20`,
+and `30` seconds after non-null planned rest reaches zero. Enabling from manual requires an explicit
+explanation that the configured boundary becomes the recorded start even if physical work begins
+later.
+
+The effective preference is copied immutably into each workout when it is created. Preference edits
+therefore affect only future workouts. Positive snapshots automate only subsequent sets of the same
+exercise; null rest, first-set starts, cross-exercise starts, completion, and performed values remain
+manual. Manual early start remains available and cancels the pending automatic action.
+
+The web client attempts once only when the execution route is mounted and visible at the boundary.
+Hidden crossings and fresh already-expired mounts never catch up. Ambiguous results receive one
+state reconciliation and no automatic mutation retry. The backend derives eligibility and the exact
+boundary from owned persisted data, accepts a timely request only through five seconds after that
+boundary, and atomically records the distinct `set_auto_started` event. This provenance prevents an
+application-triggered boundary from becoming indistinguishable from F14.2's user-declared
+`set_started` fact.

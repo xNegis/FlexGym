@@ -22,7 +22,7 @@ from app.storage import FakeObjectStore, get_object_store
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 F221_REVISION = "f22_1_body_progress_photos"
-LATEST_REVISION = "f22_1_global_photo_limit"
+LATEST_REVISION = "f27_auto_start"
 PREVIOUS_HEAD = "f22_1_photo_order_fix"
 PREVIOUS_REVISION = "f22_body_weight"
 

@@ -17,7 +17,7 @@ from app.db import get_session
 from app.main import app
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-F11_REVISION = "f22_1_global_photo_limit"
+F11_REVISION = "f27_auto_start"
 PREVIOUS_REVISION = "c31f5a8d2e04"
 
 

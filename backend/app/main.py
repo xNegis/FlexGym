@@ -22,6 +22,7 @@ from app.api.progress import router as progress_router
 from app.api.routines import router as routines_router
 from app.api.schedule import router as schedule_router
 from app.api.training_days import router as training_days_router
+from app.api.workout_preferences import router as workout_preferences_router
 from app.api.workouts import router as workouts_router
 from app.config import get_config
 from app.db import SessionLocal
@@ -98,5 +99,6 @@ app.include_router(exercise_config_router, prefix="/api")
 app.include_router(schedule_router, prefix="/api")
 app.include_router(progress_router, prefix="/api")
 app.include_router(workouts_router)
+app.include_router(workout_preferences_router, prefix="/api")
 app.include_router(body_weight_router, prefix="/api")
 app.include_router(body_progress_photos_router, prefix="/api")

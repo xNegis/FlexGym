@@ -9,6 +9,7 @@ import UnavailableScreen from "../screens/UnavailableScreen";
 import OnboardingScreen from "../screens/OnboardingScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import ProfileEditScreen from "../screens/ProfileEditScreen";
+import WorkoutSettingsScreen from "../screens/WorkoutSettingsScreen";
 import ExerciseCatalogScreen from "../screens/ExerciseCatalogScreen";
 import ExerciseDetailScreen from "../screens/ExerciseDetailScreen";
 import RoutineCreateScreen from "../screens/RoutineCreateScreen";
@@ -120,6 +121,7 @@ export default function AppRouter() {
             <Route path="/exercises/:slug" element={<ExerciseDetailScreen />} />
             <Route path="/profile" element={<ProfileScreen />} />
             <Route path="/profile/edit" element={<ProfileEditScreen />} />
+            <Route path="/profile/workout-settings" element={<WorkoutSettingsScreen />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

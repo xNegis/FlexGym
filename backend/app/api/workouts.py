@@ -108,6 +108,9 @@ def _execution_error_to_http(error: str) -> tuple[int, str]:
         "Exercise is already resolved": (409, "Exercise is already resolved"),
         "Exercise is already skipped": (409, "Exercise is already skipped"),
         "Exercise is not skipped": (409, "Exercise is not skipped"),
+        "Automatic set start is not enabled": (409, "Automatic set start is not enabled"),
+        "Automatic set start is not due": (409, "Automatic set start is not due"),
+        "Automatic set start window expired": (409, "Automatic set start window expired"),
         "Unsupported reason code": (422, "Unsupported reason code"),
     }
     if error.startswith("Invalid performed"):
@@ -395,6 +398,42 @@ def start_set(
 
     try:
         workout = workout_service.start_set(
+            session, user.id, workout_id, exercise_position, set_position
+        )
+    except workout_service.ExecutionError as e:
+        code, detail = _execution_error_to_http(str(e))
+        raise HTTPException(status_code=code, detail=detail)
+
+    return workout_service._build_workout_response(workout)
+
+
+async def _require_empty_auto_start_body(request: Request) -> None:
+    if len(await request.body()) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "auto-start accepts no request body"}],
+        )
+
+
+@router.post(
+    "/api/workouts/{workout_id}/exercises/{exercise_position}/sets/{set_position}/auto-start"
+)
+def auto_start_set(
+    workout_id: int,
+    exercise_position: int,
+    set_position: int,
+    _empty_body: None = Depends(_require_empty_auto_start_body),
+    user: User = Depends(get_current_user),
+    session: Any = Depends(get_session),
+) -> dict[str, Any]:
+    if workout_id <= 0 or exercise_position <= 0 or set_position <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"msg": "path parameters must be positive integers"}],
+        )
+
+    try:
+        workout = workout_service.auto_start_set(
             session, user.id, workout_id, exercise_position, set_position
         )
     except workout_service.ExecutionError as e:

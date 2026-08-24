@@ -20,7 +20,7 @@ from app.models import Exercise
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 F09_REVISION = "273789964714"
-LATEST_REVISION = "f22_1_global_photo_limit"
+LATEST_REVISION = "f27_auto_start"
 PREVIOUS_REVISION = "b61961abf6a5"
 
 

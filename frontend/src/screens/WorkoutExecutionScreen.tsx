@@ -11,6 +11,7 @@ import {
   startSet,
   undoSkipExercise,
   undoSkipSet,
+  autoStartSet,
   UnauthenticatedError,
   updateSetPerformance,
   type SetPerformanceResult,
@@ -49,6 +50,14 @@ import {
   restCueReducer,
   sameRestKey,
 } from "../components/restCue";
+import {
+  computeAutoRestObservation,
+  EMPTY_AUTO_REST_STORE,
+  autoRestReducer,
+  classifyAutoRestReconciliation,
+  crossedBoundaryWhileHidden,
+  type AutoRestHiddenWindow,
+} from "../components/autoRest";
 import { playRestCue, prepareRestAudio } from "../components/restAudio";
 import { useWorkoutWakeLock } from "../components/workoutWakeLock";
 import styles from "./Screen.module.css";
@@ -166,6 +175,15 @@ export default function WorkoutExecutionScreen() {
   const lastPlayedCueNonceRef = useRef(0);
   const [restCue, dispatchRestCue] = useReducer(restCueReducer, EMPTY_REST_CUE_STORE);
 
+  const [autoRest, dispatchAutoRest] = useReducer(autoRestReducer, EMPTY_AUTO_REST_STORE);
+  const lastAutoStartNonceRef = useRef(0);
+  const hiddenSinceRef = useRef<number | null>(
+    document.visibilityState !== "visible" ? Date.now() : null,
+  );
+  const lastHiddenWindowRef = useRef<AutoRestHiddenWindow | null>(null);
+  const [autoStarting, setAutoStarting] = useState(false);
+  const [autoRestError, setAutoRestError] = useState<string | null>(null);
+
   const [skipDialogOpen, setSkipDialogOpen] = useState<"set" | "exercise" | null>(null);
   const [skipReason, setSkipReason] = useState("");
   const [skipNote, setSkipNote] = useState("");
@@ -239,45 +257,52 @@ export default function WorkoutExecutionScreen() {
     return () => clearInterval(interval);
   }, [workout]);
 
-  const applyWorkout = useCallback((updated: WorkoutSession) => {
-    const prev = workoutRef.current;
-    const viaTransition =
-      prev !== null &&
-      prev.status === "in_progress" &&
-      prev.current_exercise_position != null &&
-      prev.current_set_phase === "set_in_progress" &&
-      updated.current_exercise_position === prev.current_exercise_position &&
-      updated.current_set_phase === "awaiting_set_start" &&
-      updated.current_set_position === (prev.current_set_position ?? 0) + 1;
-    restViaTransitionRef.current = viaTransition;
-    workoutRef.current = updated;
-    setWorkout(updated);
-    setServerReceivedAt(Date.now());
-    setSaving(false);
-    setSaveError(null);
-    setAdjustSet(null);
-    setAdjustError(null);
-    setAdjustFieldErrors({});
-    setAdjusting(false);
-    setStarting(false);
-    setTransitionStarting(false);
-    setAdjustDraft((draft) =>
-      draft === null
-        ? null
-        : reconcileAdjustmentDraft(draft, {
-            workout_id: updated.id,
-            current_exercise_position: updated.current_exercise_position,
-            current_set_position: updated.current_set_position,
-            current_set_phase: updated.current_set_phase,
-          }),
-    );
-    setSkipDialogOpen(null);
-    setSkipReason("");
-    setSkipNote("");
-    setSkipError(null);
-    setSkipPending(false);
-    setUndoPending(null);
-  }, []);
+  const applyWorkout = useCallback(
+    (updated: WorkoutSession, preserveAutoStartResolution = false) => {
+      const prev = workoutRef.current;
+      const viaTransition =
+        prev !== null &&
+        prev.status === "in_progress" &&
+        prev.current_exercise_position != null &&
+        prev.current_set_phase === "set_in_progress" &&
+        updated.current_exercise_position === prev.current_exercise_position &&
+        updated.current_set_phase === "awaiting_set_start" &&
+        updated.current_set_position === (prev.current_set_position ?? 0) + 1;
+      restViaTransitionRef.current = viaTransition;
+      workoutRef.current = updated;
+      setWorkout(updated);
+      setServerReceivedAt(Date.now());
+      setSaving(false);
+      setSaveError(null);
+      setAdjustSet(null);
+      setAdjustError(null);
+      setAdjustFieldErrors({});
+      setAdjusting(false);
+      setStarting(false);
+      setTransitionStarting(false);
+      if (!preserveAutoStartResolution) {
+        setAutoStarting(false);
+        setAutoRestError(null);
+      }
+      setAdjustDraft((draft) =>
+        draft === null
+          ? null
+          : reconcileAdjustmentDraft(draft, {
+              workout_id: updated.id,
+              current_exercise_position: updated.current_exercise_position,
+              current_set_position: updated.current_set_position,
+              current_set_phase: updated.current_set_phase,
+            }),
+      );
+      setSkipDialogOpen(null);
+      setSkipReason("");
+      setSkipNote("");
+      setSkipError(null);
+      setSkipPending(false);
+      setUndoPending(null);
+    },
+    [],
+  );
 
   const handleApiError = useCallback(
     (err: unknown, action: string) => {
@@ -338,6 +363,7 @@ export default function WorkoutExecutionScreen() {
 
   const handleStartSet = useCallback(async () => {
     if (!workout || !currentSet) return;
+    dispatchAutoRest({ type: "consume" });
     prepareRestAudio();
     setSaving(true);
     setSaveError(null);
@@ -358,6 +384,67 @@ export default function WorkoutExecutionScreen() {
       handleApiError(err, "start set");
     }
   }, [workout, exercisePosition, currentSet, applyWorkout, handleApiError]);
+
+  const reconcileAutoStart = useCallback(
+    async (workoutId: number, targetExercisePosition: number, targetSetPosition: number) => {
+      try {
+        const result = await fetchWorkout(workoutId);
+        if ("notFound" in result) {
+          setNotFound(true);
+          setAutoStarting(false);
+          return;
+        }
+        const outcome = classifyAutoRestReconciliation(
+          {
+            exercise_position: targetExercisePosition,
+            current_set_position: targetSetPosition,
+          },
+          result,
+        );
+        applyWorkout(result, true);
+        if (outcome.kind === "still_awaiting") {
+          setAutoRestError("Automatic start did not complete. You can start the set manually.");
+        } else {
+          setAutoRestError(null);
+        }
+        setAutoStarting(false);
+      } catch (err) {
+        if (err instanceof UnauthenticatedError) {
+          logout();
+          return;
+        }
+        setAutoRestError("Automatic start failed. You can start the set manually.");
+        setAutoStarting(false);
+      }
+    },
+    [applyWorkout, logout],
+  );
+
+  const handleAutoStart = useCallback(async () => {
+    if (!workout || !currentSet) return;
+    setAutoStarting(true);
+    setAutoRestError(null);
+    try {
+      const result = await autoStartSet(workout.id, exercisePosition, currentSet.position);
+      if ("notFound" in result) {
+        setNotFound(true);
+        setAutoStarting(false);
+        return;
+      }
+      if ("conflict" in result || "detail" in result) {
+        await reconcileAutoStart(workout.id, exercisePosition, currentSet.position);
+        return;
+      }
+      applyWorkout(result);
+      setAutoStarting(false);
+    } catch (err) {
+      if (err instanceof UnauthenticatedError) {
+        logout();
+        return;
+      }
+      await reconcileAutoStart(workout.id, exercisePosition, currentSet.position);
+    }
+  }, [workout, exercisePosition, currentSet, applyWorkout, reconcileAutoStart, logout]);
 
   const handleRecordSet = useCallback(
     async (setPosition: number) => {
@@ -516,6 +603,7 @@ export default function WorkoutExecutionScreen() {
 
   const handleSkipConfirm = useCallback(async () => {
     if (!workout || !skipDialogOpen) return;
+    dispatchAutoRest({ type: "consume" });
     setSkipPending(true);
     setSkipError(null);
     try {
@@ -649,12 +737,48 @@ export default function WorkoutExecutionScreen() {
     );
   }, [workout, exercise, nextExercise, serverReceivedAt, timerTick]);
 
+  const autoRestObservation = useMemo(() => {
+    if (!workout || !isAwaitingStart) return null;
+    return computeAutoRestObservation(
+      workout.id,
+      exercisePosition,
+      workout.automatic_set_start_delay_seconds,
+      exercise,
+      currentSet,
+      workout.server_now,
+      serverReceivedAt,
+    );
+  }, [
+    workout,
+    exercise,
+    currentSet,
+    isAwaitingStart,
+    exercisePosition,
+    serverReceivedAt,
+    timerTick,
+  ]);
+
   const showTransition =
     exercise?.is_resolved &&
     nextExercise != null &&
     workout?.transition_to_exercise_position === exercisePosition + 1;
 
   const isCancelled = workout?.status === "cancelled";
+
+  const autoDelayRemainingMs =
+    autoRestObservation && autoRestObservation.delay_remaining_ms > 0
+      ? autoRestObservation.delay_remaining_ms
+      : null;
+  // Show the automatic countdown while delay remains, and keep showing
+  // "Starting automatically" at 0:00 while the mutation or its reconciliation
+  // is pending at the boundary instead of falling back to "Rest complete".
+  const showAutoDelay =
+    isAwaitingStart &&
+    restObservation != null &&
+    restObservation.overtime &&
+    (autoDelayRemainingMs != null || autoStarting);
+  const autoDelaySeconds =
+    autoDelayRemainingMs != null ? Math.max(1, Math.ceil(autoDelayRemainingMs / 1000)) : 0;
 
   useEffect(() => {
     if (!workout || !isAwaitingStart || !restObservation) {
@@ -678,6 +802,47 @@ export default function WorkoutExecutionScreen() {
     lastPlayedCueNonceRef.current = restCue.cueNonce;
     playRestCue();
   }, [restCue.cueNonce]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      const now = Date.now();
+      const hidden = document.visibilityState !== "visible";
+      if (hidden) {
+        if (hiddenSinceRef.current === null) {
+          hiddenSinceRef.current = now;
+        }
+      } else if (hiddenSinceRef.current !== null) {
+        lastHiddenWindowRef.current = { from: hiddenSinceRef.current, to: now };
+        hiddenSinceRef.current = null;
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    if (!workout || !isAwaitingStart || !autoRestObservation) {
+      dispatchAutoRest({ type: "reset" });
+      return;
+    }
+    const currentlyVisible = document.visibilityState === "visible";
+    const crossedHidden = crossedBoundaryWhileHidden(
+      autoRestObservation.automatic_start_at_ms,
+      lastHiddenWindowRef.current,
+    );
+    dispatchAutoRest({
+      type: "observe",
+      observation: autoRestObservation,
+      visible: currentlyVisible && !crossedHidden,
+    });
+  }, [workout, isAwaitingStart, autoRestObservation]);
+
+  useEffect(() => {
+    if (autoRest.dispatchNonce === 0) return;
+    if (lastAutoStartNonceRef.current === autoRest.dispatchNonce) return;
+    lastAutoStartNonceRef.current = autoRest.dispatchNonce;
+    void handleAutoStart();
+  }, [autoRest.dispatchNonce, handleAutoStart]);
 
   if (loading) {
     return (
@@ -940,31 +1105,59 @@ export default function WorkoutExecutionScreen() {
 
                   {isAwaitingStart && restObservation && (
                     <div className={`${styles.stack2} ${styles.centered}`}>
-                      <div
-                        className={`${styles.timerCircle} ${styles.restCountdown} ${restObservation.overtime ? styles.timerOvertime : ""}`}
-                        role="timer"
-                        aria-label={
-                          restObservation.overtime
-                            ? `Rest complete. ${formatTimer(restObservation.seconds, true)} beyond planned set rest.`
-                            : `${formatTimer(restObservation.seconds, false)} of planned set rest remaining.`
-                        }
-                      >
-                        {restObservation.overtime ? (
-                          <ClockAlert size={28} aria-hidden="true" />
-                        ) : (
-                          <Clock3 size={28} aria-hidden="true" />
-                        )}
-                        <span className={`${styles.timerText} ${styles.restCountdownText}`}>
-                          {formatTimer(restObservation.seconds, restObservation.overtime)}
-                        </span>
-                      </div>
-                      <div className={styles.restStatus}>
-                        {restObservation.overtime ? "Rest complete" : "Rest"}
-                      </div>
+                      {showAutoDelay ? (
+                        <>
+                          <div
+                            className={`${styles.timerCircle} ${styles.restCountdown}`}
+                            role="timer"
+                            aria-label={
+                              autoDelaySeconds > 0
+                                ? `Starting automatically in ${formatTimer(autoDelaySeconds, false)}.`
+                                : "Starting automatically."
+                            }
+                          >
+                            <Clock3 size={28} aria-hidden="true" />
+                            <span className={`${styles.timerText} ${styles.restCountdownText}`}>
+                              {formatTimer(autoDelaySeconds, false)}
+                            </span>
+                          </div>
+                          <div className={styles.restStatus}>Starting automatically</div>
+                        </>
+                      ) : (
+                        <>
+                          <div
+                            className={`${styles.timerCircle} ${styles.restCountdown} ${restObservation.overtime ? styles.timerOvertime : ""}`}
+                            role="timer"
+                            aria-label={
+                              restObservation.overtime
+                                ? `Rest complete. ${formatTimer(restObservation.seconds, true)} beyond planned set rest.`
+                                : `${formatTimer(restObservation.seconds, false)} of planned set rest remaining.`
+                            }
+                          >
+                            {restObservation.overtime ? (
+                              <ClockAlert size={28} aria-hidden="true" />
+                            ) : (
+                              <Clock3 size={28} aria-hidden="true" />
+                            )}
+                            <span className={`${styles.timerText} ${styles.restCountdownText}`}>
+                              {formatTimer(restObservation.seconds, restObservation.overtime)}
+                            </span>
+                          </div>
+                          <div className={styles.restStatus}>
+                            {restObservation.overtime ? "Rest complete" : "Rest"}
+                          </div>
+                        </>
+                      )}
                       <span className={styles.visuallyHidden} role="status">
                         {sameRestKey(restCue.cuedKey, restObservation.key) ? "Rest complete" : ""}
                       </span>
                     </div>
+                  )}
+
+                  {!isExerciseSkipped && isAwaitingStart && currentSet && autoRestError && (
+                    <Alert variant="error">
+                      <span>{autoRestError}</span>
+                    </Alert>
                   )}
 
                   {!isExerciseSkipped && isAwaitingStart && currentSet && (
@@ -973,9 +1166,13 @@ export default function WorkoutExecutionScreen() {
                       fullWidth
                       className={styles.actionButton}
                       onClick={handleStartSet}
-                      disabled={saving || isCancelled}
+                      disabled={saving || autoStarting || isCancelled}
                     >
-                      {saving ? "Starting..." : `Start set ${currentSet.position}`}
+                      {autoStarting
+                        ? "Starting..."
+                        : saving
+                          ? "Starting..."
+                          : `Start set ${currentSet.position}`}
                     </Button>
                   )}
 
@@ -1092,7 +1289,7 @@ export default function WorkoutExecutionScreen() {
                         variant="secondary"
                         fullWidth
                         onClick={() => openAdjust(currentSet)}
-                        disabled={saving || isCancelled}
+                        disabled={saving || autoStarting || isCancelled}
                       >
                         Adjust set
                       </Button>
@@ -1101,7 +1298,7 @@ export default function WorkoutExecutionScreen() {
                           variant="ghost"
                           fullWidth
                           onClick={() => openSkipDialog("set")}
-                          disabled={saving || isCancelled}
+                          disabled={saving || autoStarting || isCancelled}
                         >
                           <SkipForward size={16} aria-hidden="true" />
                           <span>Skip set</span>
@@ -1110,7 +1307,7 @@ export default function WorkoutExecutionScreen() {
                           variant="ghost"
                           fullWidth
                           onClick={() => openSkipDialog("exercise")}
-                          disabled={saving || isCancelled}
+                          disabled={saving || autoStarting || isCancelled}
                         >
                           <span>Skip exercise</span>
                         </Button>

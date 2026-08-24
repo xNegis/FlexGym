@@ -327,6 +327,9 @@ class WorkoutSession(Base):
     )
     cancelled_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    automatic_set_start_delay_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
 
     active_workout: Mapped["ActiveWorkout | None"] = relationship(
         "ActiveWorkout",
@@ -391,6 +394,10 @@ class WorkoutSession(Base):
         CheckConstraint(
             "selection_kind = 'alternate' OR selected_training_day_id = scheduled_training_day_id",
             name="ck_workout_sessions_scheduled_selection",
+        ),
+        CheckConstraint(
+            "automatic_set_start_delay_seconds IN (0, 5, 10, 15, 20, 30)",
+            name="ck_workout_sessions_auto_start_delay",
         ),
     )
 
@@ -597,7 +604,8 @@ class WorkoutEvent(Base):
             "'set_completed','set_updated','set_marked_incomplete',"
             "'exercise_completed','workout_cancelled','workout_completed',"
             "'set_skipped','set_skip_reverted',"
-            "'exercise_skipped','exercise_skip_reverted'"
+            "'exercise_skipped','exercise_skip_reverted',"
+            "'set_auto_started'"
             ")",
             name="ck_workout_events_event_type",
         ),
@@ -715,5 +723,32 @@ class ActiveWorkout(Base):
             ["workout_session_id", "user_id"],
             ["workout_sessions.id", "workout_sessions.user_id"],
             name="fk_active_workout_session_user",
+        ),
+    )
+
+
+class WorkoutPreference(Base):
+    __tablename__ = "workout_preferences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    user: Mapped["User"] = relationship("User")
+    automatic_set_start_delay_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "automatic_set_start_delay_seconds IN (0, 5, 10, 15, 20, 30)",
+            name="ck_workout_preferences_delay",
         ),
     )

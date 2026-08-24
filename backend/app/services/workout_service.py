@@ -9,11 +9,12 @@ import hmac
 import json
 import math
 import re
+import sqlite3
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import and_, case, exists, func, or_, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import get_config
@@ -31,6 +32,7 @@ from app.models import (
     WorkoutPlannedSet,
     WorkoutSession,
 )
+from app.services import workout_preference_service
 
 WEEKDAY_NAMES = [
     "monday",
@@ -223,6 +225,7 @@ def _snapshot_workout(
     routine_model = routine.routine
     selected_assignment = training_day.schedule_assignment
     selected_week_pos = selected_assignment.week_position if selected_assignment else 0
+    automatic_delay = workout_preference_service.get_effective_delay(session, user_id)
 
     workout = WorkoutSession(
         user_id=user_id,
@@ -240,6 +243,7 @@ def _snapshot_workout(
         selection_kind=selection_kind,
         status="in_progress",
         started_at=now,
+        automatic_set_start_delay_seconds=automatic_delay,
     )
     session.add(workout)
     session.flush()
@@ -470,6 +474,37 @@ def _append_event(
     return event
 
 
+def _is_sqlite_write_conflict(exc: OperationalError) -> bool:
+    error_code = getattr(exc.orig, "sqlite_errorcode", None)
+    if error_code in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
+        return True
+
+    message = str(exc.orig).lower()
+    return "database is locked" in message or "database table is locked" in message
+
+
+def _commit_normalizing_conflict(session: Session, conflict_message: str) -> None:
+    """Commit, translating a lost write race into a deliberate domain conflict.
+
+    Two concurrent requests can both read the same next event sequence before
+    either commits. The unique (workout_session_id, sequence) constraint then
+    rejects the loser with an IntegrityError (or SQLite reports a locked database
+    with OperationalError). Normalize either into the caller's conflict message so
+    a raw persistence error never escapes the API; the first committed transaction
+    wins and the loser surfaces as an ordinary domain conflict.
+    """
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise ExecutionError(conflict_message) from None
+    except OperationalError as exc:
+        session.rollback()
+        if _is_sqlite_write_conflict(exc):
+            raise ExecutionError(conflict_message) from None
+        raise
+
+
 # ────────────────── exception helpers ──────────────────
 
 SUPPORTED_REASON_CODES = frozenset(
@@ -620,7 +655,7 @@ def skip_set(
         workout_exception_id=exc.id,
     )
 
-    session.commit()
+    _commit_normalizing_conflict(session, "Workout set is already skipped")
     return _load_workout_full(session, workout_id)
 
 
@@ -732,7 +767,7 @@ def skip_exercise(
         workout_exception_id=exc.id,
     )
 
-    session.commit()
+    _commit_normalizing_conflict(session, "Exercise is already skipped")
     return _load_workout_full(session, workout_id)
 
 
@@ -791,6 +826,7 @@ def _derive_progress(workout: WorkoutSession) -> dict[str, Any]:
     current_set_pos: int | None = None
     current_set_phase: str | None = None
     current_set_started_at: str | None = None
+    current_set_start_mode: str | None = None
     transition_to_pos: int | None = None
     found_current = False
     last_resolved_exercise_pos: int | None = None
@@ -820,9 +856,10 @@ def _derive_progress(workout: WorkoutSession) -> dict[str, Any]:
                         current_set_pos = ps.position
                         current_set_phase = _derive_set_phase(ps, workout.events)
                         if current_set_phase == "set_in_progress":
-                            current_set_started_at = _find_effective_set_started_at(
-                                ps, workout.events
-                            )
+                            start_event = _find_effective_set_start_event(ps, workout.events)
+                            if start_event is not None:
+                                current_set_started_at = start_event.occurred_at.isoformat()
+                                current_set_start_mode = _start_mode(start_event)
                         found_current = True
 
         if exercise_all_resolved and (exercise_completed > 0 or exercise_skipped_count > 0):
@@ -847,6 +884,7 @@ def _derive_progress(workout: WorkoutSession) -> dict[str, Any]:
         "current_set_position": current_set_pos,
         "current_set_phase": current_set_phase,
         "current_set_started_at": current_set_started_at,
+        "current_set_start_mode": current_set_start_mode,
         "transition_to_exercise_position": transition_to_pos,
     }
 
@@ -874,7 +912,7 @@ def _derive_set_phase(ps: WorkoutPlannedSet, events: list[WorkoutEvent]) -> str:
     )
 
     for e in set_events:
-        if e.event_type == "set_started":
+        if e.event_type in SET_START_TYPES:
             latest_start = e
         elif e.event_type in close_types:
             latest_close = e
@@ -891,15 +929,22 @@ def _derive_set_phase(ps: WorkoutPlannedSet, events: list[WorkoutEvent]) -> str:
     return "awaiting_set_start"
 
 
-def _find_effective_set_started_at(
+SET_START_TYPES = frozenset({"set_started", "set_auto_started"})
+
+
+def _start_mode(event: WorkoutEvent) -> str:
+    return "automatic" if event.event_type == "set_auto_started" else "manual"
+
+
+def _find_effective_set_start_event(
     ps: WorkoutPlannedSet, events: list[WorkoutEvent], completed_at: datetime.datetime | None = None
-) -> str | None:
+) -> WorkoutEvent | None:
     set_events = sorted(_set_lifecycle_events(ps, events), key=lambda e: e.sequence)
 
     if completed_at is None:
         latest_start: WorkoutEvent | None = None
         for e in set_events:
-            if e.event_type == "set_started":
+            if e.event_type in SET_START_TYPES:
                 latest_start = e
             elif e.event_type in (
                 "set_completed",
@@ -908,21 +953,26 @@ def _find_effective_set_started_at(
                 "exercise_skipped",
             ):
                 latest_start = None
-        if latest_start is not None:
-            return latest_start.occurred_at.isoformat()
-        return None
+        return latest_start
 
     best_start: WorkoutEvent | None = None
     for e in set_events:
         if e.occurred_at > completed_at:
             break
-        if e.event_type == "set_started":
+        if e.event_type in SET_START_TYPES:
             best_start = e
         elif e.event_type in ("set_marked_incomplete", "set_skipped", "exercise_skipped"):
             best_start = None
 
-    if best_start is not None:
-        return best_start.occurred_at.isoformat()
+    return best_start
+
+
+def _find_effective_set_started_at(
+    ps: WorkoutPlannedSet, events: list[WorkoutEvent], completed_at: datetime.datetime | None = None
+) -> str | None:
+    event = _find_effective_set_start_event(ps, events, completed_at)
+    if event is not None:
+        return event.occurred_at.isoformat()
     return None
 
 
@@ -969,12 +1019,14 @@ def _build_planned_set_response(
     if ps.performed_set is not None:
         perf = ps.performed_set
         set_started_at: str | None = None
+        set_start_mode: str | None = None
         observed_duration_seconds: int | None = None
 
-        latest_start = _find_effective_set_started_at(ps, events, perf.completed_at)
-        if latest_start is not None:
-            set_started_at = latest_start
-            start_dt = datetime.datetime.fromisoformat(latest_start)
+        start_event = _find_effective_set_start_event(ps, events, perf.completed_at)
+        if start_event is not None:
+            set_started_at = start_event.occurred_at.isoformat()
+            set_start_mode = _start_mode(start_event)
+            start_dt = datetime.datetime.fromisoformat(set_started_at)
             duration = (perf.completed_at - start_dt).total_seconds()
             observed_duration_seconds = max(0, int(duration))
 
@@ -986,6 +1038,7 @@ def _build_planned_set_response(
             "performed_rir": perf.performed_rir,
             "entry_mode": perf.entry_mode,
             "set_started_at": set_started_at,
+            "set_start_mode": set_start_mode,
             "completed_at": perf.completed_at.isoformat(),
             "observed_duration_seconds": observed_duration_seconds,
             "updated_at": perf.updated_at.isoformat(),
@@ -1177,6 +1230,7 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
         "selection_kind": workout.selection_kind,
         "status": workout.status,
         "started_at": workout.started_at.isoformat(),
+        "automatic_set_start_delay_seconds": workout.automatic_set_start_delay_seconds,
         "cancelled_at": workout.cancelled_at.isoformat() if workout.cancelled_at else None,
         "completed_at": workout.completed_at.isoformat() if workout.completed_at else None,
         "duration_seconds": duration_seconds,
@@ -1192,6 +1246,7 @@ def _build_workout_response(workout: WorkoutSession) -> dict[str, object]:
         "current_set_position": None if is_terminal else progress["current_set_position"],
         "current_set_phase": None if is_terminal else progress["current_set_phase"],
         "current_set_started_at": None if is_terminal else progress["current_set_started_at"],
+        "current_set_start_mode": None if is_terminal else progress["current_set_start_mode"],
         "transition_to_exercise_position": (
             None if is_terminal else progress["transition_to_exercise_position"]
         ),
@@ -1223,7 +1278,17 @@ def cancel_workout(session: Session, user_id: int, workout_id: int) -> WorkoutSe
     if active is not None and active.workout_session_id == workout_id:
         session.delete(active)
 
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise ValueError("Workout is not in progress") from None
+    except OperationalError as exc:
+        session.rollback()
+        if _is_sqlite_write_conflict(exc):
+            raise ValueError("Workout is not in progress") from None
+        raise
+
     session.refresh(workout)
     return _load_workout_full(session, workout_id)
 
@@ -1345,7 +1410,79 @@ def start_set(
         workout_exercise_id=we.id,
         workout_planned_set_id=ps.id,
     )
-    session.commit()
+    _commit_normalizing_conflict(session, "Workout set is already started")
+    return _load_workout_full(session, workout_id)
+
+
+def _previous_planned_set(we: WorkoutExercise, ps: WorkoutPlannedSet) -> WorkoutPlannedSet | None:
+    for candidate in we.planned_sets:
+        if candidate.position == ps.position - 1:
+            return candidate
+    return None
+
+
+# ────────────────── automatic set start ──────────────────
+
+
+def auto_start_set(
+    session: Session,
+    user_id: int,
+    workout_id: int,
+    exercise_position: int,
+    set_position: int,
+) -> WorkoutSession:
+    workout = _get_active_workout_for_execution(session, user_id, workout_id)
+
+    we = _get_exercise_by_position(workout, exercise_position)
+    if we is None:
+        raise ExecutionError("Workout set not found")
+
+    ps = _get_planned_set_by_position(we, set_position)
+    if ps is None:
+        raise ExecutionError("Workout set not found")
+
+    active_exceptions = _get_active_exceptions(workout)
+
+    earliest = _earliest_unresolved_planned_set(we, active_exceptions)
+    if earliest is None or ps.id != earliest.id:
+        raise ExecutionError("Workout set is not current")
+
+    phase = _derive_set_phase(ps, workout.events)
+    if phase != "awaiting_set_start":
+        raise ExecutionError("Workout set is already started")
+
+    delay = workout.automatic_set_start_delay_seconds
+    if delay <= 0:
+        raise ExecutionError("Automatic set start is not enabled")
+
+    previous = _previous_planned_set(we, ps)
+    if previous is None or previous.performed_set is None:
+        raise ExecutionError("Automatic set start is not enabled")
+
+    previous_rest = previous.rest_after_set_seconds
+    if previous_rest is None:
+        raise ExecutionError("Automatic set start is not enabled")
+
+    automatic_start_at = previous.performed_set.completed_at + datetime.timedelta(
+        seconds=previous_rest + delay
+    )
+    now = datetime.datetime.utcnow()
+    if now < automatic_start_at:
+        raise ExecutionError("Automatic set start is not due")
+    if now > automatic_start_at + datetime.timedelta(seconds=5):
+        raise ExecutionError("Automatic set start window expired")
+
+    seq = _get_next_event_sequence(session, workout_id)
+    _append_event(
+        session,
+        workout_id,
+        seq,
+        "set_auto_started",
+        automatic_start_at,
+        workout_exercise_id=we.id,
+        workout_planned_set_id=ps.id,
+    )
+    _commit_normalizing_conflict(session, "Workout set is already started")
     return _load_workout_full(session, workout_id)
 
 
