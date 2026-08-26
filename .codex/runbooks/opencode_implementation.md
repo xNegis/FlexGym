@@ -159,12 +159,20 @@ timeout and retain the execution handle/cell ID supplied by the Codex environmen
 After the process has started:
 
 * Tell the product owner that it is running.
-* Do not poll, interrupt, continue, or inspect it until the product owner asks for a check.
-* A normal Codex turn ending must not terminate the retained long-running process.
+* Keep the current Codex turn open until the OpenCode process exits. In the current Windows
+  execution environment, unified process handles have proven non-durable across completed Codex
+  turns: a process that is healthy before the final response may be reported as `Unknown process
+  id` on the next turn and its OpenCode transcript may remain unfinished.
+* Poll the retained process with `write_stdin` at intervals of roughly 20-30 seconds while it is
+  running. Do not use a blocking wait longer than 60 seconds, and send a concise product-owner
+  progress update at least once every 60 seconds.
+* Do not send the normal final response merely to say that the implementation is running. Yield a
+  final response only after the process exits, or after a concrete blocker requires product-owner
+  input. This keeps the PTY and runner alive for the full implementation.
 * Do not start a second implementation conversation for the same feature while the first is active.
 
-When the product owner asks to check progress, resume/wait on the retained execution handle first.
-If that handle is no longer available, inspect recent OpenCode sessions with:
+If an older run was launched under the previous cross-turn assumption and its handle is no longer
+available, inspect recent OpenCode sessions with:
 
 ```powershell
 & 'C:\Users\anton\AppData\Roaming\npm\opencode.cmd' session list --max-count 10 --format json
@@ -173,6 +181,11 @@ If that handle is no longer available, inspect recent OpenCode sessions with:
 Use `opencode run --session <session-id> ...` only when the product owner asks to continue the same
 conversation or when the completed run explicitly needs an in-scope corrective follow-up. Do not
 accidentally create a new conversation when continuity is required.
+
+On Windows, pass continuation prompts as one physical command-line string. Multiline PowerShell
+arguments routed through `opencode.cmd` have been observed to arrive truncated after their first
+line. A one-line English prompt preserves the complete handoff; verify its receipt from the session
+transcript if the agent behaves as though requirements are missing.
 
 ## Completion Review
 

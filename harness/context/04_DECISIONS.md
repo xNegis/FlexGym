@@ -669,3 +669,29 @@ boundary from owned persisted data, accepts a timely request only through five s
 boundary, and atomically records the distinct `set_auto_started` event. This provenance prevents an
 application-triggered boundary from becoming indistinguishable from F14.2's user-declared
 `set_started` fact.
+
+---
+
+## DEC-034 — Live workout critical information is distance-readable and rest timers count down
+
+**Status:** Accepted
+
+F28 promotes only the critical live set prescription needed while lifting: target value and optional
+RIR use equal large labelled circles, and optional weight uses a prominent line beneath them. Null
+optional values remain absent and explicit zero remains visible. Different surface/border
+treatments supplement visible labels rather than using color as the only distinction. Tempo, notes,
+planned rest metadata, and the rest of the application retain their supporting typography; this is
+not an app-wide font-scale change.
+
+During an exercise transition, the immediate next exercise remains prominent and an ordered `After
+that` list exposes every later unresolved exercise so the user can anticipate equipment and
+location. The list remains a read-only workout-snapshot projection and does not permit reordering or
+out-of-sequence start.
+
+Exercise rest now follows the same visual time convention as set rest: positive planned rest counts
+down to zero and then continues as warning-treated `+M:SS`, zero rest begins at `+0:00`, and null
+rest renders no timer. This supersedes F14's ascending total-elapsed transition display without
+changing the underlying completion/start timestamps from which factual transition duration remains
+derivable. The timer uses F26's dominant responsive size, but F26 audio and F27 automatic start do
+not expand across exercises. `Start next exercise` remains available early and is the only action
+that starts the next exercise.

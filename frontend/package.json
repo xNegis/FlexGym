@@ -10,7 +10,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "lint": "eslint src/",
     "typecheck": "tsc -b",
-    "test": "node --test src/components/setAdjustment.test.ts src/components/restCue.test.ts src/components/workoutWakeLock.test.ts src/components/autoRest.test.ts src/components/workoutParsing.test.ts",
+    "test": "node --test src/components/setAdjustment.test.ts src/components/restCue.test.ts src/components/workoutWakeLock.test.ts src/components/autoRest.test.ts src/components/workoutParsing.test.ts src/components/workoutPresentation.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

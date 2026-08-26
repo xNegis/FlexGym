@@ -20,12 +20,7 @@ import {
   type WorkoutResult,
 } from "../api";
 import { useAuth, useWorkoutNav } from "../context";
-import type {
-  PerformedSet,
-  WorkoutExerciseSnapshot,
-  WorkoutPlannedSetSnapshot,
-  WorkoutSession,
-} from "../types";
+import type { PerformedSet, WorkoutPlannedSetSnapshot, WorkoutSession } from "../types";
 import Page from "../layouts/Page";
 import { AppHeader } from "../layouts/AppShell";
 import Button from "../ui/Button";
@@ -39,7 +34,6 @@ import { Field, Select, TextArea, TextInput } from "../ui/Field";
 import {
   draftMatchesSet,
   parseAdjustment,
-  parseDisplayValue,
   reconcileAdjustmentDraft,
   type SetAdjustmentDraft,
   type SetAdjustmentFieldErrors,
@@ -60,6 +54,14 @@ import {
 } from "../components/autoRest";
 import { playRestCue, prepareRestAudio } from "../components/restAudio";
 import { useWorkoutWakeLock } from "../components/workoutWakeLock";
+import {
+  computeExerciseRestObservation,
+  computeLaterUnresolvedExercises,
+  formatTimer,
+  resolveEffectiveSetMetrics,
+  shouldShowCurrentSetMetrics,
+  targetTypeLabel,
+} from "../components/workoutPresentation";
 import styles from "./Screen.module.css";
 
 function focusFirstAdjustError(errors: SetAdjustmentFieldErrors): void {
@@ -111,34 +113,6 @@ function performedSetSummary(perf: PerformedSet): string {
   if (perf.performed_rir != null) parts.push(`RIR ${perf.performed_rir}`);
   parts.push(perf.entry_mode === "adjusted" ? "adj" : "planned");
   return parts.join(" · ");
-}
-
-function formatTimer(seconds: number, overtime: boolean): string {
-  const abs = Math.abs(seconds);
-  const m = Math.floor(abs / 60);
-  const s = abs % 60;
-  const prefix = overtime ? "+" : "";
-  return `${prefix}${m}:${String(s).padStart(2, "0")}`;
-}
-
-function computeTransitionTimer(
-  exercise: WorkoutExerciseSnapshot | undefined,
-  serverNow: string,
-  nextExercise: WorkoutExerciseSnapshot | undefined,
-  clientReceivedAt: number,
-): { seconds: number; overtime: boolean } | null {
-  if (!exercise || !exercise.is_resolved || !nextExercise) return null;
-  const serverTime = new Date(serverNow).getTime();
-  const estimatedServerNow = serverTime + (Date.now() - clientReceivedAt);
-
-  const completedAt = exercise.latest_completed_at;
-  if (!completedAt) return null;
-  const elapsed = Math.max(
-    0,
-    Math.floor((estimatedServerNow - new Date(completedAt).getTime()) / 1000),
-  );
-  const threshold = exercise.rest_after_exercise_seconds;
-  return { seconds: elapsed, overtime: threshold != null && elapsed >= threshold };
 }
 
 export default function WorkoutExecutionScreen() {
@@ -727,15 +701,20 @@ export default function WorkoutExecutionScreen() {
     timerTick,
   ]);
 
-  const transitionTimer = useMemo(() => {
+  const exerciseRestObservation = useMemo(() => {
     if (!workout) return null;
-    return computeTransitionTimer(
+    return computeExerciseRestObservation(
       exercise,
       workout.server_now,
       nextExercise ?? undefined,
       serverReceivedAt,
     );
   }, [workout, exercise, nextExercise, serverReceivedAt, timerTick]);
+
+  const laterUnresolvedExercises = useMemo(() => {
+    if (!workout || !nextExercise) return [];
+    return computeLaterUnresolvedExercises(workout.exercises, nextExercise.position);
+  }, [workout, nextExercise]);
 
   const autoRestObservation = useMemo(() => {
     if (!workout || !isAwaitingStart) return null;
@@ -764,6 +743,19 @@ export default function WorkoutExecutionScreen() {
     workout?.transition_to_exercise_position === exercisePosition + 1;
 
   const isCancelled = workout?.status === "cancelled";
+  const isCompleted = workout?.status === "completed";
+
+  // The large distance-readable prescription is only meaningful while a current
+  // set is actively actionable. Unstarted, skipped, resolved, cancelled, and
+  // terminal states must not present it as though a set were in progress.
+  const showCurrentSetMetrics = shouldShowCurrentSetMetrics({
+    hasCurrentSet: currentSet != null,
+    isAwaitingStart,
+    isSetInProgress,
+    isExerciseSkipped,
+    isWorkoutCancelled: isCancelled,
+    isWorkoutCompleted: isCompleted,
+  });
 
   const autoDelayRemainingMs =
     autoRestObservation && autoRestObservation.delay_remaining_ms > 0
@@ -902,9 +894,7 @@ export default function WorkoutExecutionScreen() {
     currentSet && draftMatchesSet(adjustDraft, workout.id, exercisePosition, currentSet.position)
       ? adjustDraft
       : null;
-  const draftValue = currentDraft ? parseDisplayValue(currentDraft.performed_value) : null;
-  const draftWeight = currentDraft ? parseDisplayValue(currentDraft.performed_weight_kg) : null;
-  const draftRir = currentDraft ? parseDisplayValue(currentDraft.performed_rir) : null;
+  const effectiveMetrics = currentSet ? resolveEffectiveSetMetrics(currentSet, currentDraft) : null;
 
   const openAdjust = (ps: WorkoutPlannedSetSnapshot) => {
     setAdjustSet(ps);
@@ -968,7 +958,7 @@ export default function WorkoutExecutionScreen() {
 
           {isCancelled && <Alert variant="warning">This workout has been cancelled.</Alert>}
 
-          {showTransition && nextExercise && transitionTimer && (
+          {showTransition && nextExercise && (
             <Card>
               <div className={`${styles.stack4} ${styles.centered}`}>
                 {isExerciseSkipped ? (
@@ -991,24 +981,53 @@ export default function WorkoutExecutionScreen() {
                         : "Distance"}
                   </div>
                 </div>
-                <div
-                  className={`${styles.timerCircle} ${styles.timerCircleLarge} ${transitionTimer.overtime ? styles.timerOvertime : ""}`}
-                  role="timer"
-                  aria-label={
-                    transitionTimer.overtime
-                      ? `Planned transition time exceeded. ${formatTimer(transitionTimer.seconds, false)} elapsed.`
-                      : `${formatTimer(transitionTimer.seconds, false)} transition time elapsed.`
-                  }
-                >
-                  {transitionTimer.overtime ? (
-                    <ClockAlert size={18} aria-hidden="true" />
-                  ) : (
-                    <Clock3 size={18} aria-hidden="true" />
-                  )}
-                  <span className={styles.timerText}>
-                    {formatTimer(transitionTimer.seconds, false)}
-                  </span>
-                </div>
+                {laterUnresolvedExercises.length > 0 && (
+                  <div className={styles.afterThat}>
+                    <h3 className={styles.afterThatHeading}>After that</h3>
+                    <ol
+                      className={styles.afterThatList}
+                      role="list"
+                      aria-label="Remaining exercises"
+                    >
+                      {laterUnresolvedExercises.map((e) => (
+                        <li key={e.position} className={styles.afterThatItem}>
+                          <span className={styles.afterThatPosition}>
+                            Exercise {e.position} of {workout.exercises.length}
+                          </span>
+                          <span className={styles.afterThatName}>{e.exercise_name}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+                {exerciseRestObservation && (
+                  <div className={`${styles.stack2} ${styles.centered}`}>
+                    <div
+                      className={`${styles.timerCircle} ${styles.restCountdown} ${exerciseRestObservation.overtime ? styles.timerOvertime : ""}`}
+                      role="timer"
+                      aria-label={
+                        exerciseRestObservation.overtime
+                          ? `Rest complete. ${formatTimer(exerciseRestObservation.seconds, true)} beyond planned exercise rest.`
+                          : `${formatTimer(exerciseRestObservation.seconds, false)} of planned exercise rest remaining.`
+                      }
+                    >
+                      {exerciseRestObservation.overtime ? (
+                        <ClockAlert size={28} aria-hidden="true" />
+                      ) : (
+                        <Clock3 size={28} aria-hidden="true" />
+                      )}
+                      <span className={`${styles.timerText} ${styles.restCountdownText}`}>
+                        {formatTimer(
+                          exerciseRestObservation.seconds,
+                          exerciseRestObservation.overtime,
+                        )}
+                      </span>
+                    </div>
+                    <div className={styles.restStatus}>
+                      {exerciseRestObservation.overtime ? "Rest complete" : "Rest"}
+                    </div>
+                  </div>
+                )}
                 {isExerciseSkipped && (
                   <div className={`${styles.stack2} ${styles.centered}`}>
                     <Button
@@ -1200,62 +1219,41 @@ export default function WorkoutExecutionScreen() {
                     </div>
                   )}
 
-                  {!isExerciseSkipped && currentSet && (
+                  {showCurrentSetMetrics && effectiveMetrics && (
                     <>
-                      <div className={`${styles.stack1} ${styles.centered}`}>
-                        <div className={styles.timerCircle}>
-                          <span className={styles.timerTextLarge}>
-                            {targetLabel(
-                              exercise.target_type,
-                              draftValue ?? currentSet.target_value,
-                            )}
+                      <div
+                        className={styles.metricGroup}
+                        role="group"
+                        aria-label="Current set prescription"
+                      >
+                        <div
+                          className={`${styles.metricCircle} ${styles.metricCircleTarget}`}
+                          role="img"
+                          aria-label={`Target ${effectiveMetrics.value} ${targetTypeLabel(exercise.target_type).toLowerCase()}`}
+                        >
+                          <span className={styles.metricValue}>{effectiveMetrics.value}</span>
+                          <span className={styles.metricLabel}>
+                            {targetTypeLabel(exercise.target_type)}
                           </span>
                         </div>
-                      </div>
-                      <div className={`${styles.stack2} ${styles.centered}`}>
-                        {currentDraft ? (
-                          <>
-                            {draftWeight !== null && (
-                              <span className={styles.textCompactMuted}>@ {draftWeight} kg</span>
-                            )}
-                            {draftRir !== null && (
-                              <span className={styles.textCompactMuted}>RIR {draftRir}</span>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {currentSet.target_weight_kg != null && (
-                              <span className={styles.textCompactMuted}>
-                                @ {currentSet.target_weight_kg} kg
-                              </span>
-                            )}
-                            {currentSet.target_rir != null && (
-                              <span className={styles.textCompactMuted}>
-                                RIR {currentSet.target_rir}
-                              </span>
-                            )}
-                          </>
-                        )}
-                        {currentSet.tempo != null && (
-                          <span className={styles.textCompactMuted}>
-                            Tempo: eccentric {currentSet.tempo.eccentric_seconds}s &middot; stretch
-                            pause {currentSet.tempo.stretched_pause_seconds}s &middot; concentric{" "}
-                            {currentSet.tempo.concentric_seconds}s &middot; peak contraction{" "}
-                            {currentSet.tempo.peak_contraction_seconds}s
-                          </span>
-                        )}
-                        {currentSet.rest_after_set_seconds != null && (
-                          <span className={styles.textCompactMuted}>
-                            Rest {currentSet.rest_after_set_seconds}s
-                          </span>
-                        )}
-                        {currentSet.notes && (
-                          <span className={styles.textCompactMuted}>{currentSet.notes}</span>
+                        {effectiveMetrics.rir != null && (
+                          <div
+                            className={`${styles.metricCircle} ${styles.metricCircleRir}`}
+                            role="img"
+                            aria-label={`Target RIR ${effectiveMetrics.rir}`}
+                          >
+                            <span className={styles.metricValue}>{effectiveMetrics.rir}</span>
+                            <span className={styles.metricLabel}>RIR</span>
+                          </div>
                         )}
                       </div>
-                      {currentDraft && (
-                        <div className={`${styles.textCompactMuted} ${styles.centered}`}>
-                          Adjustment applied · saved when you complete the set
+                      {effectiveMetrics.weight != null && (
+                        <div className={styles.metricWeight}>
+                          <span className={styles.metricWeightLabel}>Weight</span>
+                          <span className={styles.metricWeightValue}>
+                            {effectiveMetrics.weight}
+                          </span>
+                          <span className={styles.metricWeightLabel}>kg</span>
                         </div>
                       )}
                     </>
@@ -1357,6 +1355,32 @@ export default function WorkoutExecutionScreen() {
                           <span>Skip exercise</span>
                         </Button>
                       </div>
+                    </div>
+                  )}
+
+                  {showCurrentSetMetrics && currentSet && (
+                    <div className={`${styles.stack2} ${styles.centered}`}>
+                      {currentSet.tempo != null && (
+                        <span className={styles.textCompactMuted}>
+                          Tempo: eccentric {currentSet.tempo.eccentric_seconds}s &middot; stretch
+                          pause {currentSet.tempo.stretched_pause_seconds}s &middot; concentric{" "}
+                          {currentSet.tempo.concentric_seconds}s &middot; peak contraction{" "}
+                          {currentSet.tempo.peak_contraction_seconds}s
+                        </span>
+                      )}
+                      {currentSet.rest_after_set_seconds != null && (
+                        <span className={styles.textCompactMuted}>
+                          Rest {currentSet.rest_after_set_seconds}s
+                        </span>
+                      )}
+                      {currentSet.notes && (
+                        <span className={styles.textCompactMuted}>{currentSet.notes}</span>
+                      )}
+                      {currentDraft && (
+                        <div className={styles.textCompactMuted}>
+                          Adjustment applied · saved when you complete the set
+                        </div>
+                      )}
                     </div>
                   )}
 

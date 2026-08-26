@@ -7,7 +7,7 @@
 Phase 0 — Foundation, Phase 1 — Training Planning, Phase 2 — Workout Tracking, and Phase 3 —
 Progress & Analytics are completed successfully.
 
-Phase 3.5 — Real-world Training Refinement is active. F25, F26, F26.1, and F27 are implemented
+Phase 3.5 — Real-world Training Refinement is active. F25, F26, F26.1, F27, and F28 are implemented
 and automatically validated, with product-owner mobile/device validation pending.
 
 ## Current Status
@@ -181,19 +181,24 @@ owned persisted data and accepts a request only through five seconds after it. F
 migrated database, and the configured local database at repository head are all verified.
 Product-owner manual UI validation remains pending.
 
+F28 — Distance-readable Live Workout Execution is implemented and automatically validated. The
+current set promotes target value and optional RIR into equal large labelled circles with optional
+weight as a prominent line beneath them, and the exercise transition adds an ordered `After that`
+sequence of every later unresolved exercise below the immediate next exercise while replacing the
+compact ascending transition timer with F26's large planned-rest countdown and warning-treated
+overtime. Exercise start remains manual before or after zero. Frontend tests and backend/frontend
+static checks pass. F28 adds no transition sound, cross-exercise automatic start, persistence, API,
+or migration; the configured local database and repository head are both `f27_auto_start`.
+Product-owner manual UI validation remains pending.
+
 Phase 4 —
 Adaptation Engine V1 is postponed until the selected real-world refinements have been addressed.
 
-The first production workout produced two work areas. Performed-set adjustment reliability is now
-F25 after a production audit confirmed silently missing performed weights from an otherwise complete
-workout. The affected historical facts were repaired with explicit product-owner confirmation, a
-pre-change backup, guarded transactional writes, and successful integrity and application
-Progress-projection verification; F25 addresses the underlying frontend defects. The between-set
-rest feedback has now been split at its feature boundary: F26 owns the dominant countdown and
-one-time best-effort sound cue; F26.1 keeps the visible active workout from auto-locking on supported
-browsers; and F27 separately owns configurable same-exercise automatic start. F27 is collaboratively
-groomed and implementation-ready; its complete contract is recorded in
-`harness/features/27_configurable_automatic_same_exercise_set_start.md`.
+The first production workouts established the Phase 3.5 work. F25 owns performed-set adjustment
+reliability after the guarded repair of affected historical facts. F26 owns the dominant between-set
+countdown and one-time best-effort sound cue; F26.1 keeps the visible active workout from auto-locking
+on supported browsers; and F27 owns configurable same-exercise automatic start. F28 now owns the
+separate distance-readability, remaining-exercise preview, and exercise-rest countdown refinement.
 
 ## Completed Features
 
@@ -231,14 +236,14 @@ groomed and implementation-ready; its complete contract is recorded in
 
 ## Next Feature
 
-Finish the product-owner manual device/browser validation of F26 — Rest Countdown Focus and Audio
-Cue and F26.1 — Active Workout Screen Wake Lock (implemented and automatically validated; see their
-feature specifications). Also finish the independent corrective and focused manual UI validation of
-F25 — Performed Set Adjustment Reliability, and the focused manual UI validation of F27 —
-Configurable Automatic Same-exercise Set Start at the required widths and accessibility conditions.
-Do not mark these features completed until their manual validation passes. F26/F26.1 add no
-migration; F27 adds `f27_auto_start` and must not absorb a separate configurable automatic start
-beyond its own specification.
+F28 — Distance-readable Live Workout Execution is implemented and automatically validated. Complete
+its focused responsive and physical iPhone/Safari manual validation, which verifies target, RIR,
+weight, and the transition timer are readable from a representative floor-level viewing distance
+without lifting the device.
+
+Independently finish the outstanding product-owner mobile/device validation of F25, F26, F26.1, F27,
+and F28. Do not mark those implemented features completed until their respective manual validation
+contracts pass.
 
 ## Existing Feature Specifications
 
@@ -276,6 +281,8 @@ beyond its own specification.
   iPhone/Safari validation pending)
 * `harness/features/27_configurable_automatic_same_exercise_set_start.md` (implemented;
   product-owner manual UI validation pending)
+* `harness/features/28_distance_readable_live_workout_execution.md` (implemented; product-owner
+  manual UI validation pending)
 
 ## Current Technology
 
@@ -322,8 +329,10 @@ specification. F26.1's visible active-workout wake-lock scope, release/reacquisi
 failure isolation are settled and implemented, with physical-device validation pending. F27's
 per-user configuration, workout snapshot, allowed delays, confirmation, automatic lifecycle fact,
 concurrency/reconciliation, freshness, background limitations, and bounded replacement of F14.2's
-manual-only rule are settled in its implemented specification. The phase's broader
-completion boundary is undecided.
+manual-only rule are settled in its implemented specification. F28's distance-readable target/RIR
+circles, prominent weight, ordered remaining-exercise preview, countdown/overtime transition
+semantics, manual exercise start, and frontend-only boundary are settled in its implemented
+specification. The phase's broader completion boundary is undecided.
 
 The first Phase 4 feature, its user-facing workflow, and its initial deterministic signal also remain
 undecided until Phase 3.5 is ready to close.

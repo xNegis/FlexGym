@@ -381,10 +381,10 @@ contract is in `harness/features/26_1_active_workout_screen_wake_lock.md`.
 
 #### F27 — Configurable Automatic Same-exercise Set Start
 
-F27 is collaboratively groomed and implementation-ready. A dedicated Profile > Workout settings
-flow persists a per-user delay selected from manual (`0`) or `5`, `10`, `15`, `20`, and `30`
-seconds. Each new workout snapshots the effective setting so later preference edits do not change an
-existing session.
+F27 is implemented and automatically validated, with product-owner manual UI validation pending. A
+dedicated Profile > Workout settings flow persists a per-user delay selected from manual (`0`) or
+`5`, `10`, `15`, `20`, and `30` seconds. Each new workout snapshots the effective setting so later
+preference edits do not change an existing session.
 
 For positive snapshots and non-null same-exercise rest, the F26 cue boundary begins the configured
 post-rest countdown. A visible mounted execution screen attempts automatic start once at the derived
@@ -397,6 +397,24 @@ freshness window, and records the distinct typed `set_auto_started` event so pre
 starts remain distinguishable from manual `set_started` facts. Automatic start never records
 performance or completes work. The complete contract is in
 `harness/features/27_configurable_automatic_same_exercise_set_start.md`.
+
+#### F28 — Distance-readable Live Workout Execution
+
+Further physical-gym use showed that the current repetition target can be read from a phone resting
+on the floor while RIR and weight cannot, and that the transition screen provides too little context
+to anticipate later equipment. F28 is collaboratively groomed and implementation-ready as a
+frontend-only live-workout refinement.
+
+The current set presents target value and optional RIR in equal large labelled circles, with
+optional weight as a prominent line beneath them. Exercise transitions retain the immediate next
+exercise and add an ordered `After that` list of every later unresolved exercise. The transition
+timer adopts F26's dominant responsive size and changes from F14's total-elapsed counter to a
+planned-rest countdown followed by warning-treated `+M:SS` overtime. Zero rest starts at `+0:00`;
+null rest has no timer.
+
+The next exercise remains manually startable before or after zero. F28 adds no cross-exercise
+automatic start, transition sound, persisted state, API, or migration. The complete contract is in
+`harness/features/28_distance_readable_live_workout_execution.md`.
 
 ---
 

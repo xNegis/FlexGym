@@ -479,3 +479,107 @@
   font: var(--text-body);
   font-weight: 600;
 }
+
+.metricGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.metricCircle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: clamp(6.5rem, 29vw, 8rem);
+  height: clamp(6.5rem, 29vw, 8rem);
+  border-radius: 50%;
+}
+
+.metricCircleTarget {
+  border: 3px solid var(--color-accent);
+  background: var(--color-surface);
+}
+
+.metricCircleRir {
+  border: 3px solid var(--color-border-strong);
+  background: var(--color-surface-subtle);
+}
+
+.metricValue {
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: clamp(2rem, 9vw, 3rem);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.metricLabel {
+  color: var(--color-text-muted);
+  font: var(--text-body);
+}
+
+.metricWeight {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font: var(--text-body);
+}
+
+.metricWeightLabel {
+  color: var(--color-text-muted);
+}
+
+.metricWeightValue {
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: clamp(1.75rem, 7vw, 2.5rem);
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.afterThat {
+  width: 100%;
+  text-align: left;
+}
+
+.afterThatHeading {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-muted);
+  font: var(--text-subsection-title);
+}
+
+.afterThatList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.afterThatItem {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.afterThatPosition {
+  flex-shrink: 0;
+  color: var(--color-text-subtle);
+  font: var(--text-caption);
+}
+
+.afterThatName {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text);
+  font: var(--text-body);
+  overflow-wrap: anywhere;
+}
