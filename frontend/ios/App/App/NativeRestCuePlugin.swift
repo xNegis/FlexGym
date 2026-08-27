@@ -82,7 +82,6 @@ public final class NativeRestCuePlugin: CAPPlugin, CAPBridgedPlugin, Notificatio
 
     @objc override public func load() {
         bridge?.notificationRouter.localNotificationHandler = self
-        bridge?.notificationRouter.handleApplicationNotifications = true
     }
 
     @objc public func schedule(_ call: CAPPluginCall) {
