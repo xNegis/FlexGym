@@ -4,7 +4,7 @@ import { Camera, ChevronLeft, ChevronRight, ImageIcon, Plus, Trash2 } from "luci
 import {
   deleteProgressPhoto,
   fetchBodyProgressPhotos,
-  photoContentUrl,
+  fetchProgressPhotoContent,
   reorderProgressPhotos,
   UnauthenticatedError,
   uploadProgressPhotos,
@@ -40,6 +40,62 @@ interface DraftPhoto {
   file: File;
   previewUrl: string;
   error: string | null;
+}
+
+interface AuthenticatedPhotoProps {
+  alt: string;
+  className: string;
+  contentPath: string;
+  loadingClassName?: string;
+  onLoadError?: () => void;
+  onUnauthenticated: () => void;
+  retryToken?: number;
+}
+
+function AuthenticatedPhoto({
+  alt,
+  className,
+  contentPath,
+  loadingClassName,
+  onLoadError,
+  onUnauthenticated,
+  retryToken = 0,
+}: AuthenticatedPhotoProps) {
+  const [source, setSource] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+    setSource(null);
+
+    void fetchProgressPhotoContent(contentPath)
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSource(objectUrl);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (error instanceof UnauthenticatedError) {
+          onUnauthenticated();
+          return;
+        }
+        onLoadError?.();
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl !== null) URL.revokeObjectURL(objectUrl);
+    };
+  }, [contentPath, onLoadError, onUnauthenticated, retryToken]);
+
+  if (source === null) {
+    return loadingClassName ? (
+      <div className={loadingClassName} aria-label="Loading photo" />
+    ) : null;
+  }
+
+  return <img src={source} alt={alt} className={className} />;
 }
 
 function formatLongDate(iso: string): string {
@@ -90,6 +146,7 @@ export default function BodyWeightPhotosScreen() {
   const draftStatusRef = useRef<HTMLDivElement>(null);
 
   const requestSequence = useRef(0);
+  const handleContentError = useCallback(() => setContentError(true), []);
 
   const load = useCallback(async () => {
     const requestId = ++requestSequence.current;
@@ -396,12 +453,15 @@ export default function BodyWeightPhotosScreen() {
                       </Button>
                     </div>
                   ) : (
-                    <img
+                    <AuthenticatedPhoto
                       key={`${selectedPhoto.id}-${contentNonce}`}
-                      src={photoContentUrl(selectedPhoto.content_path)}
+                      contentPath={selectedPhoto.content_path}
                       alt={`Body progress photo ${selectedIndex + 1} of ${storedCount} for ${formatLongDate(measurementDate)}`}
                       className={styles.viewerImage}
-                      onError={() => setContentError(true)}
+                      loadingClassName={styles.viewerSkeleton}
+                      onLoadError={handleContentError}
+                      onUnauthenticated={logout}
+                      retryToken={contentNonce}
                     />
                   )}
 
@@ -485,11 +545,12 @@ export default function BodyWeightPhotosScreen() {
                           aria-label={`View photo ${index + 1}`}
                           aria-current={index === selectedIndex ? "true" : undefined}
                         >
-                          <img
-                            src={photoContentUrl(photo.content_path)}
+                          <AuthenticatedPhoto
+                            contentPath={photo.content_path}
                             alt=""
-                            aria-hidden="true"
                             className={styles.thumbnailImage}
+                            onUnauthenticated={logout}
+                            retryToken={contentNonce}
                           />
                         </button>
                       ))}

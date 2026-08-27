@@ -140,7 +140,7 @@ export default function WorkoutSettingsScreen() {
         <div className={styles.stack6}>
           <Section
             title="Set start"
-            description="Choose whether FlexGym starts the next set of the same exercise automatically after planned rest."
+            description="Choose whether FormCadence starts the next set of the same exercise automatically after planned rest."
           >
             <Field label="Automatic set start" htmlFor="auto-start-delay">
               <Select
@@ -193,7 +193,7 @@ export default function WorkoutSettingsScreen() {
       >
         <div className={styles.stack3}>
           <p>
-            Automatic start applies only between sets of the same exercise. FlexGym records the
+            Automatic start applies only between sets of the same exercise. FormCadence records the
             configured automatic boundary as the set start.
           </p>
           <p>The recorded time may be earlier than your physical first repetition.</p>

@@ -47,7 +47,7 @@ import {
 } from "./components/setAdjustment";
 import { isConfiguredSetTempo, isWorkoutSession } from "./components/workoutParsing";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://192.168.1.134:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 const EXERCISE_MUSCLES = new Set([
   "chest",
@@ -3218,4 +3218,15 @@ export async function deleteProgressPhoto(photoId: string): Promise<{ detail: st
 
 export function photoContentUrl(contentPath: string): string {
   return `${API_BASE_URL}${contentPath}`;
+}
+
+export async function fetchProgressPhotoContent(contentPath: string): Promise<Blob> {
+  const response = await fetch(photoContentUrl(contentPath), { credentials: "include" });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load progress photo");
+  }
+  return response.blob();
 }

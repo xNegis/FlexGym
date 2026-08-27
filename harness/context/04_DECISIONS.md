@@ -695,3 +695,32 @@ changing the underlying completion/start timestamps from which factual transitio
 derivable. The timer uses F26's dominant responsive size, but F26 audio and F27 automatic start do
 not expand across exercises. `Start next exercise` remains available early and is the only action
 that starts the next exercise.
+
+---
+
+## DEC-035 — One web frontend is packaged natively with Capacitor
+
+**Status:** Accepted
+
+FormCadence will use Capacitor to package the existing React/Vite frontend as iOS and Android
+applications. This supersedes the initial preference to remain PWA-only without replacing React,
+duplicating the interface in React Native, or loading the deployed website as the production native
+WebView. Native builds contain the versioned Vite output and continue to use the existing hosted
+FastAPI API.
+
+The permanent native identity on both platforms is `app.formcadence`; the visible product name is
+FormCadence. The first distribution target is private internal TestFlight, built and signed on
+Codemagic because primary development remains on Windows without local Xcode. The Android project
+shares the same source and identity, with Play Store delivery deferred.
+
+The existing seven-day JWT remains in a Secure HTTP-only server cookie. Native absolute API
+requests use Capacitor's supported native HTTP bridge so response cookies are retained and reused
+without exposing the token to JavaScript, storing it in web/native preferences, setting
+`SameSite=None`, or relaxing transport security. Web builds retain their normal browser request and
+same-origin deployment behaviour.
+
+F29 begins with the existing browser camera/file inputs, Web Audio cue, feature-detected Screen Wake
+Lock, URL navigation, and safe-area implementation. Native plugins are introduced only when
+physical-device evidence shows that a bounded capability cannot meet its contract. Packaging does
+not implicitly authorize notifications, HealthKit, background execution, widgets, or other future
+native product features.

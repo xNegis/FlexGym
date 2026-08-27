@@ -416,6 +416,20 @@ The next exercise remains manually startable before or after zero. F28 adds no c
 automatic start, transition sound, persisted state, API, or migration. The complete contract is in
 `harness/features/28_distance_readable_live_workout_execution.md`.
 
+#### F29 — Native Mobile Packaging and Private iOS Distribution
+
+F29 packages the existing React/Vite application with Capacitor rather than creating a second
+React Native interface. Web, iOS, and Android continue to share one frontend and the existing hosted
+FastAPI backend. The permanent native identity is `app.formcadence` and the user-facing product name
+is FormCadence.
+
+The first delivered native artifact is a signed iOS build produced on Codemagic and installed
+privately through internal TestFlight. The Android native project is generated from the same
+configuration, while Play Store delivery remains later work. Existing HTTP-only cookie
+authentication is preserved through Capacitor's native HTTP path rather than moving tokens into
+JavaScript storage or weakening backend cookie policy. The complete contract is in
+`harness/features/29_native_mobile_packaging.md`.
+
 ---
 
 ## Phase 4 — Adaptation Engine V1

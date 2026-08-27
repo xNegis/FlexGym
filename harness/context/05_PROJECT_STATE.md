@@ -191,6 +191,16 @@ static checks pass. F28 adds no transition sound, cross-exercise automatic start
 or migration; the configured local database and repository head are both `f27_auto_start`.
 Product-owner manual UI validation remains pending.
 
+F29 — Native Mobile Packaging and Private iOS Distribution is locally implemented and automatically
+validated. The shared React/Vite frontend now has repository-owned Capacitor iOS and Android projects using
+`app.formcadence` and `FormCadence`, a production mobile build targeting the existing HTTPS API,
+native HTTP transport that preserves the HTTP-only authentication boundary, authenticated private
+photo loading, generated MVP native assets, and a Codemagic internal-TestFlight workflow. Frontend
+tests and static checks, browser/mobile builds, Capacitor synchronization, package identity
+inspection, and the live production health endpoint pass. A hosted signed iOS build, App Store
+Connect upload, TestFlight installation, and the focused physical-iPhone validation contract remain
+pending; F29 is not completed until those gates pass.
+
 Phase 4 —
 Adaptation Engine V1 is postponed until the selected real-world refinements have been addressed.
 
@@ -236,10 +246,9 @@ separate distance-readability, remaining-exercise preview, and exercise-rest cou
 
 ## Next Feature
 
-F28 — Distance-readable Live Workout Execution is implemented and automatically validated. Complete
-its focused responsive and physical iPhone/Safari manual validation, which verifies target, RIR,
-weight, and the transition timer are readable from a representative floor-level viewing distance
-without lifting the device.
+Complete F29's hosted and physical-device delivery gates: connect the repository and App Store
+Connect API integration in Codemagic, run the signed internal-TestFlight workflow, install
+FormCadence on the product owner's iPhone, and execute F29's focused native validation contract.
 
 Independently finish the outstanding product-owner mobile/device validation of F25, F26, F26.1, F27,
 and F28. Do not mark those implemented features completed until their respective manual validation
@@ -283,6 +292,8 @@ contracts pass.
   product-owner manual UI validation pending)
 * `harness/features/28_distance_readable_live_workout_execution.md` (implemented; product-owner
   manual UI validation pending)
+* `harness/features/29_native_mobile_packaging.md` (locally implemented; hosted signing, TestFlight,
+  and product-owner physical-iPhone validation pending)
 
 ## Current Technology
 
@@ -290,7 +301,10 @@ Backend:
 Python 3.11+ / FastAPI / uv
 
 Frontend:
-React 19 / TypeScript 6 / Vite / npm / React Router 7 / Lucide React
+React 19 / TypeScript 6 / Vite / npm / React Router 7 / Lucide React / Capacitor 8
+
+Native delivery:
+Capacitor iOS and Android projects / Codemagic hosted iOS signing / private internal TestFlight
 
 Persistence:
 SQLite / SQLAlchemy 2 / Alembic

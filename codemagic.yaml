@@ -1,0 +1,52 @@
+workflows:
+  ios-internal-testflight:
+    name: FormCadence iOS — Internal TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: formcadence_app_store_connect
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: app.formcadence
+      node: 24
+      xcode: latest
+    scripts:
+      - name: Install locked frontend dependencies
+        script: |
+          cd "$CM_BUILD_DIR/frontend"
+          npm ci
+      - name: Validate shared frontend
+        script: |
+          cd "$CM_BUILD_DIR/frontend"
+          npm test
+          npm run format:check
+          npm run lint
+          npm run typecheck
+      - name: Build and synchronize the iOS application
+        script: |
+          cd "$CM_BUILD_DIR/frontend"
+          npm run mobile:sync:ios
+      - name: Set the iOS build number
+        script: |
+          cd "$CM_BUILD_DIR/frontend/ios/App"
+          xcrun agvtool new-version -all "$BUILD_NUMBER"
+      - name: Configure App Store signing for internal TestFlight
+        script: |
+          cd "$CM_BUILD_DIR/frontend/ios/App"
+          xcode-project use-profiles \
+            --custom-export-options='{"testFlightInternalTestingOnly": true}'
+      - name: Build the signed IPA
+        script: |
+          cd "$CM_BUILD_DIR/frontend/ios/App"
+          xcode-project build-ipa \
+            --project "App.xcodeproj" \
+            --scheme "App"
+    artifacts:
+      - frontend/ios/App/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration

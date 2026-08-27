@@ -4,7 +4,7 @@
 
 ```bash
 cd backend
-.venv\Scripts\python -m uvicorn app.main:app --reload --host 192.168.1.134 --port 8000
+.venv\Scripts\python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Frontend
@@ -14,4 +14,5 @@ cd frontend
 npm run dev -- --host
 ```
 
-Open `http://192.168.1.134:5173`
+Open `http://localhost:5173` on the development PC. For a browser-only check from another device on
+the same network, replace `localhost` with the development PC's current LAN address.
