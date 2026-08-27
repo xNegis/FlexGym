@@ -70,7 +70,7 @@ iOS cannot be compiled locally on Windows; the root `codemagic.yaml` workflow bu
 hosted macOS, then uploads the IPA for internal TestFlight testing.
 
 The Codemagic workflow expects an App Store Connect integration named
-`Code Magic Form Cadence`. Certificates, provisioning profiles, API private keys, issuer IDs,
+`Codemagic FormCadence`. Certificates, provisioning profiles, API private keys, issuer IDs,
 key IDs, passwords, and other secrets belong only in the Codemagic/Apple secure interfaces and must
 never be committed to this repository.
 
