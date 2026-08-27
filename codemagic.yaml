@@ -39,9 +39,20 @@ workflows:
       - name: Build the signed IPA
         script: |
           cd "$CM_BUILD_DIR/frontend/ios/App"
-          xcode-project build-ipa \
+          if xcode-project build-ipa \
             --project "App.xcodeproj" \
-            --scheme "App"
+            --scheme "App"; then
+            exit 0
+          else
+            build_status=$?
+            echo "Xcode archive failed. Printing the detailed Xcode diagnostics:"
+            for xcode_log in /tmp/xcodebuild_logs/*.log; do
+              [ -f "$xcode_log" ] || continue
+              echo "Log file: $xcode_log"
+              grep -n -C 5 -E 'error:|fatal error:|CodeSign|provisioning profile|entitlement|ARCHIVE FAILED' "$xcode_log" || tail -n 300 "$xcode_log"
+            done
+            exit "$build_status"
+          fi
     artifacts:
       - frontend/ios/App/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
