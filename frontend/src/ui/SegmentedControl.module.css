@@ -19,6 +19,8 @@
 .group {
   display: flex;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   gap: var(--space-1);
   padding: var(--space-1);
   border: var(--border-width) solid var(--color-border);

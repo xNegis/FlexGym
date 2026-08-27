@@ -1,7 +1,10 @@
 .alert {
+  min-width: 0;
+  max-width: 100%;
   padding: var(--space-4);
   border-radius: var(--radius-md);
   font: var(--text-body-compact);
+  overflow-wrap: anywhere;
 }
 
 .error {

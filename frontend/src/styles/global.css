@@ -18,10 +18,12 @@ body,
   width: 100%;
   max-width: 100%;
   min-height: 100%;
+  overscroll-behavior-x: none;
 }
 
 html,
-body {
+body,
+#root {
   overflow-x: clip;
 }
 
@@ -37,7 +39,9 @@ body {
 }
 
 img,
-svg {
+svg,
+canvas,
+video {
   display: block;
   max-width: 100%;
 }

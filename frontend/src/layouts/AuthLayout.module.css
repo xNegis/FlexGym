@@ -7,6 +7,8 @@
   padding-right: var(--safe-right);
   padding-bottom: var(--safe-bottom);
   background: var(--color-canvas);
+  overflow-x: clip;
+  touch-action: pan-y pinch-zoom;
 }
 
 .brand {

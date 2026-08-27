@@ -1,5 +1,7 @@
 .container {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .title {
@@ -10,6 +12,9 @@
 .plot {
   position: relative;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: clip;
 }
 
 .svg {
@@ -65,10 +70,13 @@
 
 .detail {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   flex-direction: column;
   gap: var(--space-1);
   margin-top: var(--space-2);
   min-height: 2.5rem;
+  overflow-wrap: anywhere;
 }
 
 .detailValue {

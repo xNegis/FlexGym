@@ -10,6 +10,10 @@
   padding-right: var(--safe-right);
   padding-bottom: var(--safe-bottom);
   padding-left: var(--safe-left);
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   animation: fadeIn var(--transition-normal) ease;
 }
 
@@ -26,13 +30,17 @@
   background: var(--color-surface);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   width: 100%;
-  max-width: 28rem;
-  max-height: 80vh;
+  min-width: 0;
+  max-width: min(28rem, 100%);
+  max-height: min(80dvh, calc(100dvh - var(--safe-top) - var(--safe-bottom)));
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-6);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  touch-action: pan-y pinch-zoom;
   animation: slideUp var(--transition-normal) ease;
   box-shadow: var(--shadow-lg);
 }
@@ -47,21 +55,36 @@
 }
 
 .title {
+  min-width: 0;
+  max-width: 100%;
   font: var(--text-section-title);
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .body {
+  min-width: 0;
+  max-width: 100%;
   font: var(--text-body);
   color: var(--color-text-muted);
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .actions {
   display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
   gap: var(--space-3);
   justify-content: flex-end;
   padding-top: var(--space-2);
+}
+
+.actions > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 @media (min-width: 640px) {

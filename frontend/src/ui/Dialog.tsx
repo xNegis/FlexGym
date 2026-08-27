@@ -18,10 +18,7 @@ export default function Dialog({ open, title, children, onClose, actions }: Dial
     if (open) {
       previousFocus.current = document.activeElement as HTMLElement;
       requestAnimationFrame(() => {
-        const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        );
-        (firstFocusable ?? dialogRef.current)?.focus();
+        dialogRef.current?.focus();
       });
     } else if (previousFocus.current) {
       previousFocus.current.focus();
@@ -61,11 +58,18 @@ export default function Dialog({ open, title, children, onClose, actions }: Dial
       }
     };
     document.addEventListener("keydown", handleKeyDown);
-    const previousOverflow = document.body.style.overflow;
+    const root = document.documentElement;
+    const previousRootOverflow = root.style.overflow;
+    const previousRootOverscrollBehavior = root.style.overscrollBehavior;
+    const previousBodyOverflow = document.body.style.overflow;
+    root.style.overflow = "hidden";
+    root.style.overscrollBehavior = "none";
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
+      root.style.overflow = previousRootOverflow;
+      root.style.overscrollBehavior = previousRootOverscrollBehavior;
+      document.body.style.overflow = previousBodyOverflow;
     };
   }, [open, onClose]);
 

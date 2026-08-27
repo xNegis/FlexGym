@@ -1,6 +1,8 @@
 .page {
   padding: var(--space-4) var(--gutter);
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .compact {

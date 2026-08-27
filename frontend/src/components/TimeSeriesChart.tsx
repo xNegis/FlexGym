@@ -18,7 +18,7 @@ interface TimeSeriesChartProps<T extends TimeSeriesPoint> {
 
 const CHART_HEIGHT = 200;
 const PAD_LEFT = 64;
-const PAD_RIGHT = 16;
+const PAD_RIGHT = 28;
 const PAD_TOP = 14;
 const PAD_BOTTOM = 30;
 const DOT_RADIUS = 4;

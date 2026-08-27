@@ -114,6 +114,8 @@
 
 .weeklyTable {
   width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font: var(--text-body-compact);
 }
@@ -127,6 +129,7 @@
   padding: var(--space-2) var(--space-2);
   text-align: right;
   border-bottom: var(--border-width) solid var(--color-border);
+  overflow-wrap: anywhere;
 }
 
 .weeklyTable th:first-child,
@@ -155,6 +158,8 @@
 
 .skipReasonRow {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
@@ -167,14 +172,18 @@
 }
 
 .skipReasonLabel {
+  min-width: 0;
   color: var(--color-text);
   font: var(--text-body);
+  overflow-wrap: anywhere;
 }
 
 .skipReasonCounts {
+  min-width: 0;
   color: var(--color-text-muted);
   font: var(--text-body-compact);
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 /* ────────────────── activity calendar ────────────────── */

@@ -1,4 +1,6 @@
 .section {
+  min-width: 0;
+  max-width: 100%;
   margin-bottom: var(--space-8);
 }
 
@@ -28,6 +30,8 @@
 
 .keyValueRow {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   justify-content: space-between;
   align-items: baseline;
   gap: var(--space-3);
@@ -46,6 +50,7 @@
 }
 
 .keyValue {
+  min-width: 0;
   font: var(--text-body);
   color: var(--color-text);
   text-align: right;
