@@ -430,6 +430,20 @@ authentication is preserved through Capacitor's native HTTP path rather than mov
 JavaScript storage or weakening backend cookie policy. The complete contract is in
 `harness/features/29_native_mobile_packaging.md`.
 
+#### F29.1 — Native Rest Completion Cue
+
+Physical TestFlight use confirmed that iOS suspends F26's Web Audio cue when FormCadence is
+backgrounded or the device is locked. F29.1 schedules one local iOS notification for each eligible
+positive same-exercise rest deadline and uses a focused native audio bridge for foreground playback.
+
+The foreground cue temporarily ducks other media and restores it after the existing short two-note
+sound. Background and Lock Screen delivery uses a visible Time Sensitive notification with the same
+non-looping sound. It respects the Ring/Silent switch and notification authorization; the feature
+does not request Critical Alerts, use AlarmKit, require acknowledgement, or keep JavaScript/audio
+alive in the background. Browser behaviour remains F26 Web Audio and Android notification delivery
+is deferred until physical-device evidence defines its platform contract. The complete contract is
+in `harness/features/29_1_native_rest_completion_cue.md`.
+
 ---
 
 ## Phase 4 — Adaptation Engine V1

@@ -53,6 +53,7 @@ import {
   type AutoRestHiddenWindow,
 } from "../components/autoRest";
 import { playRestCue, prepareRestAudio } from "../components/restAudio";
+import { createNativeRestCueDeliveryController } from "../components/nativeRestCue";
 import { useWorkoutWakeLock } from "../components/workoutWakeLock";
 import {
   computeExerciseRestObservation,
@@ -148,6 +149,7 @@ export default function WorkoutExecutionScreen() {
   const restViaTransitionRef = useRef(false);
   const lastPlayedCueNonceRef = useRef(0);
   const [restCue, dispatchRestCue] = useReducer(restCueReducer, EMPTY_REST_CUE_STORE);
+  const nativeRestCueDelivery = useMemo(() => createNativeRestCueDeliveryController(), []);
 
   const [autoRest, dispatchAutoRest] = useReducer(autoRestReducer, EMPTY_AUTO_REST_STORE);
   const lastAutoStartNonceRef = useRef(0);
@@ -773,6 +775,17 @@ export default function WorkoutExecutionScreen() {
     autoDelayRemainingMs != null ? Math.max(1, Math.ceil(autoDelayRemainingMs / 1000)) : 0;
 
   useEffect(() => {
+    nativeRestCueDelivery?.sync(restObservation);
+  }, [nativeRestCueDelivery, restObservation]);
+
+  useEffect(
+    () => () => {
+      nativeRestCueDelivery?.dispose();
+    },
+    [nativeRestCueDelivery],
+  );
+
+  useEffect(() => {
     if (!workout || !isAwaitingStart || !restObservation) {
       restViaTransitionRef.current = false;
       dispatchRestCue({ type: "reset" });
@@ -792,8 +805,12 @@ export default function WorkoutExecutionScreen() {
     if (restCue.cueNonce === 0) return;
     if (lastPlayedCueNonceRef.current === restCue.cueNonce) return;
     lastPlayedCueNonceRef.current = restCue.cueNonce;
-    playRestCue();
-  }, [restCue.cueNonce]);
+    if (nativeRestCueDelivery && restCue.cuedKey) {
+      nativeRestCueDelivery.cue(restCue.cuedKey);
+    } else {
+      playRestCue();
+    }
+  }, [nativeRestCueDelivery, restCue.cueNonce, restCue.cuedKey]);
 
   useEffect(() => {
     const onVisibilityChange = () => {

@@ -7,8 +7,8 @@
 Phase 0 — Foundation, Phase 1 — Training Planning, Phase 2 — Workout Tracking, and Phase 3 —
 Progress & Analytics are completed successfully.
 
-Phase 3.5 — Real-world Training Refinement is active. F25, F26, F26.1, F27, and F28 are implemented
-and automatically validated, with product-owner mobile/device validation pending.
+Phase 3.5 — Real-world Training Refinement is active. F25, F26, F26.1, F27, F28, and F29.1 are
+implemented and automatically validated, with product-owner mobile/device validation pending.
 
 ## Current Status
 
@@ -201,6 +201,19 @@ inspection, and the live production health endpoint pass. A hosted signed iOS bu
 Connect upload, TestFlight installation, and the focused physical-iPhone validation contract remain
 pending; F29 is not completed until those gates pass.
 
+F29.1 — Native Rest Completion Cue is implemented and automatically validated. Positive
+same-exercise rest intervals in the installed iOS runtime now schedule one Time Sensitive local
+notification at the existing server-relative deadline. The scheduled request owns both foreground
+and background delivery to avoid duplicate late Web Audio: foreground presentation is suppressed in
+favour of a short native cue that temporarily ducks other media and restores it, while background
+and Lock Screen delivery shows `Rest complete` / `Your next set is ready.` with the bundled
+non-looping sound. Early start, automatic start, skip, terminal state, identity change, and route
+exit cancel the request; permission and native failures remain isolated. Browser builds retain F26
+Web Audio, Android native notifications are deferred, and no Critical Alerts, AlarmKit, backend,
+persistence, or migration change was introduced. Frontend tests/static builds and both Capacitor
+platform synchronizations pass; Codemagic Swift compilation and focused physical-iPhone validation
+remain pending.
+
 Phase 4 —
 Adaptation Engine V1 is postponed until the selected real-world refinements have been addressed.
 
@@ -246,13 +259,17 @@ separate distance-readability, remaining-exercise preview, and exercise-rest cou
 
 ## Next Feature
 
-Complete F29's hosted and physical-device delivery gates: connect the repository and App Store
+Complete F29's remaining hosted and physical-device delivery gates: connect the repository and App Store
 Connect API integration in Codemagic, run the signed internal-TestFlight workflow, install
 FormCadence on the product owner's iPhone, and execute F29's focused native validation contract.
 
 Independently finish the outstanding product-owner mobile/device validation of F25, F26, F26.1, F27,
 and F28. Do not mark those implemented features completed until their respective manual validation
 contracts pass.
+
+Build F29.1 through Codemagic and validate notification permission, foreground Ring/Silent playback,
+Spotify duck/restore, background and Lock Screen delivery, early cancellation, and absence of a
+duplicate cue after returning to FormCadence.
 
 ## Existing Feature Specifications
 
@@ -294,6 +311,8 @@ contracts pass.
   manual UI validation pending)
 * `harness/features/29_native_mobile_packaging.md` (locally implemented; hosted signing, TestFlight,
   and product-owner physical-iPhone validation pending)
+* `harness/features/29_1_native_rest_completion_cue.md` (implemented; Codemagic compilation and
+  product-owner physical-iPhone validation pending)
 
 ## Current Technology
 

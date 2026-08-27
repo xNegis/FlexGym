@@ -724,3 +724,27 @@ Lock, URL navigation, and safe-area implementation. Native plugins are introduce
 physical-device evidence shows that a bounded capability cannot meet its contract. Packaging does
 not implicitly authorize notifications, HealthKit, background execution, widgets, or other future
 native product features.
+
+---
+
+## DEC-036 — Native positive-rest cues use one scheduled iOS notification owner
+
+**Status:** Accepted
+
+Physical TestFlight use established that F26's Web Audio cannot deliver while iOS suspends the
+installed application's WebView. For each positive same-exercise rest observed before its deadline,
+the native iOS runtime therefore schedules one local notification using the existing server-relative
+remaining duration and complete F26 rest identity. A successfully scheduled request owns delivery
+in every application state so JavaScript visibility recovery cannot produce a duplicate late cue.
+
+Foreground delivery suppresses notification presentation and plays the existing short cue through a
+temporary playback audio session with media ducking and restoration. Background, suspended, and Lock
+Screen delivery uses a visible Time Sensitive local notification with the bundled cue. Early start,
+automatic start, skip, terminal state, identity change, and execution-route exit cancel the owned
+request without becoming workout facts or changing lifecycle mutations.
+
+The product deliberately chooses a self-ending cue instead of AlarmKit's persistent alarm and does
+not request the restricted Critical Alerts entitlement. Foreground playback may remain audible
+through Ring/Silent; background and locked notification sound respects Ring/Silent, notification
+authorization, Focus settings, output routing, and system policy. Browser builds retain F26 Web
+Audio, and Android native scheduling remains a separate evidence-driven follow-up.
