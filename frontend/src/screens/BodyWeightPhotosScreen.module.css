@@ -35,13 +35,16 @@
 
 .viewer {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: var(--space-3);
 }
 
 .viewerImage {
   width: 100%;
+  min-width: 0;
   max-height: 60vh;
+  height: auto;
   object-fit: contain;
   border-radius: var(--radius-md);
   background: var(--color-surface-subtle);

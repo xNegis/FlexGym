@@ -12,7 +12,21 @@ html {
   text-size-adjust: 100%;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100%;
+}
+
+html,
 body {
+  overflow-x: clip;
+}
+
+body {
+  min-height: 100dvh;
   font-family: var(--font-family);
   font-size: 0.9375rem;
   line-height: 1.5;

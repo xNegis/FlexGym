@@ -1,23 +1,25 @@
 .appShell {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-width: 0;
   min-height: 100dvh;
-  padding-top: var(--safe-top);
   padding-left: var(--safe-left);
   padding-right: var(--safe-right);
+  overflow-x: clip;
 }
 
 .header {
   position: sticky;
-  top: var(--safe-top);
+  top: 0;
   z-index: var(--z-sticky);
   background: var(--color-canvas);
   border-bottom: var(--border-width) solid var(--color-border);
-  padding: var(--space-3) var(--gutter);
+  padding: calc(var(--space-3) + var(--safe-top)) var(--gutter) var(--space-3);
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 48px;
+  min-height: calc(48px + var(--safe-top));
 }
 
 .headerTitle {
@@ -35,6 +37,7 @@
 
 .main {
   flex: 1;
+  width: 100%;
   min-width: 0;
   padding-bottom: calc(var(--touch-target) + var(--space-8) + var(--safe-bottom) + var(--space-4));
 }
@@ -151,7 +154,7 @@
   }
 
   .header {
-    top: var(--safe-top);
+    top: 0;
     padding-right: var(--gutter-wide);
     padding-left: var(--gutter-wide);
   }
