@@ -92,3 +92,30 @@ export function RedirectToOnboarding({ children }: RequireAuthProps) {
 
   return <>{children}</>;
 }
+
+export function RequireAdmin({ children }: RequireAuthProps) {
+  const { status, user } = useAuth();
+  const location = useLocation();
+
+  if (status === "loading") {
+    return <LoadingState label="Checking access..." />;
+  }
+
+  if (status === "unavailable") {
+    return <Navigate to="/unavailable" replace />;
+  }
+
+  if (status === "unauthenticated") {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  if (status === "onboarding") {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  if (user?.role !== "admin") {
+    return <Navigate to="/profile" replace />;
+  }
+
+  return <>{children}</>;
+}

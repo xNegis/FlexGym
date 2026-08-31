@@ -10,6 +10,10 @@ Progress & Analytics are completed successfully.
 Phase 3.5 — Real-world Training Refinement is active. F25, F26, F26.1, F27, F28, and F29.1 are
 implemented and automatically validated, with product-owner mobile/device validation pending.
 
+Phase 3.6 — Administration and Access Control is collaboratively groomed and planned before public
+MVP availability. F30 is implemented and automatically validated, with product-owner manual UI
+validation pending. F31 is implementation-ready but not implemented.
+
 ## Current Status
 
 Phase 0 — Foundation completed. F01 through F04 are implemented and validated.
@@ -214,14 +218,34 @@ persistence, or migration change was introduced. Frontend tests/static builds an
 platform synchronizations pass; Codemagic Swift compilation and focused physical-iPhone validation
 remain pending.
 
-Phase 4 —
-Adaptation Engine V1 is postponed until the selected real-world refinements have been addressed.
+Phase 4 — Adaptation Engine V1 remains after the selected real-world refinements and the planned
+pre-public Phase 3.6 administration work.
 
 The first production workouts established the Phase 3.5 work. F25 owns performed-set adjustment
 reliability after the guarded repair of affected historical facts. F26 owns the dominant between-set
 countdown and one-time best-effort sound cue; F26.1 keeps the visible active workout from auto-locking
 on supported browsers; and F27 owns configurable same-exercise automatic start. F28 now owns the
 separate distance-readability, remaining-exercise preview, and exercise-rest countdown refinement.
+
+Phase 3.6 — Administration and Access Control is groomed and implementation-ready. F30 introduces
+the closed `user` / `admin` role model, deliberate idempotent administrator promotion, a protected
+Profile entry and `/admin` overview with total registered users. F31 adds the read-only newest-first
+user directory containing email, role, and registration time through bounded cursor pagination.
+Subscriptions, generic permissions, account actions, private-user-data access, additional metrics,
+and operational health monitoring remain explicitly outside the phase.
+
+F30 is implemented and automatically validated. Every user carries exactly one persisted system
+role (`user` or `admin`), existing accounts became `user` through the `f30_system_roles` migration,
+and registration always creates a normal user regardless of any client-supplied role. The public
+authentication projection now returns the server-owned role, a focused `require_admin` boundary
+enforces `401`/`403` on `GET /api/admin/overview`, the read-only overview reports the total
+registered-account count, and a repository-owned idempotent promotion command
+(`backend/scripts/promote_admin.py`) grants `admin` to one exact account by normalized email. The
+Profile renders an `Administration` section only for administrators and the protected `/admin` route
+returns normal users to Profile without rendering administrative content. Backend tests, fresh and
+upgrade migration gates, a real migrated API flow, and backend/frontend format, lint, type, and
+build checks pass; the configured local database is at repository head. Product-owner manual UI
+validation remains pending.
 
 ## Completed Features
 
@@ -271,6 +295,9 @@ Build F29.1 through Codemagic and validate notification permission, foreground R
 Spotify duck/restore, background and Lock Screen delivery, early cancellation, and absence of a
 duplicate cue after returning to FormCadence.
 
+After the outstanding Phase 3.5 delivery and device gates are resolved, implement F31 before
+public MVP availability.
+
 ## Existing Feature Specifications
 
 * `harness/features/01_project_infrastructure.md`
@@ -313,6 +340,9 @@ duplicate cue after returning to FormCadence.
   and product-owner physical-iPhone validation pending)
 * `harness/features/29_1_native_rest_completion_cue.md` (implemented; Codemagic compilation and
   product-owner physical-iPhone validation pending)
+* `harness/features/30_system_roles_admin_overview.md` (implemented; product-owner manual UI
+  validation pending)
+* `harness/features/31_admin_user_directory.md` (groomed; implementation-ready)
 
 ## Current Technology
 
@@ -368,4 +398,9 @@ semantics, manual exercise start, and frontend-only boundary are settled in its 
 specification. The phase's broader completion boundary is undecided.
 
 The first Phase 4 feature, its user-facing workflow, and its initial deterministic signal also remain
-undecided until Phase 3.5 is ready to close.
+undecided while Phase 3.5 and the planned pre-public administration phase take priority.
+
+Phase 3.6 has no blocking product question. Its two-role model, administrator inheritance without
+private-data bypass, deliberate operational promotion, Profile entry, protected read-only overview,
+registered-user count, directory fields, newest-first ordering, pagination, and non-actionable scope
+are settled in F30 and F31. Additional metrics or administrative mutations require later grooming.

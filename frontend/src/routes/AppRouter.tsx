@@ -1,6 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { AuthProvider } from "../context";
-import { RequireProfile, RedirectIfAuthenticated, RedirectToOnboarding } from "./guards";
+import {
+  RequireProfile,
+  RedirectIfAuthenticated,
+  RedirectToOnboarding,
+  RequireAdmin,
+} from "./guards";
 import AppShell from "../layouts/AppShell";
 import AuthLayout from "../layouts/AuthLayout";
 import LoginScreen from "../screens/LoginScreen";
@@ -9,6 +14,7 @@ import UnavailableScreen from "../screens/UnavailableScreen";
 import OnboardingScreen from "../screens/OnboardingScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import ProfileEditScreen from "../screens/ProfileEditScreen";
+import AdminScreen from "../screens/AdminScreen";
 import WorkoutSettingsScreen from "../screens/WorkoutSettingsScreen";
 import ExerciseCatalogScreen from "../screens/ExerciseCatalogScreen";
 import ExerciseDetailScreen from "../screens/ExerciseDetailScreen";
@@ -122,6 +128,14 @@ export default function AppRouter() {
             <Route path="/profile" element={<ProfileScreen />} />
             <Route path="/profile/edit" element={<ProfileEditScreen />} />
             <Route path="/profile/workout-settings" element={<WorkoutSettingsScreen />} />
+            <Route
+              path="/admin"
+              element={
+                <RequireAdmin>
+                  <AdminScreen />
+                </RequireAdmin>
+              }
+            />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />

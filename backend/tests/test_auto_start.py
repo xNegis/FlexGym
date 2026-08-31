@@ -860,7 +860,7 @@ def test_f27_migration_fresh_and_rerun(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'f27_fresh.db').as_posix()}"
     _run_alembic(database_url, "upgrade", "head")
     _run_alembic(database_url, "upgrade", "head")
-    assert "f27_auto_start" in _run_alembic(database_url, "current").stdout
+    assert "f30_system_roles" in _run_alembic(database_url, "current").stdout
 
     engine = create_engine(database_url)
     schema = inspect(engine)

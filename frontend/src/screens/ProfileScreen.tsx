@@ -212,6 +212,17 @@ export default function ProfileScreen() {
           </div>
         </Section>
 
+        {user?.role === "admin" && (
+          <Section
+            title="Administration"
+            description="System administration is available for this account."
+          >
+            <Button variant="secondary" size="small" onClick={() => navigate("/admin")}>
+              Open administration
+            </Button>
+          </Section>
+        )}
+
         <Divider />
 
         <Button

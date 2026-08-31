@@ -73,7 +73,9 @@ function AppShellContent() {
     }
     if (path === "/plan") return location.pathname.startsWith("/plan");
     if (path === "/exercises") return location.pathname.startsWith("/exercises");
-    if (path === "/profile") return location.pathname.startsWith("/profile");
+    if (path === "/profile") {
+      return location.pathname.startsWith("/profile") || location.pathname === "/admin";
+    }
     return location.pathname === path;
   };
 

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.active_routine import router as active_routine_router
+from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
 from app.api.body_progress_photos import router as body_progress_photos_router
 from app.api.body_weight import router as body_weight_router
@@ -91,6 +92,7 @@ app.add_middleware(
 app.include_router(health_router, prefix="/api")
 app.include_router(active_routine_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 app.include_router(fitness_profile_router, prefix="/api")
 app.include_router(exercises_router, prefix="/api")
 app.include_router(routines_router, prefix="/api")

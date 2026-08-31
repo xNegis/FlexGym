@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.jwt import create_token
 from app.auth.password import hash_password, verify_password
-from app.models import User
+from app.models import User, UserRole
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -51,7 +51,11 @@ def register_user(session: Session, email: str, password: str) -> tuple[User, st
     if existing is not None:
         raise EmailAlreadyRegisteredError("Email is already registered")
 
-    user = User(email=normalized_email, password_hash=hash_password(password))
+    user = User(
+        email=normalized_email,
+        password_hash=hash_password(password),
+        role=UserRole.USER.value,
+    )
     session.add(user)
     try:
         session.commit()

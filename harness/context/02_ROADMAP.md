@@ -446,6 +446,45 @@ in `harness/features/29_1_native_rest_completion_cue.md`.
 
 ---
 
+## Phase 3.6 — Administration and Access Control
+
+Goal: introduce a deliberately small administrative authority boundary and a useful read-only
+administration area before opening the MVP to external users.
+
+Current intended sequence:
+
+* F30 — System Roles and Admin Overview
+* F31 — Admin User Directory
+
+### F30 — System Roles and Admin Overview
+
+F30 adds exactly two persisted system roles: `user` and `admin`. Existing and newly registered
+accounts remain normal users unless one exact existing account is deliberately promoted through a
+documented idempotent backend command. An administrator retains ordinary user capabilities but does
+not gain access to another user's private fitness data.
+
+Profile exposes an administrator-only entry to `/admin`, protected independently in the backend.
+The first read-only overview contains the total number of registered accounts. It adds no generic
+permission tables, role-management UI, account actions, infrastructure monitoring, activity
+metrics, subscription tiers, or entitlements. The complete contract is in
+`harness/features/30_system_roles_admin_overview.md`.
+
+### F31 — Admin User Directory
+
+F31 extends the same Administration screen with a newest-first, opaque cursor-paginated account
+directory. Each non-interactive row shows only normalized email, friendly `User` or `Administrator`
+role, and registration date/time. Administrators appear in the same list as normal users.
+
+The directory is read-only and adds no search, filters, account detail, role changes, suspension,
+deletion, impersonation, subscription data, usage metrics, or access to private fitness facts. The
+complete contract is in `harness/features/31_admin_user_directory.md`.
+
+Phase 3.6 is complete when the two roles, explicit administrator provisioning, protected overview,
+and read-only directory are implemented and validated. Further metrics and account-management
+actions require separate evidence and collaborative grooming.
+
+---
+
 ## Phase 4 — Adaptation Engine V1
 
 Goal: derive useful deterministic signals from user behaviour.

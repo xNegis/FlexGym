@@ -1,5 +1,6 @@
 import datetime
 import uuid
+from enum import StrEnum
 
 from sqlalchemy import (
     JSON,
@@ -21,18 +22,26 @@ class Base(DeclarativeBase):
     pass
 
 
+class UserRole(StrEnum):
+    USER = "user"
+    ADMIN = "admin"
+
+
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False, default=UserRole.USER.value)
     photo_storage_namespace: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, unique=True, nullable=True
     )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.datetime.utcnow
     )
+
+    __table_args__ = (CheckConstraint("role IN ('user', 'admin')", name="ck_users_role"),)
 
 
 class FitnessProfile(Base):

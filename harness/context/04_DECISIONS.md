@@ -748,3 +748,29 @@ not request the restricted Critical Alerts entitlement. Foreground playback may 
 through Ring/Silent; background and locked notification sound respects Ring/Silent, notification
 authorization, Focus settings, output routing, and system policy. Browser builds retain F26 Web
 Audio, and Android native scheduling remains a separate evidence-driven follow-up.
+
+---
+
+## DEC-037 — Administrative authority is separate from subscriptions and private user data
+
+**Status:** Accepted
+
+FormCadence initially has exactly two system roles: `user` and `admin`. Role answers whether an
+account may enter protected system-administration capabilities. Future subscription plan,
+commercial tier, and feature entitlement are separate concepts and must not be encoded as roles
+such as `user_tier_1`.
+
+Registration always creates `user`. Migration does not infer an administrator from creation order,
+numeric ID, email convention, or first-account status. One exact existing account is promoted
+deliberately through a documented idempotent backend operation; frontend and HTTP role management
+remain deferred.
+
+An administrator retains the normal user application but does not bypass ownership checks or gain
+implicit access to another user's profile, routines, workouts, measurements, photographs, progress,
+or other private fitness data. Administrative API authorization is enforced by the backend on every
+request; frontend route visibility is only a presentation boundary.
+
+The first Administration area is read-only. F30 exposes the total registered-account count and F31
+adds a paginated directory containing only email, role, and registration timestamp. Account
+actions, additional metrics, system-health monitoring, subscriptions, and generic permission tables
+remain outside this phase until a concrete need is groomed.

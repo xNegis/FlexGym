@@ -3,9 +3,12 @@ type AuthScreen =
 
 type Section = "profile" | "exercises" | "routines";
 
+type UserRole = "user" | "admin";
+
 interface User {
   id: number;
   email: string;
+  role: UserRole;
 }
 
 interface WorkoutPreference {
@@ -543,6 +546,7 @@ export {
   type StartContextState,
   type TrainingDay,
   type User,
+  type UserRole,
   type WorkoutEvent,
   type WorkoutEventException,
   type WorkoutExceptionProjection,

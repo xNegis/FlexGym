@@ -35,7 +35,7 @@ def test_multi_account_registration_and_duplicate_email(client: TestClient) -> N
         json={"email": "  User@Example.COM  ", "password": "a-secure-password-15"},
     )
     assert registered.status_code == 201
-    assert registered.json() == {"id": 1, "email": "user@example.com"}
+    assert registered.json() == {"id": 1, "email": "user@example.com", "role": "user"}
     assert registered.cookies.get("auth_token") is not None
 
     second = client.post(
@@ -43,7 +43,7 @@ def test_multi_account_registration_and_duplicate_email(client: TestClient) -> N
         json={"email": "second@example.com", "password": "a-secure-password-15"},
     )
     assert second.status_code == 201
-    assert second.json() == {"id": 2, "email": "second@example.com"}
+    assert second.json() == {"id": 2, "email": "second@example.com", "role": "user"}
 
     duplicate = client.post(
         "/api/auth/register",
@@ -88,7 +88,7 @@ def test_authenticated_identity(client: TestClient) -> None:
 
     current = client.get("/api/auth/me", cookies={"auth_token": token})
     assert current.status_code == 200
-    assert current.json() == {"id": 1, "email": "me@example.com"}
+    assert current.json() == {"id": 1, "email": "me@example.com", "role": "user"}
 
     client.cookies.clear()
     assert client.get("/api/auth/me").status_code == 401

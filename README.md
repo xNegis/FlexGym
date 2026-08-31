@@ -113,6 +113,25 @@ Set `BODY_PROGRESS_PHOTO_GLOBAL_LIMIT` to a positive integer in the deployment `
 different ceiling. Active photos and objects still pending physical S3 deletion both consume this
 capacity; a successfully deleted S3 object frees its slot.
 
+### Administrative access
+
+Every account starts as a normal `user`. To grant the read-only `admin` role to one exact existing
+account (identified by its normalized email), run the repository-owned promotion command. The
+operation is idempotent, never creates an account or accepts a password, and never changes any
+other user.
+
+Local invocation (from `backend`):
+
+```bash
+.venv\Scripts\python scripts\promote_admin.py --email owner@example.com
+```
+
+Deployed Compose invocation (uses the running backend's configured database):
+
+```bash
+docker compose exec backend uv run python scripts/promote_admin.py --email owner@example.com
+```
+
 ## Running Tests
 
 ### Backend tests

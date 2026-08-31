@@ -114,6 +114,13 @@ export class UnauthenticatedError extends Error {
   }
 }
 
+export class ForbiddenError extends Error {
+  constructor() {
+    super("Access is not permitted");
+    this.name = "ForbiddenError";
+  }
+}
+
 export interface HealthResponse {
   status: "ok" | "unavailable";
 }
@@ -138,6 +145,7 @@ export async function fetchHealth(): Promise<HealthResponse> {
 export interface UserResponse {
   id: number;
   email: string;
+  role: "user" | "admin";
 }
 
 export interface AuthErrorResponse {
@@ -151,7 +159,9 @@ function isUserResponse(value: unknown): value is UserResponse {
     "id" in value &&
     typeof value.id === "number" &&
     "email" in value &&
-    typeof value.email === "string"
+    typeof value.email === "string" &&
+    "role" in value &&
+    (value.role === "user" || value.role === "admin")
   );
 }
 
@@ -266,7 +276,11 @@ export async function fetchMe(): Promise<UserResponse | null> {
   if (!response.ok) {
     throw new Error("Unable to determine authenticated user");
   }
-  return (await response.json()) as UserResponse;
+  const data: unknown = await responseJson(response);
+  if (!isUserResponse(data)) {
+    throw new Error("Invalid authentication response");
+  }
+  return data;
 }
 
 export async function logout(): Promise<void> {
@@ -277,6 +291,41 @@ export async function logout(): Promise<void> {
   if (!response.ok) {
     throw new Error("Unable to log out");
   }
+}
+
+export interface AdminOverview {
+  registered_user_count: number;
+}
+
+function isAdminOverview(value: unknown): value is AdminOverview {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "registered_user_count" in value &&
+    typeof value.registered_user_count === "number" &&
+    Number.isInteger(value.registered_user_count) &&
+    value.registered_user_count >= 0
+  );
+}
+
+export async function fetchAdminOverview(): Promise<AdminOverview> {
+  const response = await fetch(`${API_BASE_URL}/api/admin/overview`, {
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    throw new UnauthenticatedError();
+  }
+  if (response.status === 403) {
+    throw new ForbiddenError();
+  }
+  if (!response.ok) {
+    throw new Error("Unable to load administration overview");
+  }
+  const data: unknown = await responseJson(response);
+  if (!isAdminOverview(data)) {
+    throw new Error("Invalid administration overview response");
+  }
+  return data;
 }
 
 export async function fetchFitnessProfile(): Promise<FitnessProfile | null> {

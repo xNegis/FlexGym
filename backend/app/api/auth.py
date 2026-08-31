@@ -13,7 +13,7 @@ from app.auth.dependencies import COOKIE_NAME, get_current_user
 from app.auth.jwt import TOKEN_EXPIRY
 from app.config import get_config
 from app.db import get_session
-from app.models import User
+from app.models import User, UserRole
 from app.services.user_service import (
     EmailAlreadyRegisteredError,
     LoginError,
@@ -34,6 +34,7 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 class UserOut(BaseModel):
     id: int
     email: str
+    role: UserRole
 
     model_config = {"from_attributes": True}
 
